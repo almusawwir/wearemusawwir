@@ -252,9 +252,9 @@ export default function App() {
           <p className="font-sans text-sm text-[#5C5855] mb-8 relative z-10">
             Fill out the form below to request an invitation.
           </p>
-          <a href="https://forms.gle/UgZUYvSodxqQQCNQA" target="_blank" rel="noreferrer" className="relative inline-flex w-full sm:w-auto justify-center py-4 px-8 bg-[#1A1817] text-white overflow-hidden rounded-full transition-all duration-300 hover:bg-[#FF6B35] z-10 group/btn">
+          <a href="/register" target="_blank" rel="noreferrer" className="relative inline-flex w-full sm:w-auto justify-center py-4 px-8 bg-[#1A1817] text-white overflow-hidden rounded-full transition-all duration-300 hover:bg-[#FF6B35] z-10 group/btn">
             <span className="relative z-10 font-sans text-xs md:text-sm font-bold uppercase tracking-[0.2em] flex items-center gap-2">
-              Open Google Form
+              Secure Your Spot
               <svg className="w-4 h-4 transform group-hover/btn:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
             </span>
           </a>
