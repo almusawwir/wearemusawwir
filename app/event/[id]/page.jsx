@@ -26,23 +26,29 @@ export async function generateMetadata({ params }) {
 
   if (!currentEvent) return { title: 'Event Not Found | Al-Musawwir' };
 
+  // 👇 ADD THIS
+  const ogImage = currentEvent.image_url 
+    ? `https://almusawwir.art/api/og-image?url=${encodeURIComponent(currentEvent.image_url)}`
+    : 'https://almusawwir.art/api/og-image';
+
   return {
     title: `${currentEvent.title} | Al-Musawwir`,
     description: currentEvent.tagline || 'Secure your canvas under the trees.',
     openGraph: {
       title: currentEvent.title,
       description: currentEvent.tagline,
-      images: [currentEvent.image_url || 'https://almusawwir.art/images/hero-bg.jpg'],
+      images: [ogImage],  // 👈 CHANGED
       siteName: 'Al-Musawwir Gatherings',
     },
     twitter: {
       card: 'summary_large_image',
       title: currentEvent.title,
       description: currentEvent.tagline,
-      images: [currentEvent.image_url || 'https://almusawwir.art/images/hero-bg.jpg'],
+      images: [ogImage],  // 👈 CHANGED
     }
   };
 }
+
 
 export default async function EventDetailPage({ params }) {
   const resolvedParams = await params;
