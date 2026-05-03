@@ -13,6 +13,7 @@ const geistMono = Geist_Mono({
 
 // ✦ AL-MUSAWWIR GLOBAL METADATA ✦
 export const metadata = {
+  metadataBase: new URL('https://almusawwir.art'), // <--- ADD THIS LINE
   title: 'Al-Musawwir | Gatherings',
   description: 'The world is your canvas. You are the fashioner. A curated morning of strokes, stories, and silence at Cubbon Park.',
   openGraph: {
