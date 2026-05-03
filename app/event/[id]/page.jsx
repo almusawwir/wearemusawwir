@@ -106,9 +106,62 @@ export default async function EventDetailPage({ params }) {
 
   const isSoldOut = currentEvent.status && (currentEvent.status.toLowerCase().includes('sold') || currentEvent.status.toLowerCase().includes('closed'));
 
+  // ✦ Build absolute image URL for JSON-LD
+  const rawImage = currentEvent.image_url || '/images/hero-bg.jpg';
+  const absoluteImage = rawImage.startsWith('/')
+    ? `https://almusawwir.art${rawImage}`
+    : rawImage;
+
   return (
     <div className="relative min-h-screen w-full bg-[#F7F5F0] text-[#1A1817] font-sans pb-32 md:pb-40">
-      
+
+      {/* ✦ STEP 1: AI & BOT FRIENDLY STRUCTURED DATA (JSON-LD) ✦ */}
+      {/* Invisible to users. ChatGPT, Perplexity, Google read this directly. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Event",
+            "name": currentEvent.title,
+            "description": currentEvent.description || currentEvent.tagline,
+            "image": absoluteImage,
+            "url": `https://almusawwir.art/event/${targetId}`,
+            "startDate": currentEvent.date,
+            "eventStatus": isSoldOut
+              ? "https://schema.org/EventCancelled"
+              : "https://schema.org/EventScheduled",
+            "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+            "location": {
+              "@type": "Place",
+              "name": currentEvent.location_main,
+              "address": {
+                "@type": "PostalAddress",
+                "streetAddress": currentEvent.location_sub,
+                "addressLocality": "Bangalore",
+                "addressRegion": "KA",
+                "addressCountry": "IN"
+              }
+            },
+            "offers": {
+              "@type": "Offer",
+              "url": `https://almusawwir.art/event/${targetId}`,
+              "price": currentEvent.price || "999",
+              "priceCurrency": "INR",
+              "availability": isSoldOut
+                ? "https://schema.org/SoldOut"
+                : "https://schema.org/InStock",
+              "validFrom": new Date().toISOString()
+            },
+            "organizer": {
+              "@type": "Organization",
+              "name": "Al-Musawwir",
+              "url": "https://almusawwir.art"
+            }
+          })
+        }}
+      />
+
       <style dangerouslySetInnerHTML={{__html: `
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Manrope:wght@200;300;400;500;600;700&display=swap');
         .font-serif { font-family: 'Cormorant Garamond', serif; }
@@ -221,7 +274,6 @@ export default async function EventDetailPage({ params }) {
           <div className="flex gap-4 overflow-x-auto pb-8 snap-x hide-scrollbar">
             {suggestedEvents.map((event) => (
               <Link href={`/event/${event.id?.trim()}`} key={event.id} className="snap-start shrink-0 w-[240px] md:w-[280px] group bg-white/50 border border-[#1A1817]/5 p-3 rounded-3xl hover:bg-white transition-colors">
-                {/* Small card — 280px wide, serve tiny image */}
                 <div className="h-32 md:h-40 bg-[#1A1817] rounded-2xl overflow-hidden mb-4 relative">
                   {event.image_url ? (
                     <EventImage
