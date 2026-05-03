@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useEffect, useRef } from 'react';
 
 export default function App() {
@@ -98,14 +100,6 @@ export default function App() {
         }
         .animate-float {
           animation: float 6s ease-in-out infinite;
-        }
-
-        @keyframes slideDown {
-          0% { transform: translateY(-100%); }
-          100% { transform: translateY(100%); }
-        }
-        .animate-slide-down {
-          animation: slideDown 2s ease-in-out infinite;
         }
 
         .animation-delay-2000 { animation-delay: 2s; }
