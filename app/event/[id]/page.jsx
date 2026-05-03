@@ -26,10 +26,12 @@ export async function generateMetadata({ params }) {
 
   if (!currentEvent) return { title: 'Event Not Found | Al-Musawwir' };
 
-  // 👇 ADD THIS
-  const ogImage = currentEvent.image_url 
-    ? `https://almusawwir.art/api/og-image?url=${encodeURIComponent(currentEvent.image_url)}`
-    : 'https://almusawwir.art/api/og-image';
+  // ✦ FIX: Make relative paths absolute before passing to og-image route
+  const rawImage = currentEvent.image_url || '/images/hero-bg.jpg';
+  const absoluteImage = rawImage.startsWith('/')
+    ? `https://almusawwir.art${rawImage}`
+    : rawImage;
+  const ogImage = `https://almusawwir.art/api/og-image?url=${encodeURIComponent(absoluteImage)}`;
 
   return {
     title: `${currentEvent.title} | Al-Musawwir`,
@@ -37,14 +39,14 @@ export async function generateMetadata({ params }) {
     openGraph: {
       title: currentEvent.title,
       description: currentEvent.tagline,
-      images: [ogImage],  // 👈 CHANGED
+      images: [ogImage],
       siteName: 'Al-Musawwir Gatherings',
     },
     twitter: {
       card: 'summary_large_image',
       title: currentEvent.title,
       description: currentEvent.tagline,
-      images: [ogImage],  // 👈 CHANGED
+      images: [ogImage],
     }
   };
 }
