@@ -72,6 +72,9 @@ export default async function EventDetailPage({ params }) {
   const shareUrl = `https://almusawwir.art/event/${targetId}`;
   const whatsappLink = `https://wa.me/?text=${encodeURIComponent(shareText + ' ' + shareUrl)}`;
 
+  // Determine Sold Out status to disable the button
+  const isSoldOut = currentEvent.status && (currentEvent.status.toLowerCase().includes('sold') || currentEvent.status.toLowerCase().includes('closed'));
+
   return (
     <div className="relative min-h-screen w-full bg-[#F7F5F0] text-[#1A1817] font-sans pb-32 md:pb-40">
       
@@ -210,17 +213,38 @@ export default async function EventDetailPage({ params }) {
         </div>
       )}
 
-      {/* THE STICKY BOTTOM REGISTER BAR */}
+      {/* ✦ FIX: THE STICKY BOTTOM REGISTER BAR WITH DYNAMIC PRICING & EVENT ID ✦ */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-lg border-t border-[#1A1817]/10 p-4 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] transform translate-y-0 transition-transform duration-300">
         <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
+          
           <div className="hidden sm:block">
             <p className="font-serif text-xl md:text-2xl text-[#1A1817] leading-none mb-1">{currentEvent.title}</p>
-            <p className="font-sans text-[9px] md:text-[10px] uppercase tracking-widest text-[#5C5855]">{currentEvent.date} • ₹999</p>
+            <div className="flex items-center gap-2 font-sans text-[10px] uppercase tracking-widest text-[#5C5855]">
+              <span>{currentEvent.date}</span>
+              <span>•</span>
+              {/* Dynamic Strikethrough Pricing */}
+              {currentEvent.original_price && currentEvent.original_price.trim() !== '' && (
+                <span className="line-through opacity-60">₹{currentEvent.original_price}</span>
+              )}
+              <span className="font-bold text-[#1A1817]">₹{currentEvent.price || '999'}</span>
+            </div>
           </div>
-          <Link href="/register" className="w-full sm:w-auto bg-[#1A1817] text-white font-sans text-xs md:text-sm uppercase tracking-[0.2em] font-bold py-4 px-10 rounded-full hover:bg-[#FF6B35] transition-all text-center shadow-xl hover:-translate-y-1 flex items-center justify-center gap-2 flex-grow sm:flex-grow-0">
-            Secure Canvas
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-          </Link>
+
+          {/* Dynamic Button (Sold Out state vs Open state) */}
+          {isSoldOut ? (
+            <div className="w-full sm:w-auto bg-[#5C5855] text-white font-sans text-xs md:text-sm uppercase tracking-[0.2em] font-bold py-4 px-10 rounded-full text-center shadow-xl flex items-center justify-center gap-2 flex-grow sm:flex-grow-0 cursor-not-allowed opacity-80">
+              {currentEvent.button_text || 'Sold Out'}
+            </div>
+          ) : (
+            <Link 
+              href={`/register?eventId=${currentEvent.id}`} 
+              className="w-full sm:w-auto bg-[#1A1817] text-white font-sans text-xs md:text-sm uppercase tracking-[0.2em] font-bold py-4 px-10 rounded-full hover:bg-[#FF6B35] transition-all text-center shadow-xl hover:-translate-y-1 flex items-center justify-center gap-2 flex-grow sm:flex-grow-0"
+            >
+              {currentEvent.button_text || 'Secure Canvas'}
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+            </Link>
+          )}
+
         </div>
       </div>
     </div>

@@ -1,10 +1,20 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import Script from 'next/script';
+import { useSearchParams } from 'next/navigation';
+import Papa from 'papaparse';
 
-export default function RegisterPage() {
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSSCmEDqxpPn1OEzXR3geUaynoeGhrswVO5xf8zKETC8xOq1oimP1SiapOAsSPY_nEMTHoDeacTgKC/pub?gid=0&single=true&output=csv";
+
+function RegisterContent() {
+  const searchParams = useSearchParams();
+  const eventId = searchParams.get('eventId') || ''; // Grabs ?eventId=vol-1 from URL
+
+  const [eventDetails, setEventDetails] = useState(null);
+  const [isLoadingEvent, setIsLoadingEvent] = useState(true);
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -16,6 +26,37 @@ export default function RegisterPage() {
   });
 
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // 1. Fetch the specific event details from Google Sheets so the UI matches what they clicked!
+  useEffect(() => {
+    if (!eventId) {
+      setIsLoadingEvent(false);
+      return;
+    }
+
+    fetch(CSV_URL)
+      .then(res => res.text())
+      .then(text => {
+        Papa.parse(text, {
+          header: true,
+          skipEmptyLines: true,
+          transformHeader: (h) => h.trim().toLowerCase().replace(/^\uFEFF/, ''),
+          complete: (results) => {
+            const foundEvent = results.data.find(e => e.id && e.id.trim().toLowerCase() === eventId.toLowerCase());
+            if (foundEvent) {
+              setEventDetails({
+                title: foundEvent.title,
+                date: foundEvent.date,
+                time: foundEvent.time,
+                location: foundEvent.location_main,
+                price: foundEvent.price || '999'
+              });
+            }
+            setIsLoadingEvent(false);
+          }
+        });
+      });
+  }, [eventId]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -30,9 +71,11 @@ export default function RegisterPage() {
     setIsProcessing(true);
 
     try {
-      // 1. Ask our backend to create a Razorpay Order
+      // 2. Ask backend to create a Razorpay Order (Pass the eventId so the backend knows the price!)
       const response = await fetch('/api/create-order', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventId: eventId }) 
       });
       const data = await response.json();
 
@@ -42,24 +85,25 @@ export default function RegisterPage() {
         return;
       }
 
-      // 2. Setup the Razorpay popup window
+      // Setup the Razorpay popup window
       const options = {
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID, // Your public key
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID, 
         amount: data.order.amount,
         currency: data.order.currency,
         name: "Al-Musawwir",
-        description: "Strokes & Stories Registration",
-        order_id: data.order.id, // The secure ID we got from the backend
+        description: eventDetails ? eventDetails.title : "Strokes & Stories",
+        order_id: data.order.id, 
         
         handler: async function (response) {
           console.log("Payment Success!", response);
           
           try {
-            // Send the form data AND the Razorpay Payment ID to our new API route
+            // 3. Send the form data AND the Event ID to your Google Sheet!
             await fetch('/api/save-data', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
+                eventId: eventId, // <--- CRITICAL FIX
                 name: formData.name,
                 email: formData.email,
                 whatsapp: formData.whatsapp,
@@ -70,29 +114,27 @@ export default function RegisterPage() {
               })
             });
             
-            // Optional: Redirect them to a success page or clear the form here!
-// Send them directly to their personalized ticket page!
-              window.location.href = `/ticket?id=${response.razorpay_payment_id}&name=${encodeURIComponent(formData.name)}`;             
+            // 4. Send them directly to their personalized ticket page with the event ID!
+            window.location.href = `/ticket?id=${response.razorpay_payment_id}&name=${encodeURIComponent(formData.name)}&eventId=${encodeURIComponent(eventId)}`;             
           } catch (error) {
             console.error("Payment succeeded but saving failed:", error);
-            alert("Payment successful, but we had trouble saving your form. Please screenshot this and WhatsApp us: " + response.razorpay_payment_id);
+            alert("Payment successful, but we had trouble saving your form. Please WhatsApp us your Payment ID: " + response.razorpay_payment_id);
           }
         },
 
         prefill: {
           name: formData.name,
           contact: formData.whatsapp,
+          email: formData.email,
         },
         theme: {
-          color: "#1A1817", // Matches your brand ink color
+          color: "#1A1817", 
         },
       };
 
-      // 3. Open the popup
       const paymentObject = new window.Razorpay(options);
       paymentObject.open();
 
-      // Handle popup close
       paymentObject.on('payment.failed', function (response) {
         alert("Payment Failed. Please try again.");
       });
@@ -108,33 +150,25 @@ export default function RegisterPage() {
   return (
     <div className="relative min-h-screen w-full bg-[#F7F5F0] text-[#1A1817] font-sans antialiased selection:bg-[#FF6B35] selection:text-white flex justify-center py-12 px-4 md:px-6">
       
-      {/* Load the Razorpay Script */}
       <Script src="https://checkout.razorpay.com/v1/checkout.js" />
 
-      {/* Global Styles */}
       <style dangerouslySetInnerHTML={{__html: `
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Manrope:wght@200;300;400;500;600;700&display=swap');
         .font-serif { font-family: 'Cormorant Garamond', serif; }
         .font-sans { font-family: 'Manrope', sans-serif; }
         .canvas-texture {
-          position: fixed;
-          inset: 0;
-          z-index: 0;
-          pointer-events: none;
+          position: fixed; inset: 0; z-index: 0; pointer-events: none;
           background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
           mix-blend-mode: multiply;
         }
         .glass-card {
-          background: rgba(255, 255, 255, 0.6);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
+          background: rgba(255, 255, 255, 0.6); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
           border: 1px solid rgba(255, 255, 255, 0.8);
         }
       `}} />
 
       <div className="canvas-texture"></div>
 
-      {/* Ambient Background Blobs */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
         <div className="absolute top-[-10%] right-[-10%] w-[50vw] h-[50vw] bg-[#004E98]/10 rounded-full mix-blend-multiply filter blur-[100px]"></div>
         <div className="absolute bottom-[-10%] left-[-10%] w-[60vw] h-[60vw] bg-[#FF6B35]/10 rounded-full mix-blend-multiply filter blur-[120px]"></div>
@@ -142,38 +176,44 @@ export default function RegisterPage() {
 
       <div className="w-full max-w-2xl relative z-10 flex flex-col gap-8">
         
-        {/* Header / Back Button */}
         <div className="flex items-center justify-between">
-          <Link href="/" className="group flex items-center gap-2 text-[#5C5855] hover:text-[#FF6B35] transition-colors font-sans text-xs uppercase tracking-widest font-bold">
+          <Link href={`/event/${eventId}`} className="group flex items-center gap-2 text-[#5C5855] hover:text-[#FF6B35] transition-colors font-sans text-xs uppercase tracking-widest font-bold">
             <svg className="w-4 h-4 transform group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-            Back to Home
+            Back to Event
           </Link>
           <span className="font-serif italic text-lg text-[#1A1817]">Al-Musawwir</span>
         </div>
 
-        {/* The Form Card */}
         <div className="glass-card rounded-[2rem] md:rounded-[2.5rem] shadow-2xl shadow-[#1A1817]/5 overflow-hidden">
           
-          {/* Static Event Info Banner */}
-          <div className="bg-[#1A1817] text-[#F7F5F0] p-8 md:p-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative overflow-hidden">
+          {/* Dynamic Event Info Banner */}
+          <div className="bg-[#1A1817] text-[#F7F5F0] p-8 md:p-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative overflow-hidden min-h-[160px]">
             <div className="absolute top-0 right-0 w-32 h-32 bg-[#FF6B35] rounded-full filter blur-[50px] opacity-20"></div>
-            <div>
-              <h1 className="font-serif text-3xl md:text-4xl mb-2 text-white">Secure Your Canvas</h1>
-              <p className="font-sans text-sm tracking-wide text-[#F7F5F0]/70 flex items-center gap-2">
-                <svg className="w-4 h-4 text-[#FF6B35]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                May 16, 2026 • 10:00 AM • Cubbon Park
-              </p>
-            </div>
-            <div className="text-left md:text-right">
-              <span className="font-sans text-[10px] uppercase tracking-[0.2em] text-[#F7F5F0]/50 block mb-1">Registration Fee</span>
-              <span className="font-serif text-3xl text-white">₹999</span>
-            </div>
+            
+            {isLoadingEvent ? (
+              <div className="animate-pulse flex flex-col gap-3 w-full">
+                <div className="h-8 bg-white/20 rounded w-3/4"></div>
+                <div className="h-4 bg-white/20 rounded w-1/2"></div>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <h1 className="font-serif text-3xl md:text-4xl mb-2 text-white line-clamp-1">{eventDetails?.title || 'Secure Your Canvas'}</h1>
+                  <p className="font-sans text-sm tracking-wide text-[#F7F5F0]/70 flex items-center gap-2">
+                    <svg className="w-4 h-4 text-[#FF6B35] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    {eventDetails ? `${eventDetails.date} • ${eventDetails.time}` : 'Event specifics unavailable'}
+                  </p>
+                </div>
+                <div className="text-left md:text-right shrink-0">
+                  <span className="font-sans text-[10px] uppercase tracking-[0.2em] text-[#F7F5F0]/50 block mb-1">Registration Fee</span>
+                  <span className="font-serif text-3xl text-white">₹{eventDetails?.price || '999'}</span>
+                </div>
+              </>
+            )}
           </div>
 
-          {/* Form Fields */}
           <form onSubmit={handleSubmit} className="p-8 md:p-10 flex flex-col gap-8">
             
-            {/* 1. Basic Info */}
             <div className="space-y-6">
               <h2 className="font-sans text-[11px] uppercase tracking-[0.3em] font-bold text-[#FF6B35] border-b border-[#1A1817]/10 pb-2">1. The Basics</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -185,16 +225,13 @@ export default function RegisterPage() {
                   <label className="font-sans text-xs font-bold text-[#1A1817] uppercase tracking-wider">WhatsApp Number *</label>
                   <input type="tel" name="whatsapp" required value={formData.whatsapp} onChange={handleChange} className="bg-white/50 border border-[#1A1817]/20 rounded-xl px-4 py-3 font-sans text-base text-[#1A1817] focus:outline-none focus:border-[#004E98] focus:bg-white transition-all placeholder:text-[#1A1817]/30" placeholder="+91 00000 00000" />
                 </div>
-              
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-2 md:col-span-2">
                  <label className="font-sans text-xs font-bold text-[#1A1817] uppercase tracking-wider">Email Address *</label>
                   <input type="email" name="email" required value={formData.email} onChange={handleChange} className="bg-white/50 border border-[#1A1817]/20 rounded-xl px-4 py-3 font-sans text-base text-[#1A1817] focus:outline-none focus:border-[#004E98] focus:bg-white transition-all placeholder:text-[#1A1817]/30" placeholder="artist@example.com" />
                 </div>
-                
               </div>
             </div>
-|
-            {/* 2. Creative Link */}
+
             <div className="space-y-6">
               <h2 className="font-sans text-[11px] uppercase tracking-[0.3em] font-bold text-[#004E98] border-b border-[#1A1817]/10 pb-2">2. Your World (Optional)</h2>
               <div className="flex flex-col gap-2">
@@ -203,7 +240,6 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            {/* 3. Why Joining */}
             <div className="space-y-6">
               <h2 className="font-sans text-[11px] uppercase tracking-[0.3em] font-bold text-[#E24E7A] border-b border-[#1A1817]/10 pb-2">3. Intentions</h2>
               <label className="font-sans text-xs font-bold text-[#1A1817] uppercase tracking-wider">Why are you joining us? *</label>
@@ -217,7 +253,6 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            {/* 4. Reflection */}
             <div className="space-y-6">
               <h2 className="font-sans text-[11px] uppercase tracking-[0.3em] font-bold text-[#F9A03F] border-b border-[#1A1817]/10 pb-2">4. Reflection (Optional)</h2>
               <div className="flex flex-col gap-2">
@@ -226,7 +261,6 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            {/* 6. Consent */}
             <div className="pt-4">
               <label className="flex items-start gap-3 cursor-pointer group">
                 <div className="relative flex items-center justify-center mt-1">
@@ -237,10 +271,10 @@ export default function RegisterPage() {
               </label>
             </div>
 
-            {/* 7. Submit */}
             <div className="pt-6">
-              <button disabled={isProcessing} type="submit" className="w-full bg-[#1A1817] disabled:bg-[#5C5855] disabled:cursor-not-allowed text-white font-sans text-sm uppercase tracking-[0.2em] font-bold py-5 px-8 rounded-xl hover:bg-[#FF6B35] transition-all hover:shadow-xl hover:-translate-y-1 flex items-center justify-center gap-3 group">
-                {isProcessing ? "Processing..." : "Submit & Pay ₹999"}
+              {/* Dynamic Button Price */}
+              <button disabled={isProcessing || isLoadingEvent} type="submit" className="w-full bg-[#1A1817] disabled:bg-[#5C5855] disabled:cursor-not-allowed text-white font-sans text-sm uppercase tracking-[0.2em] font-bold py-5 px-8 rounded-xl hover:bg-[#FF6B35] transition-all hover:shadow-xl hover:-translate-y-1 flex items-center justify-center gap-3 group">
+                {isProcessing ? "Processing..." : `Submit & Pay ₹${eventDetails?.price || '...'}`}
                 {!isProcessing && <svg className="w-5 h-5 transform group-hover:translate-x-2 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l7-7m7-7H3"></path></svg>}
               </button>
               <p className="font-sans text-[10px] text-center text-[#5C5855] uppercase tracking-widest mt-4 flex items-center justify-center gap-2">
@@ -253,5 +287,18 @@ export default function RegisterPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// ✦ REQUIRED BY NEXT.JS: Wrapping useSearchParams in Suspense ✦
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-[#F7F5F0] text-[#1A1817] font-serif text-2xl">
+        Setting up your canvas...
+      </div>
+    }>
+      <RegisterContent />
+    </Suspense>
   );
 }

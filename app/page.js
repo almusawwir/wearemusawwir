@@ -167,6 +167,9 @@ export default function App() {
                 const desc = event.description || "";
                 const isLongDesc = desc.length > 120;
                 const displayDesc = isExpanded ? desc : (isLongDesc ? desc.slice(0, 120) + '...' : desc);
+                
+                // ✦ RESTORED: Determine if the event is Sold Out ✦
+                const isSoldOut = event.status && (event.status.toLowerCase().includes('sold') || event.status.toLowerCase().includes('closed'));
 
                 return (
                   <div key={event.id} ref={setRef} onClick={() => handleCardClick(event.id)}
@@ -199,7 +202,7 @@ export default function App() {
                         </p>
                       </div>
 
-                      {/* FULL 4-PART GRID RESTORED HERE */}
+                      {/* ✦ FULL 4-PART GRID RESTORED ✦ */}
                       <div className="grid grid-cols-2 gap-y-6 gap-x-4 mb-8">
                         <div>
                           <span className="font-sans text-[9px] md:text-[10px] uppercase tracking-[0.2em] text-[#5C5855] mb-1.5 font-semibold flex items-center gap-1.5">
@@ -231,14 +234,32 @@ export default function App() {
                         </div>
                       </div>
 
+                      {/* ✦ RESTORED: DYNAMIC PRICING & BUTTON SECTION ✦ */}
                       <div className="mt-auto pt-6 border-t border-[#1A1817]/10 flex items-center justify-between">
-                        <span className="font-sans text-[11px] uppercase tracking-widest text-red-500 font-bold flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>RSVP Open
-                        </span>
-                        <div className="w-10 h-10 rounded-full bg-[#1A1817] text-white flex items-center justify-center group-hover:bg-[#FF6B35] transition-colors">
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                        <div className="flex flex-col gap-1">
+                          <span className={`font-sans text-[10px] md:text-[11px] uppercase tracking-widest font-bold flex items-center gap-2 ${isSoldOut ? 'text-[#5C5855]' : 'text-red-500'}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${isSoldOut ? 'bg-[#5C5855]' : 'bg-red-500 animate-pulse'}`}></span>
+                            {event.status || 'RSVP Open'}
+                          </span>
+                          
+                          <div className="font-serif text-xl text-[#1A1817] flex items-center gap-2">
+                            {event.original_price && event.original_price.trim() !== '' && (
+                              <span className="text-[#5C5855]/60 line-through text-sm md:text-base">₹{event.original_price}</span>
+                            )}
+                            <span>₹{event.price || '999'}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <span className="hidden sm:block font-sans text-[10px] uppercase tracking-widest text-[#1A1817] font-bold group-hover:text-[#FF6B35] transition-colors">
+                            {event.button_text || 'View Details'}
+                          </span>
+                          <div className="w-10 h-10 rounded-full bg-[#1A1817] text-white flex items-center justify-center group-hover:bg-[#FF6B35] transition-colors shadow-md">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                          </div>
                         </div>
                       </div>
+                      
                     </div>
                   </div>
                 );

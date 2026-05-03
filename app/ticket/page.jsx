@@ -1,13 +1,45 @@
 "use client";
 
-import React, { Suspense } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import Papa from 'papaparse';
+
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSSCmEDqxpPn1OEzXR3geUaynoeGhrswVO5xf8zKETC8xOq1oimP1SiapOAsSPY_nEMTHoDeacTgKC/pub?gid=0&single=true&output=csv";
 
 function TicketContent() {
   const searchParams = useSearchParams();
   const ticketId = searchParams.get('id') || 'TKT-PENDING';
   const attendeeName = searchParams.get('name') || 'Artist';
+  const eventId = searchParams.get('eventId') || '';
+
+  const [eventDetails, setEventDetails] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch the specific event details to populate the ticket
+  useEffect(() => {
+    if (!eventId) {
+      setIsLoading(false);
+      return;
+    }
+
+    fetch(CSV_URL)
+      .then(res => res.text())
+      .then(text => {
+        Papa.parse(text, {
+          header: true,
+          skipEmptyLines: true,
+          transformHeader: (h) => h.trim().toLowerCase().replace(/^\uFEFF/, ''),
+          complete: (results) => {
+            const foundEvent = results.data.find(e => e.id && e.id.trim().toLowerCase() === eventId.toLowerCase());
+            if (foundEvent) {
+              setEventDetails(foundEvent);
+            }
+            setIsLoading(false);
+          }
+        });
+      });
+  }, [eventId]);
 
   return (
     <div className="w-full max-w-md mx-auto relative z-10 flex flex-col gap-6">
@@ -28,7 +60,13 @@ function TicketContent() {
         <div className="bg-[#1A1817] p-8 text-center relative overflow-hidden">
           <div className="absolute top-[-50%] right-[-20%] w-40 h-40 bg-[#FF6B35] rounded-full filter blur-[50px] opacity-30"></div>
           <span className="font-sans text-[10px] uppercase tracking-[0.4em] text-[#F7F5F0]/60 block mb-2">Digital Pass</span>
-          <h2 className="font-serif italic text-3xl text-white">Al-Musawwir</h2>
+          {isLoading ? (
+             <div className="h-8 bg-white/20 rounded w-3/4 mx-auto animate-pulse"></div>
+          ) : (
+             <h2 className="font-serif italic text-3xl text-white leading-tight">
+               {eventDetails?.title || 'Al-Musawwir'}
+             </h2>
+          )}
         </div>
 
         {/* Ticket Details */}
@@ -41,17 +79,32 @@ function TicketContent() {
           <div className="grid grid-cols-2 gap-6">
             <div>
               <span className="font-sans text-[9px] uppercase tracking-[0.2em] text-[#5C5855] font-bold block mb-1">Date</span>
-              <span className="font-serif text-lg text-[#1A1817]">May 16, 2026</span>
+              {isLoading ? (
+                <div className="h-6 bg-[#1A1817]/10 rounded w-full animate-pulse mt-1"></div>
+              ) : (
+                <span className="font-serif text-lg text-[#1A1817]">{eventDetails?.date || 'TBD'}</span>
+              )}
             </div>
             <div>
               <span className="font-sans text-[9px] uppercase tracking-[0.2em] text-[#5C5855] font-bold block mb-1">Time</span>
-              <span className="font-serif text-lg text-[#1A1817]">10:00 AM</span>
+              {isLoading ? (
+                <div className="h-6 bg-[#1A1817]/10 rounded w-full animate-pulse mt-1"></div>
+              ) : (
+                <span className="font-serif text-lg text-[#1A1817]">{eventDetails?.time || 'TBD'}</span>
+              )}
             </div>
           </div>
 
           <div>
             <span className="font-sans text-[9px] uppercase tracking-[0.2em] text-[#5C5855] font-bold block mb-1">Location</span>
-            <span className="font-serif text-lg text-[#1A1817]">Cubbon Park, BLR</span>
+            {isLoading ? (
+                <div className="h-6 bg-[#1A1817]/10 rounded w-3/4 animate-pulse mt-1"></div>
+            ) : (
+                <span className="font-serif text-lg text-[#1A1817]">
+                  {eventDetails?.location_main || 'TBD'}
+                  {eventDetails?.location_sub ? `, ${eventDetails.location_sub}` : ''}
+                </span>
+            )}
           </div>
 
           <div className="pt-6 border-t border-dashed border-[#1A1817]/20 flex justify-between items-end">
@@ -72,7 +125,7 @@ function TicketContent() {
         <Link href="/" className="w-full bg-[#1A1817] text-white font-sans text-xs uppercase tracking-[0.2em] font-bold py-4 px-8 rounded-xl hover:bg-[#FF6B35] transition-all text-center">
           Return to Home
         </Link>
-        <a href={`mailto:wearemusawwir@gmail.com?subject=Cancel Ticket: ${ticketId}&body=Hi team, I would like to cancel my ticket (${ticketId}) for Al-Musawwir.`} className="text-center font-sans text-[10px] text-[#5C5855] underline hover:text-[#E24E7A] transition-colors mt-2">
+        <a href={`mailto:wearemusawwir@gmail.com?subject=Cancel Ticket: ${ticketId}&body=Hi team, I would like to cancel my ticket (${ticketId}) for ${eventDetails?.title || 'Al-Musawwir'}.`} className="text-center font-sans text-[10px] text-[#5C5855] underline hover:text-[#E24E7A] transition-colors mt-2">
           Request Cancellation (Within 30 mins)
         </a>
       </div>
