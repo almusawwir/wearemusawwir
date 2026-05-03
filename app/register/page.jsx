@@ -49,12 +49,35 @@ export default function RegisterPage() {
         name: "Al-Musawwir",
         description: "Strokes & Stories Registration",
         order_id: data.order.id, // The secure ID we got from the backend
-        handler: function (response) {
-          // THIS RUNS WHEN PAYMENT IS SUCCESSFUL!
+        
+        handler: async function (response) {
           console.log("Payment Success!", response);
-          alert("Payment Successful! See you on May 16th.");
-          // In the future, you can save the user's formData to a database here.
+          
+          try {
+            // Send the form data AND the Razorpay Payment ID to our new API route
+            await fetch('/api/save-data', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: formData.name,
+                whatsapp: formData.whatsapp,
+                creativeLink: formData.creativeLink,
+                reason: formData.reason,
+                reflection: formData.reflection,
+                paymentId: response.razorpay_payment_id
+              })
+            });
+            
+            alert("Payment Successful! Your spot is secured. See you on May 16th!");
+            // Optional: Redirect them to a success page or clear the form here!
+            window.location.href = "/"; // Takes them back to the home page
+            
+          } catch (error) {
+            console.error("Payment succeeded but saving failed:", error);
+            alert("Payment successful, but we had trouble saving your form. Please screenshot this and WhatsApp us: " + response.razorpay_payment_id);
+          }
         },
+        
         prefill: {
           name: formData.name,
           contact: formData.whatsapp,
