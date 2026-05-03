@@ -13,9 +13,15 @@ const geistMono = Geist_Mono({
 
 // ✦ AL-MUSAWWIR GLOBAL METADATA ✦
 export const metadata = {
-  metadataBase: new URL('https://almusawwir.art'), // <--- ADD THIS LINE
+  metadataBase: new URL('https://almusawwir.art'),
   title: 'Al-Musawwir | Gatherings',
   description: 'The world is your canvas. You are the fashioner. A curated morning of strokes, stories, and silence at Cubbon Park.',
+
+  // ✦ GOOGLE SEARCH CONSOLE VERIFICATION ✦
+  verification: {
+    google: '1h4maxE_OEqU5EXVwp91yD3jx2l6VwCnELRo8Xs43rY',
+  },
+
   openGraph: {
     title: 'Al-Musawwir | Gatherings',
     description: 'We believe that art isn\'t a profession—it\'s a human right. Secure your canvas.',
@@ -36,7 +42,7 @@ export const metadata = {
     card: 'summary_large_image',
     title: 'Al-Musawwir | Gatherings',
     description: 'We believe that art isn\'t a profession—it\'s a human right. Secure your canvas.',
-    images: ['https://almusawwir.art/images/hero-bg.jpg'],
+    images: ['https://almusawwir.art/api/og-image'],
   },
 };
 
