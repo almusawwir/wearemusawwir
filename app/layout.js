@@ -23,7 +23,7 @@ export const metadata = {
     siteName: 'Al-Musawwir',
     images: [
       {
-        url: 'https://almusawwir.art/images/hero-bg.jpg', // Used when sharing the homepage
+        url: 'https://almusawwir.art/api/og-image',
         width: 1200,
         height: 630,
         alt: 'Al-Musawwir Gathering',
