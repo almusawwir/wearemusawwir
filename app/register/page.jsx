@@ -72,8 +72,8 @@ export default function RegisterPage() {
             
             alert("Payment Successful! Your spot is secured. See you on May 16th!");
             // Optional: Redirect them to a success page or clear the form here!
-            window.location.href = "/"; // Takes them back to the home page
-            
+// Send them directly to their personalized ticket page!
+              window.location.href = `/ticket?id=${response.razorpay_payment_id}&name=${encodeURIComponent(formData.name)}`;             
           } catch (error) {
             console.error("Payment succeeded but saving failed:", error);
             alert("Payment successful, but we had trouble saving your form. Please screenshot this and WhatsApp us: " + response.razorpay_payment_id);
