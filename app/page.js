@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import Papa from 'papaparse';
 
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSSCmEDqxpPn1OEzXR3geUaynoeGhrswVO5xf8zKETC8xOq1oimP1SiapOAsSPY_nEMTHoDeacTgKC/pub?gid=0&single=true&output=csv";
@@ -62,23 +63,11 @@ export default function App() {
 
   return (
     <div className="relative overflow-x-hidden w-full bg-[#F7F5F0] text-[#1A1817] font-sans antialiased selection:bg-[#FF6B35] selection:text-white pb-24">
-      {/* Global Styles & Image Anti-Jitter Optimization */}
       <style dangerouslySetInnerHTML={{__html: `
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Manrope:wght@200;300;400;500;600;700&display=swap');
         html { scroll-behavior: smooth; }
         .font-serif { font-family: 'Cormorant Garamond', serif; }
         .font-sans { font-family: 'Manrope', sans-serif; }
-        
-        /* IMAGE OPTIMIZATION */
-        @keyframes imageFadeIn {
-          from { opacity: 0; filter: blur(10px); }
-          to { opacity: 1; filter: blur(0); }
-        }
-        .optimized-img {
-          animation: imageFadeIn 0.8s ease-out forwards;
-          background-color: #1A1817; 
-        }
-
         .canvas-texture {
           position: fixed; inset: 0; z-index: 50; pointer-events: none;
           background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
@@ -108,11 +97,16 @@ export default function App() {
       {/* Cinematic Hero Section */}
       <header className="relative min-h-[100vh] flex flex-col items-center justify-center px-4 md:px-6 overflow-hidden pt-20">
         <div className="absolute inset-0 z-0 bg-[#1A1817]">
-          <img 
-            src="/images/hero-bg.jpg" 
-            className="w-full h-full object-cover optimized-img"
+          {/* HERO — priority:true means loads immediately, no lazy load */}
+          <Image
+            src="/images/hero-bg.jpg"
             alt="Al-Musawwir Background"
-            decoding="sync"
+            fill
+            priority
+            quality={85}
+            sizes="100vw"
+            className="object-cover"
+            style={{ opacity: 0.7 }}
           />
           <div className="absolute inset-0 bg-gradient-to-b from-[#1A1817]/60 via-[#1A1817]/40 to-[#F7F5F0]"></div>
         </div>
@@ -167,23 +161,43 @@ export default function App() {
                 const desc = event.description || "";
                 const isLongDesc = desc.length > 120;
                 const displayDesc = isExpanded ? desc : (isLongDesc ? desc.slice(0, 120) + '...' : desc);
-                
-                // ✦ RESTORED: Determine if the event is Sold Out ✦
                 const isSoldOut = event.status && (event.status.toLowerCase().includes('sold') || event.status.toLowerCase().includes('closed'));
+                const isExternalImage = event.image_url && event.image_url.startsWith('http');
 
                 return (
                   <div key={event.id} ref={setRef} onClick={() => handleCardClick(event.id)}
                     className="cursor-pointer reveal glass-card rounded-[2rem] overflow-hidden shadow-2xl shadow-[#1A1817]/5 flex flex-col md:flex-row group hover:-translate-y-2 transition-all duration-500 bg-white/60">
                     
-                    {/* Fixed Height Image Container */}
+                    {/* Event Card Image */}
                     <div className="w-full md:w-2/5 relative h-64 md:h-auto min-h-[16rem] overflow-hidden bg-[#1A1817]">
-                      <img 
-                        src={event.image_url || "https://images.unsplash.com/photo-1513364776144-60967b0f800f?q=80&w=1200"} 
-                        className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000 optimized-img" 
-                        alt={event.title} 
-                        loading="lazy" 
-                        decoding="async" 
-                      />
+                      {event.image_url ? (
+                        isExternalImage ? (
+                          // External URLs (e.g. Google Drive) — use regular img tag
+                          // Next.js Image requires domains to be whitelisted in next.config.js
+                          <img
+                            src={event.image_url}
+                            className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000"
+                            alt={event.title}
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        ) : (
+                          // Local images — use Next.js Image for full optimization
+                          <Image
+                            src={event.image_url}
+                            alt={event.title}
+                            fill
+                            quality={75}
+                            sizes="(max-width: 768px) 100vw, 40vw"
+                            className="object-cover group-hover:scale-105 transition-transform duration-1000"
+                            loading="lazy"
+                          />
+                        )
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center bg-[#004E98]/20">
+                          <span className="font-serif italic text-[#F7F5F0]/50 text-sm">Artwork Pending</span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="w-full md:w-3/5 p-8 md:p-10 flex flex-col">
@@ -202,7 +216,6 @@ export default function App() {
                         </p>
                       </div>
 
-                      {/* ✦ FULL 4-PART GRID RESTORED ✦ */}
                       <div className="grid grid-cols-2 gap-y-6 gap-x-4 mb-8">
                         <div>
                           <span className="font-sans text-[9px] md:text-[10px] uppercase tracking-[0.2em] text-[#5C5855] mb-1.5 font-semibold flex items-center gap-1.5">
@@ -234,14 +247,12 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* ✦ RESTORED: DYNAMIC PRICING & BUTTON SECTION ✦ */}
                       <div className="mt-auto pt-6 border-t border-[#1A1817]/10 flex items-center justify-between">
                         <div className="flex flex-col gap-1">
                           <span className={`font-sans text-[10px] md:text-[11px] uppercase tracking-widest font-bold flex items-center gap-2 ${isSoldOut ? 'text-[#5C5855]' : 'text-red-500'}`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${isSoldOut ? 'bg-[#5C5855]' : 'bg-red-500 animate-pulse'}`}></span>
                             {event.status || 'RSVP Open'}
                           </span>
-                          
                           <div className="font-serif text-xl text-[#1A1817] flex items-center gap-2">
                             {event.original_price && event.original_price.trim() !== '' && (
                               <span className="text-[#5C5855]/60 line-through text-sm md:text-base">₹{event.original_price}</span>
@@ -259,7 +270,6 @@ export default function App() {
                           </div>
                         </div>
                       </div>
-                      
                     </div>
                   </div>
                 );
