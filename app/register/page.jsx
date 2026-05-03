@@ -10,7 +10,7 @@ const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSSCmEDqxpPn1O
 
 function RegisterContent() {
   const searchParams = useSearchParams();
-  const eventId = searchParams.get('eventId') || ''; // Grabs ?eventId=vol-1 from URL
+  const eventId = searchParams.get('eventId') || '';
 
   const [eventDetails, setEventDetails] = useState(null);
   const [isLoadingEvent, setIsLoadingEvent] = useState(true);
@@ -27,7 +27,6 @@ function RegisterContent() {
 
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // 1. Fetch the specific event details from Google Sheets so the UI matches what they clicked!
   useEffect(() => {
     if (!eventId) {
       setIsLoadingEvent(false);
@@ -49,7 +48,10 @@ function RegisterContent() {
                 date: foundEvent.date,
                 time: foundEvent.time,
                 location: foundEvent.location_main,
-                price: foundEvent.price || '999'
+                price: foundEvent.price || '999',
+                // ✦ WE NOW SAVE THESE SO WE CAN EMAIL THEM! ✦
+                bring: foundEvent.bring || 'An open heart.',
+                provided: foundEvent.provided || 'Canvas and paints.'
               });
             }
             setIsLoadingEvent(false);
@@ -71,7 +73,6 @@ function RegisterContent() {
     setIsProcessing(true);
 
     try {
-      // 2. Ask backend to create a Razorpay Order (Pass the eventId so the backend knows the price!)
       const response = await fetch('/api/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -85,7 +86,6 @@ function RegisterContent() {
         return;
       }
 
-      // Setup the Razorpay popup window
       const options = {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID, 
         amount: data.order.amount,
@@ -95,26 +95,29 @@ function RegisterContent() {
         order_id: data.order.id, 
         
         handler: async function (response) {
-          console.log("Payment Success!", response);
-          
           try {
-            // 3. Send the form data AND the Event ID to your Google Sheet!
             await fetch('/api/save-data', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                eventId: eventId, // <--- CRITICAL FIX
+                eventId: eventId,
                 name: formData.name,
                 email: formData.email,
                 whatsapp: formData.whatsapp,
                 creativeLink: formData.creativeLink,
                 reason: formData.reason,
                 reflection: formData.reflection,
-                paymentId: response.razorpay_payment_id
+                paymentId: response.razorpay_payment_id,
+                // ✦ SENDING THE SPECIFIC EVENT DATA TO THE EMAIL SCRIPT ✦
+                eventTitle: eventDetails?.title || "Al-Musawwir",
+                eventDate: eventDetails?.date || "TBD",
+                eventTime: eventDetails?.time || "TBD",
+                eventLocation: eventDetails?.location || "TBD",
+                eventBring: eventDetails?.bring || "An open heart",
+                eventProvided: eventDetails?.provided || "Art supplies"
               })
             });
             
-            // 4. Send them directly to their personalized ticket page with the event ID!
             window.location.href = `/ticket?id=${response.razorpay_payment_id}&name=${encodeURIComponent(formData.name)}&eventId=${encodeURIComponent(eventId)}`;             
           } catch (error) {
             console.error("Payment succeeded but saving failed:", error);
@@ -186,7 +189,6 @@ function RegisterContent() {
 
         <div className="glass-card rounded-[2rem] md:rounded-[2.5rem] shadow-2xl shadow-[#1A1817]/5 overflow-hidden">
           
-          {/* Dynamic Event Info Banner */}
           <div className="bg-[#1A1817] text-[#F7F5F0] p-8 md:p-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative overflow-hidden min-h-[160px]">
             <div className="absolute top-0 right-0 w-32 h-32 bg-[#FF6B35] rounded-full filter blur-[50px] opacity-20"></div>
             
@@ -272,7 +274,6 @@ function RegisterContent() {
             </div>
 
             <div className="pt-6">
-              {/* Dynamic Button Price */}
               <button disabled={isProcessing || isLoadingEvent} type="submit" className="w-full bg-[#1A1817] disabled:bg-[#5C5855] disabled:cursor-not-allowed text-white font-sans text-sm uppercase tracking-[0.2em] font-bold py-5 px-8 rounded-xl hover:bg-[#FF6B35] transition-all hover:shadow-xl hover:-translate-y-1 flex items-center justify-center gap-3 group">
                 {isProcessing ? "Processing..." : `Submit & Pay ₹${eventDetails?.price || '...'}`}
                 {!isProcessing && <svg className="w-5 h-5 transform group-hover:translate-x-2 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l7-7m7-7H3"></path></svg>}
@@ -290,7 +291,6 @@ function RegisterContent() {
   );
 }
 
-// ✦ REQUIRED BY NEXT.JS: Wrapping useSearchParams in Suspense ✦
 export default function RegisterPage() {
   return (
     <Suspense fallback={
