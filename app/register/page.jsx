@@ -70,7 +70,6 @@ export default function RegisterPage() {
               })
             });
             
-            alert("Payment Successful! Your spot is secured. See you on May 16th!");
             // Optional: Redirect them to a success page or clear the form here!
 // Send them directly to their personalized ticket page!
               window.location.href = `/ticket?id=${response.razorpay_payment_id}&name=${encodeURIComponent(formData.name)}`;             
