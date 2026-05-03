@@ -7,6 +7,7 @@ import Script from 'next/script';
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
     name: '',
+    email: '',
     whatsapp: '',
     creativeLink: '',
     reason: '',
@@ -60,6 +61,7 @@ export default function RegisterPage() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 name: formData.name,
+                email: formData.email,
                 whatsapp: formData.whatsapp,
                 creativeLink: formData.creativeLink,
                 reason: formData.reason,
@@ -77,7 +79,7 @@ export default function RegisterPage() {
             alert("Payment successful, but we had trouble saving your form. Please screenshot this and WhatsApp us: " + response.razorpay_payment_id);
           }
         },
-        
+
         prefill: {
           name: formData.name,
           contact: formData.whatsapp,
@@ -184,9 +186,15 @@ export default function RegisterPage() {
                   <label className="font-sans text-xs font-bold text-[#1A1817] uppercase tracking-wider">WhatsApp Number *</label>
                   <input type="tel" name="whatsapp" required value={formData.whatsapp} onChange={handleChange} className="bg-white/50 border border-[#1A1817]/20 rounded-xl px-4 py-3 font-sans text-base text-[#1A1817] focus:outline-none focus:border-[#004E98] focus:bg-white transition-all placeholder:text-[#1A1817]/30" placeholder="+91 00000 00000" />
                 </div>
+              
+                <div className="flex flex-col gap-2">
+                 <label className="font-sans text-xs font-bold text-[#1A1817] uppercase tracking-wider">Email Address *</label>
+                  <input type="email" name="email" required value={formData.email} onChange={handleChange} className="bg-white/50 border border-[#1A1817]/20 rounded-xl px-4 py-3 font-sans text-base text-[#1A1817] focus:outline-none focus:border-[#004E98] focus:bg-white transition-all placeholder:text-[#1A1817]/30" placeholder="artist@example.com" />
+                </div>
+                
               </div>
             </div>
-
+|
             {/* 2. Creative Link */}
             <div className="space-y-6">
               <h2 className="font-sans text-[11px] uppercase tracking-[0.3em] font-bold text-[#004E98] border-b border-[#1A1817]/10 pb-2">2. Your World (Optional)</h2>
