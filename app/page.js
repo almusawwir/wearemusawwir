@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Papa from 'papaparse';
 
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSSCmEDqxpPn1OEzXR3geUaynoeGhrswVO5xf8zKETC8xOq1oimP1SiapOAsSPY_nEMTHoDeacTgKC/pub?gid=0&single=true&output=csv";
@@ -9,12 +9,27 @@ const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSSCmEDqxpPn1O
 export default function App() {
   const [events, setEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [expandedCards, setExpandedCards] = useState({}); // Tracks which descriptions are open
   const revealRefs = useRef([]);
+  const router = useRouter();
 
   // Helper to add refs for the scroll reveal animation
   const setRef = (el) => {
     if (el && !revealRefs.current.includes(el)) {
       revealRefs.current.push(el);
+    }
+  };
+
+  // Safe toggle for the "See More" button so it doesn't open the full page
+  const toggleExpand = (e, id) => {
+    e.stopPropagation(); // STOPS the card from clicking through to the next page!
+    setExpandedCards(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  // Navigates to the full page if they click anywhere else on the card
+  const handleCardClick = (id) => {
+    if (id) {
+      router.push(`/event/${id.trim()}`);
     }
   };
 
@@ -26,6 +41,7 @@ export default function App() {
         Papa.parse(text, {
           header: true,
           skipEmptyLines: true,
+          transformHeader: (h) => h.trim().toLowerCase().replace(/^\uFEFF/, ''),
           complete: (results) => {
             setEvents(results.data);
             setIsLoading(false);
@@ -57,7 +73,7 @@ export default function App() {
 
   return (
     <div className="relative overflow-x-hidden w-full bg-[#F7F5F0] text-[#1A1817] font-sans antialiased selection:bg-[#FF6B35] selection:text-white pb-24">
-      {/* Global Styles for Custom Configs & Fonts */}
+      {/* Global Styles */}
       <style dangerouslySetInnerHTML={{__html: `
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Manrope:wght@200;300;400;500;600;700&display=swap');
         html { scroll-behavior: smooth; }
@@ -144,55 +160,97 @@ export default function App() {
             <div className="text-center font-serif text-xl animate-pulse">Summoning canvases...</div>
           ) : (
             <div className="space-y-12">
-              {events.map((event) => (
-                // This makes the entire beautiful card a clickable link to the detail page
-                <Link href={`/event/${event.id?.trim()}`} key={event.id} ref={setRef} className="reveal glass-card rounded-[1.5rem] md:rounded-[2rem] overflow-hidden shadow-2xl shadow-[#004E98]/5 flex flex-col md:flex-row group hover:-translate-y-2 transition-transform duration-500 block">
-                  
-                  {/* Event Image */}
-                  <div className="w-full md:w-2/5 relative h-56 md:h-auto overflow-hidden">
-                    <img src={event.image_url || "https://images.unsplash.com/photo-1513364776144-60967b0f800f?q=80&w=1200"} 
-                         alt={event.title} 
-                         className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#1A1817]/70 via-transparent to-transparent flex items-end p-6">
-                      <span className="font-sans text-[9px] uppercase tracking-[0.3em] font-bold text-white bg-[#FF6B35] px-3 py-1.5 rounded-full backdrop-blur-md">View Details</span>
+              {events.map((event) => {
+                const isExpanded = expandedCards[event.id];
+                const desc = event.description || "";
+                const isLongDesc = desc.length > 120;
+                const displayDesc = isExpanded ? desc : (isLongDesc ? desc.slice(0, 120) + '...' : desc);
+
+                return (
+                  // Using an interactive DIV instead of a LINK so the "See More" button can work!
+                  <div 
+                    key={event.id} 
+                    ref={setRef} 
+                    onClick={() => handleCardClick(event.id)}
+                    className="cursor-pointer reveal glass-card rounded-[1.5rem] md:rounded-[2rem] overflow-hidden shadow-2xl shadow-[#004E98]/5 flex flex-col md:flex-row group hover:-translate-y-2 transition-transform duration-500"
+                  >
+                    
+                    {/* Event Image */}
+                    <div className="w-full md:w-2/5 relative h-56 md:h-auto overflow-hidden">
+                      <img src={event.image_url || "https://images.unsplash.com/photo-1513364776144-60967b0f800f?q=80&w=1200"} 
+                           alt={event.title} 
+                           className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#1A1817]/70 via-transparent to-transparent flex items-end p-6">
+                        <span className="font-sans text-[9px] uppercase tracking-[0.3em] font-bold text-white bg-[#FF6B35] px-3 py-1.5 rounded-full backdrop-blur-md">View Details</span>
+                      </div>
+                    </div>
+
+                    {/* Event Details */}
+                    <div className="w-full md:w-3/5 p-6 md:p-10 flex flex-col">
+                      <span className="font-sans text-[10px] uppercase tracking-[0.4em] text-[#FF6B35] mb-2 font-bold block">{event.id}</span>
+                      <h3 className="font-serif text-3xl md:text-4xl text-[#1A1817] mb-2">{event.title}</h3>
+                      <p className="font-serif italic text-lg md:text-xl text-[#5C5855] mb-4">{event.tagline}</p>
+
+                      {/* Expandable Description */}
+                      <div className="mb-8">
+                        <p className="font-sans text-sm md:text-base text-[#1A1817]/80 leading-relaxed transition-all duration-300">
+                          {displayDesc}
+                          {isLongDesc && (
+                            <button 
+                              onClick={(e) => toggleExpand(e, event.id)}
+                              className="ml-2 font-sans text-[10px] uppercase tracking-widest font-bold text-[#FF6B35] hover:text-[#004E98] transition-colors"
+                            >
+                              {isExpanded ? "See Less" : "See More"}
+                            </button>
+                          )}
+                        </p>
+                      </div>
+
+                      {/* Full Info Grid from your original design */}
+                      <div className="grid grid-cols-2 gap-y-6 gap-x-4 mb-8">
+                        <div>
+                          <span className="font-sans text-[9px] md:text-[10px] uppercase tracking-[0.2em] text-[#5C5855] mb-1.5 font-semibold flex items-center gap-1.5">
+                            <svg className="w-3.5 h-3.5 text-[#004E98]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                            When
+                          </span>
+                          <span className="font-serif text-lg text-[#1A1817] leading-tight block">{event.date}<br/><span className="text-sm italic text-[#5C5855]">{event.time}</span></span>
+                        </div>
+                        <div>
+                          <span className="font-sans text-[9px] md:text-[10px] uppercase tracking-[0.2em] text-[#5C5855] mb-1.5 font-semibold flex items-center gap-1.5">
+                            <svg className="w-3.5 h-3.5 text-[#E24E7A]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                            Where
+                          </span>
+                          <span className="font-serif text-lg text-[#1A1817] leading-tight block">{event.location_main}<br/><span className="text-sm italic text-[#5C5855]">{event.location_sub}</span></span>
+                        </div>
+                        <div>
+                          <span className="font-sans text-[9px] md:text-[10px] uppercase tracking-[0.2em] text-[#5C5855] mb-1.5 font-semibold flex items-center gap-1.5">
+                            <svg className="w-3.5 h-3.5 text-[#FF6B35]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path></svg>
+                            Provided
+                          </span>
+                          <span className="font-serif text-base text-[#1A1817] leading-tight block line-clamp-2">{event.provided}</span>
+                        </div>
+                        <div>
+                          <span className="font-sans text-[9px] md:text-[10px] uppercase tracking-[0.2em] text-[#5C5855] mb-1.5 font-semibold flex items-center gap-1.5">
+                            <svg className="w-3.5 h-3.5 text-[#F9A03F]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                            To Bring
+                          </span>
+                          <span className="font-serif text-base text-[#1A1817] leading-tight block line-clamp-2">{event.bring}</span>
+                        </div>
+                      </div>
+
+                      <div className="mt-auto pt-6 border-t border-[#1A1817]/10 flex items-center justify-between">
+                        <span className="font-sans text-[11px] text-[#5C5855] italic flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+                          Limited capacity.
+                        </span>
+                        <div className="w-10 h-10 rounded-full bg-[#1A1817] text-white flex items-center justify-center group-hover:bg-[#FF6B35] transition-colors">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                        </div>
+                      </div>
                     </div>
                   </div>
-
-                  {/* Event Details */}
-                  <div className="w-full md:w-3/5 p-6 md:p-10 flex flex-col">
-                    <span className="font-sans text-[10px] uppercase tracking-[0.4em] text-[#FF6B35] mb-2 font-bold block">{event.id}</span>
-                    <h3 className="font-serif text-3xl md:text-4xl text-[#1A1817] mb-2">{event.title}</h3>
-                    <p className="font-serif italic text-lg md:text-xl text-[#5C5855] mb-8">{event.tagline}</p>
-
-                    <div className="grid grid-cols-2 gap-y-6 gap-x-4 mb-8">
-                      <div>
-                        <span className="font-sans text-[9px] md:text-[10px] uppercase tracking-[0.2em] text-[#5C5855] mb-1.5 font-semibold flex items-center gap-1.5">
-                          <svg className="w-3.5 h-3.5 text-[#004E98]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                          When
-                        </span>
-                        <span className="font-serif text-lg text-[#1A1817] leading-tight block">{event.date}<br/><span className="text-sm italic text-[#5C5855]">{event.time}</span></span>
-                      </div>
-                      <div>
-                        <span className="font-sans text-[9px] md:text-[10px] uppercase tracking-[0.2em] text-[#5C5855] mb-1.5 font-semibold flex items-center gap-1.5">
-                          <svg className="w-3.5 h-3.5 text-[#E24E7A]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                          Where
-                        </span>
-                        <span className="font-serif text-lg text-[#1A1817] leading-tight block">{event.location_main}<br/><span className="text-sm italic text-[#5C5855]">{event.location_sub}</span></span>
-                      </div>
-                    </div>
-
-                    <div className="mt-auto pt-6 border-t border-[#1A1817]/10 flex items-center justify-between">
-                      <span className="font-sans text-[11px] text-[#5C5855] italic flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
-                        Limited capacity.
-                      </span>
-                      <div className="w-10 h-10 rounded-full bg-[#1A1817] text-white flex items-center justify-center group-hover:bg-[#FF6B35] transition-colors">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

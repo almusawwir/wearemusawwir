@@ -8,15 +8,27 @@ async function getEvents() {
   const res = await fetch(CSV_URL, { next: { revalidate: 0 } });
   const text = await res.text();
   return new Promise((resolve) => {
-    Papa.parse(text, { header: true, skipEmptyLines: true, complete: (results) => resolve(results.data) });
+    Papa.parse(text, { 
+      header: true, 
+      skipEmptyLines: true, 
+      // This forces all Google Sheet columns to lowercase so it never breaks if you type "ID" instead of "id"
+      transformHeader: (h) => h.trim().toLowerCase().replace(/^\uFEFF/, ''),
+      complete: (results) => resolve(results.data) 
+    });
   });
 }
 
 export default async function EventDetailPage({ params }) {
+  // 1. CRITICAL FIX: We must "await" the params in modern Next.js before reading them!
+  const resolvedParams = await params;
+  
   const events = await getEvents();
-  // Safe matching with .trim() to avoid Google Sheet hidden space errors
-  const currentEvent = events.find(e => e.id && e.id.trim() === params.id?.trim());
-  const suggestedEvents = events.filter(e => e.id && e.id.trim() !== params.id?.trim());
+  
+  // 2. CRITICAL FIX: Decode the URL and force lowercase to guarantee a perfect match
+  const targetId = decodeURIComponent(resolvedParams.id || '').trim().toLowerCase();
+
+  const currentEvent = events.find(e => e.id && e.id.trim().toLowerCase() === targetId);
+  const suggestedEvents = events.filter(e => e.id && e.id.trim().toLowerCase() !== targetId);
 
   if (!currentEvent) {
     return (
@@ -163,7 +175,7 @@ export default async function EventDetailPage({ params }) {
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-lg border-t border-[#1A1817]/10 p-4 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] transform translate-y-0 transition-transform duration-300">
         <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
           
-          {/* Left Side: Event Recap (Hidden on very small phones) */}
+          {/* Left Side: Event Recap */}
           <div className="hidden sm:block">
             <p className="font-serif text-xl md:text-2xl text-[#1A1817] leading-none mb-1">{currentEvent.title}</p>
             <p className="font-sans text-[9px] md:text-[10px] uppercase tracking-widest text-[#5C5855]">{currentEvent.date} • ₹999</p>
