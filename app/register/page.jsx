@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import Script from 'next/script';
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -13,6 +14,8 @@ export default function RegisterPage() {
     consent: false
   });
 
+  const [isProcessing, setIsProcessing] = useState(false);
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({
@@ -21,17 +24,70 @@ export default function RegisterPage() {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // This is where you will trigger Razorpay / Stripe in the future
-    console.log("Form Submitted, redirecting to payment gateway...", formData);
-    alert("This will redirect to the payment gateway!");
+    setIsProcessing(true);
+
+    try {
+      // 1. Ask our backend to create a Razorpay Order
+      const response = await fetch('/api/create-order', {
+        method: 'POST',
+      });
+      const data = await response.json();
+
+      if (!data.order) {
+        alert("Failed to create order. Please try again.");
+        setIsProcessing(false);
+        return;
+      }
+
+      // 2. Setup the Razorpay popup window
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID, // Your public key
+        amount: data.order.amount,
+        currency: data.order.currency,
+        name: "Al-Musawwir",
+        description: "Strokes & Stories Registration",
+        order_id: data.order.id, // The secure ID we got from the backend
+        handler: function (response) {
+          // THIS RUNS WHEN PAYMENT IS SUCCESSFUL!
+          console.log("Payment Success!", response);
+          alert("Payment Successful! See you on May 16th.");
+          // In the future, you can save the user's formData to a database here.
+        },
+        prefill: {
+          name: formData.name,
+          contact: formData.whatsapp,
+        },
+        theme: {
+          color: "#1A1817", // Matches your brand ink color
+        },
+      };
+
+      // 3. Open the popup
+      const paymentObject = new window.Razorpay(options);
+      paymentObject.open();
+
+      // Handle popup close
+      paymentObject.on('payment.failed', function (response) {
+        alert("Payment Failed. Please try again.");
+      });
+
+    } catch (error) {
+      console.error("Payment setup failed:", error);
+      alert("Something went wrong. Please try again.");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
     <div className="relative min-h-screen w-full bg-[#F7F5F0] text-[#1A1817] font-sans antialiased selection:bg-[#FF6B35] selection:text-white flex justify-center py-12 px-4 md:px-6">
       
-      {/* Global Styles for Fonts & Texture */}
+      {/* Load the Razorpay Script */}
+      <Script src="https://checkout.razorpay.com/v1/checkout.js" />
+
+      {/* Global Styles */}
       <style dangerouslySetInnerHTML={{__html: `
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Manrope:wght@200;300;400;500;600;700&display=swap');
         .font-serif { font-family: 'Cormorant Garamond', serif; }
@@ -153,13 +209,13 @@ export default function RegisterPage() {
 
             {/* 7. Submit */}
             <div className="pt-6">
-              <button type="submit" className="w-full bg-[#1A1817] text-white font-sans text-sm uppercase tracking-[0.2em] font-bold py-5 px-8 rounded-xl hover:bg-[#FF6B35] transition-all hover:shadow-xl hover:-translate-y-1 flex items-center justify-center gap-3 group">
-                Submit & Pay ₹999
-                <svg className="w-5 h-5 transform group-hover:translate-x-2 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+              <button disabled={isProcessing} type="submit" className="w-full bg-[#1A1817] disabled:bg-[#5C5855] disabled:cursor-not-allowed text-white font-sans text-sm uppercase tracking-[0.2em] font-bold py-5 px-8 rounded-xl hover:bg-[#FF6B35] transition-all hover:shadow-xl hover:-translate-y-1 flex items-center justify-center gap-3 group">
+                {isProcessing ? "Processing..." : "Submit & Pay ₹999"}
+                {!isProcessing && <svg className="w-5 h-5 transform group-hover:translate-x-2 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l7-7m7-7H3"></path></svg>}
               </button>
               <p className="font-sans text-[10px] text-center text-[#5C5855] uppercase tracking-widest mt-4 flex items-center justify-center gap-2">
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-                Secure Checkout
+                Secure Checkout by Razorpay
               </p>
             </div>
 
