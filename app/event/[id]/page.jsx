@@ -314,30 +314,28 @@ export default async function EventDetailPage({ params }) {
             </div>
           </div>
 
-          {/* Right side: price (mobile only) + button */}
-          <div className="flex flex-col items-end gap-1.5 w-full sm:w-auto">
-            {/* Price row — mobile only */}
-            <div className="flex items-baseline gap-2 sm:hidden">
-              {hasOriginalPrice && (
-                <span className="font-sans text-xs line-through text-[#9C9894]">₹{currentEvent.original_price}</span>
-              )}
-              <span className="font-sans text-base font-bold text-[#1A1817]">₹{currentEvent.price || '999'}</span>
-            </div>
-
-            {isSoldOut ? (
-              <div className="w-full sm:w-auto bg-[#5C5855] text-white font-sans text-xs md:text-sm uppercase tracking-[0.2em] font-bold py-4 px-10 rounded-full text-center shadow-xl flex items-center justify-center gap-2 cursor-not-allowed opacity-80">
-                {currentEvent.button_text || 'Sold Out'}
-              </div>
-            ) : (
-              <Link
-                href={`/register?eventId=${currentEvent.id}`}
-                className="w-full sm:w-auto bg-[#1A1817] text-white font-sans text-xs md:text-sm uppercase tracking-[0.2em] font-bold py-4 px-10 rounded-full hover:bg-[#FF6B35] transition-all text-center shadow-xl hover:-translate-y-1 flex items-center justify-center gap-2"
-              >
-                {currentEvent.button_text || 'Secure Canvas'}
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-              </Link>
+          {/* Price — mobile only, left side */}
+          <div className="flex flex-col gap-0.5 sm:hidden shrink-0">
+            {hasOriginalPrice && (
+              <span className="font-sans text-xs line-through text-[#9C9894]">₹{currentEvent.original_price}</span>
             )}
+            <span className="font-sans text-lg font-bold text-[#1A1817]">₹{currentEvent.price || '999'}</span>
           </div>
+
+          {/* Button — right side, ~70% on mobile */}
+          {isSoldOut ? (
+            <div className="w-[70%] sm:w-auto bg-[#5C5855] text-white font-sans text-xs md:text-sm uppercase tracking-[0.2em] font-bold py-4 px-6 rounded-full text-center shadow-xl flex items-center justify-center gap-2 cursor-not-allowed opacity-80">
+              {currentEvent.button_text || 'Sold Out'}
+            </div>
+          ) : (
+            <Link
+              href={`/register?eventId=${currentEvent.id}`}
+              className="w-[70%] sm:w-auto bg-[#1A1817] text-white font-sans text-xs md:text-sm uppercase tracking-[0.2em] font-bold py-4 px-6 rounded-full hover:bg-[#FF6B35] transition-all text-center shadow-xl hover:-translate-y-1 flex items-center justify-center gap-2"
+            >
+              {currentEvent.button_text || 'Secure Canvas'}
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+            </Link>
+          )}
 
         </div>
       </div>
