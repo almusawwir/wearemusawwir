@@ -12,6 +12,10 @@ function TicketContent() {
   const ticketId = searchParams.get('id') || 'TKT-PENDING';
   const attendeeName = searchParams.get('name') || 'Artist';
   const eventId = searchParams.get('eventId') || '';
+  
+  // ✦ Grab the quantity from the URL (default to 1) ✦
+  const qtyString = searchParams.get('qty');
+  const ticketQty = qtyString ? parseInt(qtyString, 10) : 1;
 
   const [eventDetails, setEventDetails] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -50,7 +54,9 @@ function TicketContent() {
           <svg className="w-8 h-8 text-[#FF6B35]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg>
         </div>
         <h1 className="font-serif text-3xl md:text-4xl text-[#1A1817]">Payment Successful</h1>
-        <p className="font-sans text-sm text-[#5C5855]">Your canvas is officially secured.</p>
+        <p className="font-sans text-sm text-[#5C5855]">
+          {ticketQty > 1 ? `Your ${ticketQty} canvases are officially secured.` : "Your canvas is officially secured."}
+        </p>
       </div>
 
       {/* The Ticket Card */}
@@ -59,11 +65,21 @@ function TicketContent() {
         {/* Ticket Header */}
         <div className="bg-[#1A1817] p-8 text-center relative overflow-hidden">
           <div className="absolute top-[-50%] right-[-20%] w-40 h-40 bg-[#FF6B35] rounded-full filter blur-[50px] opacity-30"></div>
-          <span className="font-sans text-[10px] uppercase tracking-[0.4em] text-[#F7F5F0]/60 block mb-2">Digital Pass</span>
+          
+          <div className="flex items-center justify-center gap-2 mb-2 relative z-10">
+            <span className="font-sans text-[10px] uppercase tracking-[0.4em] text-[#F7F5F0]/60">Digital Pass</span>
+            {/* ✦ Display Badge if Group Ticket ✦ */}
+            {ticketQty > 1 && (
+              <span className="bg-[#FF6B35] text-white text-[9px] uppercase tracking-widest font-bold px-2 py-0.5 rounded-full">
+                Group x{ticketQty}
+              </span>
+            )}
+          </div>
+          
           {isLoading ? (
              <div className="h-8 bg-white/20 rounded w-3/4 mx-auto animate-pulse"></div>
           ) : (
-             <h2 className="font-serif italic text-3xl text-white leading-tight">
+             <h2 className="font-serif italic text-3xl text-white leading-tight relative z-10">
                {eventDetails?.title || 'Al-Musawwir'}
              </h2>
           )}
@@ -71,9 +87,21 @@ function TicketContent() {
 
         {/* Ticket Details */}
         <div className="p-8 bg-white/60 space-y-6">
-          <div>
-            <span className="font-sans text-[9px] uppercase tracking-[0.2em] text-[#5C5855] font-bold block mb-1">Attendee</span>
-            <span className="font-serif text-2xl text-[#1A1817]">{attendeeName}</span>
+          
+          {/* Dynamic Row: Attendee & Quantity */}
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <span className="font-sans text-[9px] uppercase tracking-[0.2em] text-[#5C5855] font-bold block mb-1">Attendee</span>
+              <span className="font-serif text-2xl text-[#1A1817]">{attendeeName}</span>
+            </div>
+            
+            {/* ✦ Only show Quantity block if > 1 ✦ */}
+            {ticketQty > 1 && (
+              <div className="text-right">
+                <span className="font-sans text-[9px] uppercase tracking-[0.2em] text-[#5C5855] font-bold block mb-1">Admit</span>
+                <span className="font-serif text-2xl text-[#1A1817]">{ticketQty}</span>
+              </div>
+            )}
           </div>
           
           <div className="grid grid-cols-2 gap-6">

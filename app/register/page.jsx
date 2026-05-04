@@ -29,6 +29,9 @@ function RegisterContent() {
   });
 
   const [isProcessing, setIsProcessing] = useState(false);
+  
+  // ✦ ADDED: Success Loading State
+  const [isSuccessLoading, setIsSuccessLoading] = useState(false);
 
   useEffect(() => {
     if (!eventId) {
@@ -109,6 +112,9 @@ function RegisterContent() {
         order_id: data.order.id, 
         
         handler: async function (response) {
+          // ✦ ADDED: Trigger the loading overlay immediately
+          setIsSuccessLoading(true);
+          
           try {
             await fetch('/api/save-data', {
               method: 'POST',
@@ -138,6 +144,7 @@ function RegisterContent() {
             window.location.href = `/ticket?id=${response.razorpay_payment_id}&name=${encodeURIComponent(formData.name)}&eventId=${encodeURIComponent(eventId)}&qty=${ticketCount}`;             
           } catch (error) {
             console.error("Payment succeeded but saving failed:", error);
+            setIsSuccessLoading(false); // Hide loading on error
             alert("Payment successful, but we had trouble saving your form. Please WhatsApp us your Payment ID: " + response.razorpay_payment_id);
           }
         },
@@ -156,20 +163,35 @@ function RegisterContent() {
       paymentObject.open();
 
       paymentObject.on('payment.failed', function (response) {
+        setIsProcessing(false); // Reset processing on failure
         alert("Payment Failed. Please try again.");
       });
 
     } catch (error) {
       console.error("Payment setup failed:", error);
+      setIsProcessing(false); // Reset processing on error
       alert("Something went wrong. Please try again.");
-    } finally {
-      setIsProcessing(false);
-    }
+    } 
   };
 
   return (
     <div className="relative min-h-screen w-full bg-[#F7F5F0] text-[#1A1817] font-sans antialiased selection:bg-[#FF6B35] selection:text-white flex justify-center py-12 px-4 md:px-6">
       
+      {/* ✦ ADDED: Full Screen Loading Overlay ✦ */}
+      {isSuccessLoading && (
+        <div className="fixed inset-0 z-[100] bg-[#F7F5F0]/90 backdrop-blur-md flex flex-col items-center justify-center">
+          <div className="relative w-20 h-20 mb-8">
+            <div className="absolute inset-0 border-4 border-[#1A1817]/10 rounded-full"></div>
+            <div className="absolute inset-0 border-4 border-[#FF6B35] rounded-full border-t-transparent animate-spin"></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <svg className="w-8 h-8 text-[#1A1817] animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg>
+            </div>
+          </div>
+          <h2 className="font-serif italic text-3xl md:text-4xl text-[#1A1817] mb-2">Securing your canvas...</h2>
+          <p className="font-sans text-xs text-[#5C5855] tracking-[0.2em] uppercase font-bold animate-pulse">Please do not close this window</p>
+        </div>
+      )}
+
       <Script src="https://checkout.razorpay.com/v1/checkout.js" />
 
       <style dangerouslySetInnerHTML={{__html: `
