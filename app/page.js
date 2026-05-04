@@ -14,7 +14,7 @@ export default function App() {
   const [expandedCards, setExpandedCards] = useState({});
   
   // Navigation scroll state
-  const [isNavVisible, setIsNavVisible] = useState(false);
+  const [isNavVisible, setIsNavVisible] = useState(true); // UI FIX: Start visible on load
   const [lastScrollY, setLastScrollY] = useState(0);
   
   const revealRefs = useRef([]);
@@ -81,9 +81,9 @@ export default function App() {
       const handleScroll = () => {
         const currentScrollY = window.scrollY;
         
-        // Hide at the very top
-        if (currentScrollY < 100) {
-          setIsNavVisible(false);
+        // UI FIX: Always show at the very top (0-50px)
+        if (currentScrollY <= 50) {
+          setIsNavVisible(true);
         } 
         // Show when scrolling up
         else if (currentScrollY < lastScrollY) {
@@ -132,17 +132,18 @@ export default function App() {
           isNavVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10 pointer-events-none'
         }`}
       >
-        <div className="glass-card px-6 py-3 rounded-full shadow-lg flex items-center justify-between gap-4 md:gap-6 max-w-max bg-white/80 border border-white/40">
-          <a href="#about-section" className="font-serif italic font-medium text-[#1A1817] hover:text-[#FF6B35] transition-colors cursor-pointer">Al-Musawwir</a>
+        <div className="glass-card px-4 sm:px-6 py-2 sm:py-3 rounded-full shadow-lg flex items-center justify-between gap-3 sm:gap-6 max-w-max bg-white/90 sm:bg-white/80 border border-white/40">
+          <a href="#about-section" className="font-serif italic font-medium text-[#1A1817] text-sm sm:text-base hover:text-[#FF6B35] transition-colors cursor-pointer mr-1 sm:mr-0">Al-Musawwir</a>
           <div className="w-1 h-1 rounded-full bg-[#FF6B35] hidden sm:block"></div>
-          <Link href="/about" className="font-sans text-[10px] uppercase tracking-widest font-bold text-[#5C5855] hover:text-[#1A1817] transition-colors">About</Link>
-          <div className="w-1 h-1 rounded-full bg-[#1A1817]/20"></div>
-          <a href="#events" className="font-sans text-[10px] uppercase tracking-widest font-bold text-[#004E98] hover:text-[#FF6B35] transition-colors">Gatherings</a>
+          {/* UI FIX: Increased touch targets (py-2 px-1) and mobile symmetry (hidden sm:block on both dots) */}
+          <Link href="/about" className="font-sans text-[11px] sm:text-[10px] uppercase tracking-widest font-bold text-[#5C5855] hover:text-[#1A1817] transition-colors py-2 px-1 sm:p-0">About</Link>
+          <div className="w-1 h-1 rounded-full bg-[#1A1817]/20 hidden sm:block"></div>
+          <a href="#events" className="font-sans text-[11px] sm:text-[10px] uppercase tracking-widest font-bold text-[#004E98] hover:text-[#FF6B35] transition-colors py-2 px-1 sm:p-0">Gatherings</a>
         </div>
       </nav>
 
       {/* Redesigned Premium Cinematic Hero Section */}
-      <header className="relative min-h-[100vh] flex flex-col items-center justify-center px-4 md:px-6 overflow-hidden pt-20">
+      <header className="relative min-h-[100vh] flex flex-col items-center justify-center px-4 md:px-6 overflow-hidden pt-24 pb-12 md:py-20">
         <div className="absolute inset-0 z-0 bg-[#1A1817]">
           <Image
             src="/images/hero-bg.jpg"
@@ -158,7 +159,8 @@ export default function App() {
         </div>
 
         <div className="relative z-10 max-w-4xl mx-auto w-full flex flex-col items-center text-center">
-          <h1 className="font-serif font-light text-6xl md:text-8xl lg:text-[10rem] tracking-[0.1em] text-white leading-none mb-8 opacity-0 animate-fade-in-up drop-shadow-2xl" style={{ animationDelay: '0.2s' }}>
+          {/* UI FIX: Responsive font sizing and tracking to prevent awkward word breaks on small phones */}
+          <h1 className="font-serif font-light text-5xl sm:text-6xl md:text-8xl lg:text-[10rem] tracking-[0.05em] md:tracking-[0.1em] text-white leading-none mb-8 opacity-0 animate-fade-in-up drop-shadow-2xl" style={{ animationDelay: '0.2s' }}>
             AL MUSAWWIR
           </h1>
           
@@ -166,20 +168,20 @@ export default function App() {
             <p className="font-serif italic text-white/90 text-2xl md:text-3xl tracking-wider mb-8 drop-shadow-md font-light">
               We create, therefore we are.
             </p>
-            <div className="font-sans font-light text-white/80 text-sm md:text-base leading-relaxed mb-12 space-y-2 max-w-2xl">
+            <div className="font-sans font-light text-white/80 text-sm md:text-base leading-relaxed mb-12 space-y-2 max-w-2xl px-2">
               <p>Not everyone calls themselves an artist.</p>
               <p>But everyone imagines, shapes, expresses, remembers, and creates.</p>
               <p>That is the spirit of Al-Musawwir.</p>
               <p>A gathering space for people to paint, reflect, connect, and explore creativity without pressure, perfection, or labels.</p>
             </div>
-            <a href="#events" className="inline-block border border-white/30 bg-white/5 backdrop-blur-sm text-white font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-4 px-10 rounded-full hover:bg-white hover:text-[#1A1817] transition-all duration-500 hover:scale-105">
+            <a href="#events" className="inline-block border border-white/30 bg-white/5 backdrop-blur-sm text-white font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-3 px-8 md:py-4 md:px-10 rounded-full hover:bg-white hover:text-[#1A1817] transition-all duration-500 hover:scale-105 mb-4">
               Explore Gatherings
             </a>
           </div>
         </div>
       </header>
 
-      {/* Dynamic Events Section (Untouched) */}
+      {/* Dynamic Events Section */}
       <section id="events" className="py-24 px-4 md:px-6 relative z-10">
         <div className="max-w-4xl mx-auto">
           <div ref={setRef} className="text-center mb-16 reveal">
@@ -317,17 +319,17 @@ export default function App() {
         <div className="max-w-3xl mx-auto text-center" ref={setRef}>
           <h2 className="font-serif text-4xl md:text-5xl font-light text-[#1A1817] mb-10 reveal">What is Al-Musawwir?</h2>
           
-          <div className="reveal space-y-6 font-serif text-xl md:text-2xl text-[#5C5855] font-light leading-relaxed">
+          <div className="reveal space-y-6 font-serif text-xl md:text-2xl text-[#5C5855] font-light leading-relaxed px-2">
             <p className="font-sans text-[12px] uppercase tracking-[0.4em] text-[#FF6B35] font-bold">Al-Musawwir</p>
             <p className="text-[#1A1817] font-medium">The Fashioner. The one who gives form to the formless.</p>
             <p>
-              Across traditions, creation has always been deeply human.<br />
-              We gather to paint, reflect, and reconnect with that instinct<br />
+              Across traditions, creation has always been deeply human.<br className="hidden md:block" />
+              We gather to paint, reflect, and reconnect with that instinct<br className="hidden md:block" />
               without pressure, perfection, or labels.
             </p>
             <p className="italic text-[#1A1817]">You do not need permission to call yourself an artist.</p>
             <div className="pt-8">
-              <a href="#events" className="inline-block border border-[#1A1817]/20 bg-[#1A1817] text-white font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-4 px-10 rounded-full hover:bg-[#FF6B35] hover:border-[#FF6B35] transition-all duration-500 hover:-translate-y-1 shadow-lg">
+              <a href="#events" className="inline-block border border-[#1A1817]/20 bg-[#1A1817] text-white font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-4 px-8 md:px-10 rounded-full hover:bg-[#FF6B35] hover:border-[#FF6B35] transition-all duration-500 hover:-translate-y-1 shadow-lg">
                 Come create with us.
               </a>
             </div>
@@ -335,17 +337,17 @@ export default function App() {
         </div>
       </section>
 
-      {/* Unified Footer (Untouched) */}
+      {/* Unified Footer */}
       <footer className="py-20 text-center relative z-10 border-t border-[#1A1817]/10 flex flex-col items-center">
         <p className="font-sans text-[10px] uppercase tracking-[0.5em] text-[#1A1817] mb-4 font-bold">AL-MUSAWWIR</p>
-        <p className="font-serif italic text-[#5C5855] text-2xl mb-8">We create, therefore we are.</p>
+        <p className="font-serif italic text-[#5C5855] text-2xl mb-8 px-4">We create, therefore we are.</p>
         
-        <div className="flex flex-wrap justify-center items-center gap-6 mb-6">
-          <Link href="/about" className="font-sans text-[10px] text-[#5C5855] tracking-widest uppercase font-bold hover:text-[#FF6B35] transition-colors">About Us</Link>
+        <div className="flex flex-wrap justify-center items-center gap-4 sm:gap-6 mb-6 px-4">
+          <Link href="/about" className="font-sans text-[10px] text-[#5C5855] tracking-widest uppercase font-bold hover:text-[#FF6B35] transition-colors py-2">About Us</Link>
           <span className="w-1 h-1 rounded-full bg-[#1A1817]/20"></span>
-          <Link href="/terms" className="font-sans text-[10px] text-[#5C5855] tracking-widest uppercase font-bold hover:text-[#FF6B35] transition-colors">Terms & Conditions</Link>
+          <Link href="/terms" className="font-sans text-[10px] text-[#5C5855] tracking-widest uppercase font-bold hover:text-[#FF6B35] transition-colors py-2">Terms & Conditions</Link>
           <span className="w-1 h-1 rounded-full bg-[#1A1817]/20"></span>
-          <a href="mailto:wearemusawwir@gmail.com" className="font-sans text-[10px] text-[#5C5855] tracking-widest uppercase font-bold hover:text-[#FF6B35] transition-colors">Contact</a>
+          <a href="mailto:wearemusawwir@gmail.com" className="font-sans text-[10px] text-[#5C5855] tracking-widest uppercase font-bold hover:text-[#FF6B35] transition-colors py-2">Contact</a>
         </div>
         
         <p className="font-sans text-[9px] text-[#5C5855]/60 uppercase tracking-widest">© {new Date().getFullYear()} Al-Musawwir Gatherings. All rights reserved.</p>
