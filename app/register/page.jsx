@@ -2,13 +2,12 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import Script from 'next/script';
 import { useSearchParams } from 'next/navigation';
 import Papa from 'papaparse';
 
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSSCmEDqxpPn1OEzXR3geUaynoeGhrswVO5xf8zKETC8xOq1oimP1SiapOAsSPY_nEMTHoDeacTgKC/pub?gid=0&single=true&output=csv";
 
-// ── Fetched once, outside the component so it never triggers re-renders ──
+// ── CSV fetched once, cached globally — never causes re-renders ──
 let cachedEvents = null;
 async function fetchEvents() {
   if (cachedEvents) return cachedEvents;
@@ -27,15 +26,30 @@ async function fetchEvents() {
   });
 }
 
+// ── Load Razorpay script on demand, resolve when ready ──
+function loadRazorpay() {
+  return new Promise((resolve, reject) => {
+    if (window.Razorpay) return resolve(window.Razorpay);
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => {
+      if (window.Razorpay) resolve(window.Razorpay);
+      else reject(new Error('Razorpay did not initialise after script load'));
+    };
+    script.onerror = () => reject(new Error('Failed to load Razorpay script'));
+    document.body.appendChild(script);
+  });
+}
+
 function RegisterContent() {
   const searchParams = useSearchParams();
   const eventId = searchParams.get('eventId') || '';
-  // ticketsLeft passed from event detail page as a URL param — use as the ceiling
   const ticketsLeftParam = parseInt(searchParams.get('ticketsLeft') || '99');
 
   const [eventDetails, setEventDetails] = useState(null);
   const [isLoadingEvent, setIsLoadingEvent] = useState(true);
-  // Cap is the minimum of ticketsLeftParam and 5 (your existing max)
+
   const maxTickets = Math.min(ticketsLeftParam, 5);
   const showCountdown = ticketsLeftParam <= 4 && ticketsLeftParam > 0;
 
@@ -54,12 +68,9 @@ function RegisterContent() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccessLoading, setIsSuccessLoading] = useState(false);
 
-  // ── Single fetch on mount, no dependencies that cause re-fetch ──
+  // ── Single fetch on mount ──
   useEffect(() => {
-    if (!eventId) {
-      setIsLoadingEvent(false);
-      return;
-    }
+    if (!eventId) { setIsLoadingEvent(false); return; }
     fetchEvents().then((data) => {
       const foundEvent = data.find(
         (e) => e.id && e.id.trim().toLowerCase() === eventId.toLowerCase()
@@ -82,25 +93,13 @@ function RegisterContent() {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
-  const increment = (e) => {
-    e.preventDefault();
-    setTicketCount((prev) => Math.min(maxTickets, prev + 1));
-  };
-  const decrement = (e) => {
-    e.preventDefault();
-    setTicketCount((prev) => Math.max(1, prev - 1));
-  };
+  const increment = (e) => { e.preventDefault(); setTicketCount((p) => Math.min(maxTickets, p + 1)); };
+  const decrement = (e) => { e.preventDefault(); setTicketCount((p) => Math.max(1, p - 1)); };
 
-  const unitPrice =
-    ticketCount === 1
-      ? parseInt(eventDetails?.price || 999)
-      : parseInt(eventDetails?.groupPrice || 999);
+  const unitPrice = ticketCount === 1 ? parseInt(eventDetails?.price || 999) : parseInt(eventDetails?.groupPrice || 999);
   const totalAmount = unitPrice * ticketCount;
 
   const handleSubmit = async (e) => {
@@ -108,6 +107,9 @@ function RegisterContent() {
     setIsProcessing(true);
 
     try {
+      // ── Ensure Razorpay is loaded before touching window.Razorpay ──
+      await loadRazorpay();
+
       const response = await fetch('/api/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -129,7 +131,7 @@ function RegisterContent() {
         description: `${ticketCount}x Ticket(s) for ${eventDetails ? eventDetails.title : 'Strokes & Stories'}`,
         order_id: data.order.id,
 
-        handler: async function (response) {
+        handler: async function (razorpayResponse) {
           setIsSuccessLoading(true);
           try {
             await fetch('/api/save-data', {
@@ -143,7 +145,7 @@ function RegisterContent() {
                 creativeLink: formData.creativeLink,
                 reason: formData.reason,
                 reflection: formData.reflection,
-                paymentId: response.razorpay_payment_id,
+                paymentId: razorpayResponse.razorpay_payment_id,
                 eventTitle: eventDetails?.title || 'Al-Musawwir',
                 eventDate: eventDetails?.date || 'TBD',
                 eventTime: eventDetails?.time || 'TBD',
@@ -154,16 +156,14 @@ function RegisterContent() {
                 totalPaid: totalAmount,
               }),
             });
-            window.location.href = `/ticket?id=${response.razorpay_payment_id}&name=${encodeURIComponent(formData.name)}&eventId=${encodeURIComponent(eventId)}&qty=${ticketCount}`;
+            window.location.href = `/ticket?id=${razorpayResponse.razorpay_payment_id}&name=${encodeURIComponent(formData.name)}&eventId=${encodeURIComponent(eventId)}&qty=${ticketCount}`;
           } catch (error) {
             console.error('Payment succeeded but saving failed:', error);
             setIsSuccessLoading(false);
-            alert(
-              'Payment successful, but we had trouble saving your form. Please WhatsApp us your Payment ID: ' +
-                response.razorpay_payment_id
-            );
+            alert('Payment successful, but we had trouble saving your form. Please WhatsApp us your Payment ID: ' + razorpayResponse.razorpay_payment_id);
           }
         },
+
         prefill: { name: formData.name, contact: formData.whatsapp, email: formData.email },
         theme: { color: '#1A1817' },
       };
@@ -174,6 +174,7 @@ function RegisterContent() {
         setIsProcessing(false);
         alert('Payment Failed. Please try again.');
       });
+
     } catch (error) {
       console.error('Payment setup failed:', error);
       setIsProcessing(false);
@@ -197,13 +198,9 @@ function RegisterContent() {
             </div>
           </div>
           <h2 className="font-serif italic text-3xl md:text-4xl text-[#1A1817] mb-2">Securing your canvas...</h2>
-          <p className="font-sans text-xs text-[#5C5855] tracking-[0.2em] uppercase font-bold animate-pulse">
-            Please do not close this window
-          </p>
+          <p className="font-sans text-xs text-[#5C5855] tracking-[0.2em] uppercase font-bold animate-pulse">Please do not close this window</p>
         </div>
       )}
-
-      <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="beforeInteractive" />
 
       <style dangerouslySetInnerHTML={{__html: `
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Manrope:wght@200;300;400;500;600;700&display=swap');
@@ -216,8 +213,7 @@ function RegisterContent() {
         }
         .glass-card {
           background: rgba(255, 255, 255, 0.6);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
+          backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
           border: 1px solid rgba(255, 255, 255, 0.8);
         }
         @keyframes pulse-fast { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
@@ -226,7 +222,7 @@ function RegisterContent() {
 
       <div className="canvas-texture"></div>
 
-      {/* Background blobs — static, no state dependency, no jitter */}
+      {/* Static background blobs — no state, no jitter */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0" aria-hidden="true">
         <div className="absolute top-[-10%] right-[-10%] w-[50vw] h-[50vw] bg-[#004E98]/10 rounded-full mix-blend-multiply filter blur-[100px]"></div>
         <div className="absolute bottom-[-10%] left-[-10%] w-[60vw] h-[60vw] bg-[#FF6B35]/10 rounded-full mix-blend-multiply filter blur-[120px]"></div>
@@ -236,10 +232,7 @@ function RegisterContent() {
 
         {/* Nav */}
         <div className="flex items-center justify-between">
-          <Link
-            href={`/event/${eventId}`}
-            className="group flex items-center gap-2 text-[#5C5855] hover:text-[#FF6B35] transition-colors font-sans text-xs uppercase tracking-widest font-bold"
-          >
+          <Link href={`/event/${eventId}`} className="group flex items-center gap-2 text-[#5C5855] hover:text-[#FF6B35] transition-colors font-sans text-xs uppercase tracking-widest font-bold">
             <svg className="w-4 h-4 transform group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
             </svg>
@@ -248,12 +241,12 @@ function RegisterContent() {
           <span className="font-serif italic text-lg text-[#1A1817]">Al-Musawwir</span>
         </div>
 
-        {/* ── Urgency banner — only shown when ticketsLeft <= 4 ── */}
+        {/* ── Urgency banner — only when <=4 tickets left ── */}
         {showCountdown && (
           <div className="bg-[#DC2626] text-white rounded-2xl px-5 py-3 flex items-center gap-3">
             <span className="animate-pulse-fast w-2 h-2 bg-white rounded-full shrink-0"></span>
             <p className="font-sans text-xs font-bold uppercase tracking-wider">
-              Only {ticketsLeftParam} spot{ticketsLeftParam === 1 ? '' : 's'} left for this event — you're almost there
+              Only {ticketsLeftParam} spot{ticketsLeftParam === 1 ? '' : 's'} left — you're almost there
             </p>
           </div>
         )}
@@ -263,7 +256,6 @@ function RegisterContent() {
           {/* Header */}
           <div className="bg-[#1A1817] text-[#F7F5F0] p-8 md:p-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative overflow-hidden min-h-[160px]">
             <div className="absolute top-0 right-0 w-32 h-32 bg-[#FF6B35] rounded-full filter blur-[50px] opacity-20" aria-hidden="true"></div>
-
             {isLoadingEvent ? (
               <div className="animate-pulse flex flex-col gap-3 w-full">
                 <div className="h-8 bg-white/20 rounded w-3/4"></div>
@@ -292,124 +284,65 @@ function RegisterContent() {
 
           <form onSubmit={handleSubmit} className="p-8 md:p-10 flex flex-col gap-8">
 
-            {/* Section 1: Basics */}
+            {/* 1. Basics */}
             <div className="space-y-6">
-              <h2 className="font-sans text-[11px] uppercase tracking-[0.3em] font-bold text-[#FF6B35] border-b border-[#1A1817]/10 pb-2">
-                1. The Basics
-              </h2>
+              <h2 className="font-sans text-[11px] uppercase tracking-[0.3em] font-bold text-[#FF6B35] border-b border-[#1A1817]/10 pb-2">1. The Basics</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="flex flex-col gap-2">
                   <label className="font-sans text-xs font-bold text-[#1A1817] uppercase tracking-wider">Full Name *</label>
-                  <input
-                    type="text"
-                    name="name"
-                    required
-                    value={formData.name}
-                    onChange={handleChange}
+                  <input type="text" name="name" required value={formData.name} onChange={handleChange}
                     className="bg-white/50 border border-[#1A1817]/20 rounded-xl px-4 py-3 font-serif text-lg text-[#1A1817] focus:outline-none focus:border-[#004E98] focus:bg-white transition-all placeholder:text-[#1A1817]/30"
-                    placeholder="Aham Brahmasmi"
-                  />
+                    placeholder="Aham Brahmasmi" />
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="font-sans text-xs font-bold text-[#1A1817] uppercase tracking-wider">WhatsApp Number *</label>
-                  <input
-                    type="tel"
-                    name="whatsapp"
-                    required
-                    value={formData.whatsapp}
-                    onChange={handleChange}
+                  <input type="tel" name="whatsapp" required value={formData.whatsapp} onChange={handleChange}
                     className="bg-white/50 border border-[#1A1817]/20 rounded-xl px-4 py-3 font-sans text-base text-[#1A1817] focus:outline-none focus:border-[#004E98] focus:bg-white transition-all placeholder:text-[#1A1817]/30"
-                    placeholder="+91 00000 00000"
-                  />
+                    placeholder="+91 00000 00000" />
                 </div>
                 <div className="flex flex-col gap-2 md:col-span-2">
                   <label className="font-sans text-xs font-bold text-[#1A1817] uppercase tracking-wider">Email Address *</label>
-                  <input
-                    type="email"
-                    name="email"
-                    required
-                    value={formData.email}
-                    onChange={handleChange}
+                  <input type="email" name="email" required value={formData.email} onChange={handleChange}
                     className="bg-white/50 border border-[#1A1817]/20 rounded-xl px-4 py-3 font-sans text-base text-[#1A1817] focus:outline-none focus:border-[#004E98] focus:bg-white transition-all placeholder:text-[#1A1817]/30"
-                    placeholder="artist@example.com"
-                  />
+                    placeholder="artist@example.com" />
                 </div>
               </div>
             </div>
 
-            {/* Section 2: Your World — REQUIRED, no URL or @ restriction */}
+            {/* 2. Your World — required, plain text, no restrictions */}
             <div className="space-y-6">
-              <h2 className="font-sans text-[11px] uppercase tracking-[0.3em] font-bold text-[#004E98] border-b border-[#1A1817]/10 pb-2">
-                2. Your World
-              </h2>
+              <h2 className="font-sans text-[11px] uppercase tracking-[0.3em] font-bold text-[#004E98] border-b border-[#1A1817]/10 pb-2">2. Your World</h2>
               <div className="flex flex-col gap-2">
-                <label className="font-sans text-xs font-bold text-[#1A1817] uppercase tracking-wider">
-                  Instagram / LinkedIn / Portfolio *
-                </label>
-                <input
-                  type="text"
-                  name="creativeLink"
-                  required
-                  value={formData.creativeLink}
-                  onChange={handleChange}
+                <label className="font-sans text-xs font-bold text-[#1A1817] uppercase tracking-wider">Instagram / LinkedIn / Portfolio *</label>
+                <input type="text" name="creativeLink" required value={formData.creativeLink} onChange={handleChange}
                   className="bg-white/50 border border-[#1A1817]/20 rounded-xl px-4 py-3 font-sans text-base text-[#1A1817] focus:outline-none focus:border-[#004E98] focus:bg-white transition-all placeholder:text-[#1A1817]/30"
-                  placeholder="username, handle, or link"
-                />
-                <p className="font-sans text-[10px] text-[#5C5855] tracking-wide">
-                  Any format works — a handle, a username, or a full link.
-                </p>
+                  placeholder="username, handle, or link" />
+                <p className="font-sans text-[10px] text-[#5C5855] tracking-wide">Any format works — a handle, a username, or a full link.</p>
               </div>
             </div>
 
-            {/* Section 3: Intentions */}
+            {/* 3. Intentions */}
             <div className="space-y-6">
-              <h2 className="font-sans text-[11px] uppercase tracking-[0.3em] font-bold text-[#E24E7A] border-b border-[#1A1817]/10 pb-2">
-                3. Intentions
-              </h2>
-              <label className="font-sans text-xs font-bold text-[#1A1817] uppercase tracking-wider">
-                Why are you joining us? *
-              </label>
+              <h2 className="font-sans text-[11px] uppercase tracking-[0.3em] font-bold text-[#E24E7A] border-b border-[#1A1817]/10 pb-2">3. Intentions</h2>
+              <label className="font-sans text-xs font-bold text-[#1A1817] uppercase tracking-wider">Why are you joining us? *</label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
                 {['To learn', 'To meet people', 'To paint with like-minded people', 'To explore creativity'].map((option) => (
-                  <label
-                    key={option}
-                    className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
-                      formData.reason === option
-                        ? 'border-[#E24E7A] bg-[#E24E7A]/5'
-                        : 'border-[#1A1817]/10 bg-white/40 hover:bg-white/70'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="reason"
-                      value={option}
-                      required
-                      onChange={handleChange}
-                      className="w-4 h-4 text-[#E24E7A] focus:ring-[#E24E7A]"
-                    />
+                  <label key={option} className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${formData.reason === option ? 'border-[#E24E7A] bg-[#E24E7A]/5' : 'border-[#1A1817]/10 bg-white/40 hover:bg-white/70'}`}>
+                    <input type="radio" name="reason" value={option} required onChange={handleChange} className="w-4 h-4 text-[#E24E7A] focus:ring-[#E24E7A]" />
                     <span className="font-serif text-[1.1rem] text-[#1A1817]">{option}</span>
                   </label>
                 ))}
               </div>
             </div>
 
-            {/* Section 4: Reflection (optional) */}
+            {/* 4. Reflection — optional */}
             <div className="space-y-6">
-              <h2 className="font-sans text-[11px] uppercase tracking-[0.3em] font-bold text-[#F9A03F] border-b border-[#1A1817]/10 pb-2">
-                4. Reflection (Optional)
-              </h2>
+              <h2 className="font-sans text-[11px] uppercase tracking-[0.3em] font-bold text-[#F9A03F] border-b border-[#1A1817]/10 pb-2">4. Reflection (Optional)</h2>
               <div className="flex flex-col gap-2">
-                <label className="font-sans text-xs font-bold text-[#1A1817] uppercase tracking-wider">
-                  What does art/creation mean to you?
-                </label>
-                <textarea
-                  name="reflection"
-                  rows="3"
-                  value={formData.reflection}
-                  onChange={handleChange}
+                <label className="font-sans text-xs font-bold text-[#1A1817] uppercase tracking-wider">What does art/creation mean to you?</label>
+                <textarea name="reflection" rows="3" value={formData.reflection} onChange={handleChange}
                   className="bg-white/50 border border-[#1A1817]/20 rounded-xl px-4 py-3 font-serif text-lg text-[#1A1817] focus:outline-none focus:border-[#F9A03F] focus:bg-white transition-all placeholder:text-[#1A1817]/30 resize-none"
-                  placeholder="A few words on how you feel..."
-                ></textarea>
+                  placeholder="A few words on how you feel..."></textarea>
               </div>
             </div>
 
@@ -417,65 +350,42 @@ function RegisterContent() {
             <div className="pt-4">
               <label className="flex items-start gap-3 cursor-pointer group">
                 <div className="relative flex items-center justify-center mt-1">
-                  <input
-                    type="checkbox"
-                    name="consent"
-                    required
-                    checked={formData.consent}
-                    onChange={handleChange}
-                    className="peer appearance-none w-5 h-5 border-2 border-[#1A1817]/30 rounded-[4px] checked:bg-[#1A1817] checked:border-[#1A1817] transition-all cursor-pointer"
-                  />
+                  <input type="checkbox" name="consent" required checked={formData.consent} onChange={handleChange}
+                    className="peer appearance-none w-5 h-5 border-2 border-[#1A1817]/30 rounded-[4px] checked:bg-[#1A1817] checked:border-[#1A1817] transition-all cursor-pointer" />
                   <svg className="absolute w-3 h-3 text-white opacity-0 peer-checked:opacity-100 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path>
                   </svg>
                 </div>
                 <span className="font-sans text-sm text-[#5C5855] group-hover:text-[#1A1817] transition-colors">
                   I understand that this is a curated space for art, and I agree to the{' '}
-                  <Link href="/terms" target="_blank" className="font-bold text-[#1A1817] underline hover:text-[#FF6B35]">
-                    Terms & Guidelines
-                  </Link>
-                  .
+                  <Link href="/terms" target="_blank" className="font-bold text-[#1A1817] underline hover:text-[#FF6B35]">Terms & Guidelines</Link>.
                 </span>
               </label>
             </div>
 
-            {/* Ticket counter + pay button */}
+            {/* Ticket counter + pay */}
             <div className="pt-6 border-t border-[#1A1817]/10">
               <div className="flex items-center justify-between bg-white/60 p-4 rounded-2xl border border-[#1A1817]/10 mb-4 shadow-sm">
                 <div>
-                  <span className="font-sans text-[10px] uppercase tracking-widest text-[#5C5855] font-bold block mb-1">
-                    Select Quantity
-                  </span>
+                  <span className="font-sans text-[10px] uppercase tracking-widest text-[#5C5855] font-bold block mb-1">Select Quantity</span>
                   <span className="font-serif text-lg text-[#1A1817] leading-none">
-                    {ticketCount === 1
-                      ? `₹${eventDetails?.price || '999'} per person`
-                      : `Group Rate: ₹${eventDetails?.groupPrice || '899'} per person`}
+                    {ticketCount === 1 ? `₹${eventDetails?.price || '999'} per person` : `Group Rate: ₹${eventDetails?.groupPrice || '899'} per person`}
                   </span>
                 </div>
                 <div className="flex items-center bg-[#1A1817] rounded-full p-1 gap-4 text-white">
-                  <button
-                    onClick={decrement}
-                    disabled={ticketCount <= 1 || isProcessing}
-                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors disabled:opacity-30"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 12H4"></path>
-                    </svg>
+                  <button onClick={decrement} disabled={ticketCount <= 1 || isProcessing}
+                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors disabled:opacity-30">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 12H4"></path></svg>
                   </button>
                   <span className="font-sans font-bold w-4 text-center">{ticketCount}</span>
-                  <button
-                    onClick={increment}
-                    disabled={ticketCount >= maxTickets || isProcessing}
-                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors disabled:opacity-30"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
-                    </svg>
+                  <button onClick={increment} disabled={ticketCount >= maxTickets || isProcessing}
+                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors disabled:opacity-30">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
                   </button>
                 </div>
               </div>
 
-              {/* ── "Only X left" warning under the counter ── */}
+              {/* Only X left warning under counter */}
               {showCountdown && (
                 <div className="flex items-center gap-2 mb-4 px-1">
                   <span className="animate-pulse-fast w-1.5 h-1.5 bg-[#DC2626] rounded-full shrink-0"></span>
@@ -485,11 +395,8 @@ function RegisterContent() {
                 </div>
               )}
 
-              <button
-                disabled={isProcessing || isLoadingEvent}
-                type="submit"
-                className="w-full bg-[#1A1817] disabled:bg-[#5C5855] disabled:cursor-not-allowed text-white font-sans text-sm uppercase tracking-[0.2em] font-bold py-5 px-8 rounded-xl hover:bg-[#FF6B35] transition-all hover:shadow-xl hover:-translate-y-1 flex items-center justify-between group"
-              >
+              <button disabled={isProcessing || isLoadingEvent} type="submit"
+                className="w-full bg-[#1A1817] disabled:bg-[#5C5855] disabled:cursor-not-allowed text-white font-sans text-sm uppercase tracking-[0.2em] font-bold py-5 px-8 rounded-xl hover:bg-[#FF6B35] transition-all hover:shadow-xl hover:-translate-y-1 flex items-center justify-between group">
                 <span>{isProcessing ? 'Processing...' : `Secure ${ticketCount} Ticket${ticketCount > 1 ? 's' : ''}`}</span>
                 {!isProcessing && (
                   <span className="flex items-center gap-3">

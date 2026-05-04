@@ -103,18 +103,20 @@ export default async function EventDetailPage({ params }) {
   const shareUrl = `https://almusawwir.art/event/${targetId}`;
   const whatsappLink = `https://wa.me/?text=${encodeURIComponent(shareText + ' ' + shareUrl)}`;
 
+  // ── status column is the ONLY source of truth for sold out ──
   const isSoldOut = currentEvent.status && (
     currentEvent.status.toLowerCase().includes('sold') ||
     currentEvent.status.toLowerCase().includes('closed')
   );
 
-  // ── Ticket availability calculations ──
+  // ticketsLeft: for countdown badge only
   const capacity = parseInt(currentEvent.capacity) || 0;
   const booked = parseInt(currentEvent.booked) || 0;
   const ticketsLeft = Math.max(0, capacity - booked);
-  // "Feeling Fast" when >= 50% booked (and not fully sold out)
-  const isFeelingFast = !isSoldOut && capacity > 0 && booked >= capacity * 0.5 && ticketsLeft > 0;
-  // Countdown badge when <= 4 left (and not sold out)
+
+  // Filling Fast: >=50% booked, not sold out
+  const isFeelingFast = !isSoldOut && capacity > 0 && booked >= capacity * 0.5;
+  // Countdown: <=4 left, not sold out
   const showCountdown = !isSoldOut && ticketsLeft > 0 && ticketsLeft <= 4;
 
   const rawImage = currentEvent.image_url || '/images/hero-bg.jpg';
@@ -214,25 +216,6 @@ export default async function EventDetailPage({ params }) {
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-[#F7F5F0] via-transparent to-transparent"></div>
 
-        {/* ── Feeling Fast badge on hero image ── */}
-        {isFeelingFast && !showCountdown && (
-          <div className="absolute top-6 right-4 md:right-8 z-20">
-            <span className="animate-pulse-fast inline-flex items-center gap-1.5 bg-[#FF6B35] text-white font-sans text-[10px] uppercase tracking-[0.2em] font-bold px-4 py-2 rounded-full shadow-lg">
-              <span className="w-1.5 h-1.5 bg-white rounded-full"></span>
-              Filling Fast
-            </span>
-          </div>
-        )}
-
-        {/* ── Countdown badge on hero image (overrides Filling Fast) ── */}
-        {showCountdown && (
-          <div className="absolute top-6 right-4 md:right-8 z-20">
-            <span className="urgency-glow inline-flex items-center gap-1.5 bg-[#DC2626] text-white font-sans text-[10px] uppercase tracking-[0.2em] font-bold px-4 py-2 rounded-full shadow-lg">
-              <span className="animate-pulse-fast w-1.5 h-1.5 bg-white rounded-full"></span>
-              Only {ticketsLeft} left
-            </span>
-          </div>
-        )}
       </div>
 
       <div className="max-w-3xl mx-auto px-4 -mt-24 relative z-10 space-y-12">
@@ -245,25 +228,6 @@ export default async function EventDetailPage({ params }) {
           <h1 className="font-serif italic text-5xl md:text-7xl text-[#1A1817] leading-tight pt-4">{currentEvent.title}</h1>
           <p className="font-serif text-xl md:text-2xl text-[#5C5855]">{currentEvent.tagline}</p>
 
-          {/* ── Inline urgency strip below tagline ── */}
-          {showCountdown && (
-            <div className="inline-flex items-center gap-2 bg-[#DC2626]/8 border border-[#DC2626]/20 rounded-2xl px-5 py-3 mt-2">
-              <svg className="w-4 h-4 text-[#DC2626] shrink-0 animate-pulse-fast" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-              <span className="font-sans text-xs font-bold text-[#DC2626] uppercase tracking-wider">
-                Only {ticketsLeft} spot{ticketsLeft === 1 ? '' : 's'} remaining
-              </span>
-            </div>
-          )}
-          {isFeelingFast && !showCountdown && (
-            <div className="inline-flex items-center gap-2 bg-[#FF6B35]/8 border border-[#FF6B35]/20 rounded-2xl px-5 py-3 mt-2">
-              <span className="animate-pulse-fast w-2 h-2 bg-[#FF6B35] rounded-full shrink-0"></span>
-              <span className="font-sans text-xs font-bold text-[#FF6B35] uppercase tracking-wider">
-                Filling fast — more than half the spots are gone
-              </span>
-            </div>
-          )}
         </div>
 
         {/* Location card */}
@@ -365,25 +329,6 @@ export default async function EventDetailPage({ params }) {
       {/* ── STICKY BOTTOM BAR ── */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-lg border-t border-[#1A1817]/10 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
 
-        {/* ── Urgency strip above the bar (countdown only) ── */}
-        {showCountdown && (
-          <div className="w-full bg-[#DC2626] py-2 px-4 text-center">
-            <p className="font-sans text-[10px] uppercase tracking-[0.25em] font-bold text-white flex items-center justify-center gap-2">
-              <span className="animate-pulse-fast w-1.5 h-1.5 bg-white rounded-full inline-block"></span>
-              Hurry — only {ticketsLeft} spot{ticketsLeft === 1 ? '' : 's'} left
-              <span className="animate-pulse-fast w-1.5 h-1.5 bg-white rounded-full inline-block"></span>
-            </p>
-          </div>
-        )}
-        {isFeelingFast && !showCountdown && (
-          <div className="w-full bg-[#FF6B35]/10 border-b border-[#FF6B35]/20 py-1.5 px-4 text-center">
-            <p className="font-sans text-[10px] uppercase tracking-[0.2em] font-bold text-[#FF6B35] flex items-center justify-center gap-2">
-              <span className="animate-pulse-fast w-1.5 h-1.5 bg-[#FF6B35] rounded-full inline-block"></span>
-              Filling fast
-            </p>
-          </div>
-        )}
-
         <div className="p-4">
           <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
 
@@ -408,20 +353,34 @@ export default async function EventDetailPage({ params }) {
               <span className="font-sans text-lg font-bold text-[#1A1817]">₹{currentEvent.price || '999'}</span>
             </div>
 
-            {/* CTA Button */}
-            {isSoldOut ? (
-              <div className="w-[70%] sm:w-auto bg-[#5C5855] text-white font-sans text-xs md:text-sm uppercase tracking-[0.2em] font-bold py-4 px-6 rounded-full text-center shadow-xl flex items-center justify-center gap-2 cursor-not-allowed opacity-80">
-                {currentEvent.button_text || 'Sold Out'}
-              </div>
-            ) : (
-              <Link
-                href={`/register?eventId=${currentEvent.id}&ticketsLeft=${ticketsLeft}`}
-                className="w-[70%] sm:w-auto bg-[#1A1817] text-white font-sans text-xs md:text-sm uppercase tracking-[0.2em] font-bold py-4 px-6 rounded-full hover:bg-[#FF6B35] transition-all text-center shadow-xl hover:-translate-y-1 flex items-center justify-center gap-2"
-              >
-                {currentEvent.button_text || 'Secure Canvas'}
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-              </Link>
-            )}
+            {/* CTA Button — urgency label sits above it, same spot always */}
+            <div className="flex flex-col items-end gap-1 w-[70%] sm:w-auto">
+              {showCountdown && (
+                <span className="flex items-center gap-1.5 font-sans text-[10px] uppercase tracking-wider font-bold text-[#DC2626]">
+                  <span className="animate-pulse-fast w-1.5 h-1.5 bg-[#DC2626] rounded-full"></span>
+                  Only {ticketsLeft} spot{ticketsLeft === 1 ? '' : 's'} left
+                </span>
+              )}
+              {isFeelingFast && !showCountdown && (
+                <span className="flex items-center gap-1.5 font-sans text-[10px] uppercase tracking-wider font-bold text-[#FF6B35]">
+                  <span className="animate-pulse-fast w-1.5 h-1.5 bg-[#FF6B35] rounded-full"></span>
+                  Filling fast
+                </span>
+              )}
+              {isSoldOut ? (
+                <div className="w-full bg-[#5C5855] text-white font-sans text-xs md:text-sm uppercase tracking-[0.2em] font-bold py-4 px-6 rounded-full text-center shadow-xl flex items-center justify-center gap-2 cursor-not-allowed opacity-80">
+                  Sold Out
+                </div>
+              ) : (
+                <Link
+                  href={`/register?eventId=${currentEvent.id}&ticketsLeft=${ticketsLeft}`}
+                  className="w-full bg-[#1A1817] text-white font-sans text-xs md:text-sm uppercase tracking-[0.2em] font-bold py-4 px-6 rounded-full hover:bg-[#FF6B35] transition-all text-center shadow-xl hover:-translate-y-1 flex items-center justify-center gap-2"
+                >
+                  {currentEvent.button_text || 'Secure Canvas'}
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                </Link>
+              )}
+            </div>
           </div>
         </div>
       </div>
