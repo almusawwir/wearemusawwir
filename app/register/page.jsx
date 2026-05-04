@@ -15,7 +15,7 @@ function RegisterContent() {
   const [eventDetails, setEventDetails] = useState(null);
   const [isLoadingEvent, setIsLoadingEvent] = useState(true);
 
-  // ✦ ADDED: Ticket Counter State
+  // ✦ Ticket Counter State
   const [ticketCount, setTicketCount] = useState(1);
 
   const [formData, setFormData] = useState({
@@ -30,7 +30,7 @@ function RegisterContent() {
 
   const [isProcessing, setIsProcessing] = useState(false);
   
-  // ✦ ADDED: Success Loading State
+  // ✦ Success Loading State
   const [isSuccessLoading, setIsSuccessLoading] = useState(false);
 
   useEffect(() => {
@@ -55,7 +55,6 @@ function RegisterContent() {
                 time: foundEvent.time,
                 location: foundEvent.location_main,
                 price: foundEvent.price || '999',
-                // ✦ ADDED: Fetch Group Price
                 groupPrice: foundEvent.group_price || foundEvent.price || '999',
                 bring: foundEvent.bring || 'An open heart.',
                 provided: foundEvent.provided || 'Canvas and paints.'
@@ -75,11 +74,9 @@ function RegisterContent() {
     }));
   };
 
-  // ✦ ADDED: Counter Logic
   const increment = (e) => { e.preventDefault(); setTicketCount(prev => Math.min(5, prev + 1)); };
   const decrement = (e) => { e.preventDefault(); setTicketCount(prev => Math.max(1, prev - 1)); };
 
-  // ✦ ADDED: Live Total Calculation
   const unitPrice = ticketCount === 1 ? (eventDetails?.price || 999) : (eventDetails?.groupPrice || 999);
   const totalAmount = parseInt(unitPrice) * ticketCount;
 
@@ -91,7 +88,6 @@ function RegisterContent() {
       const response = await fetch('/api/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // ✦ ADDED: Passing ticketCount to Backend
         body: JSON.stringify({ eventId: eventId, ticketCount: ticketCount }) 
       });
       const data = await response.json();
@@ -107,14 +103,11 @@ function RegisterContent() {
         amount: data.order.amount,
         currency: data.order.currency,
         name: "Al-Musawwir",
-        // ✦ ADDED: Dynamic description showing quantity
         description: `${ticketCount}x Ticket(s) for ${eventDetails ? eventDetails.title : "Strokes & Stories"}`,
         order_id: data.order.id, 
         
         handler: async function (response) {
-          // ✦ ADDED: Trigger the loading overlay immediately
           setIsSuccessLoading(true);
-          
           try {
             await fetch('/api/save-data', {
               method: 'POST',
@@ -134,42 +127,30 @@ function RegisterContent() {
                 eventLocation: eventDetails?.location || "TBD",
                 eventBring: eventDetails?.bring || "An open heart",
                 eventProvided: eventDetails?.provided || "Art supplies",
-                // ✦ ADDED: Saving Quantity and Total Paid to Google Sheet
                 ticketCount: ticketCount,
                 totalPaid: totalAmount
               })
             });
-            
-            // ✦ ADDED: Passing Quantity to the Ticket Page URL
             window.location.href = `/ticket?id=${response.razorpay_payment_id}&name=${encodeURIComponent(formData.name)}&eventId=${encodeURIComponent(eventId)}&qty=${ticketCount}`;             
           } catch (error) {
             console.error("Payment succeeded but saving failed:", error);
-            setIsSuccessLoading(false); // Hide loading on error
+            setIsSuccessLoading(false);
             alert("Payment successful, but we had trouble saving your form. Please WhatsApp us your Payment ID: " + response.razorpay_payment_id);
           }
         },
-
-        prefill: {
-          name: formData.name,
-          contact: formData.whatsapp,
-          email: formData.email,
-        },
-        theme: {
-          color: "#1A1817", 
-        },
+        prefill: { name: formData.name, contact: formData.whatsapp, email: formData.email },
+        theme: { color: "#1A1817" },
       };
 
       const paymentObject = new window.Razorpay(options);
       paymentObject.open();
-
       paymentObject.on('payment.failed', function (response) {
-        setIsProcessing(false); // Reset processing on failure
+        setIsProcessing(false);
         alert("Payment Failed. Please try again.");
       });
-
     } catch (error) {
       console.error("Payment setup failed:", error);
-      setIsProcessing(false); // Reset processing on error
+      setIsProcessing(false);
       alert("Something went wrong. Please try again.");
     } 
   };
@@ -177,7 +158,6 @@ function RegisterContent() {
   return (
     <div className="relative min-h-screen w-full bg-[#F7F5F0] text-[#1A1817] font-sans antialiased selection:bg-[#FF6B35] selection:text-white flex justify-center py-12 px-4 md:px-6">
       
-      {/* ✦ ADDED: Full Screen Loading Overlay ✦ */}
       {isSuccessLoading && (
         <div className="fixed inset-0 z-[100] bg-[#F7F5F0]/90 backdrop-blur-md flex flex-col items-center justify-center">
           <div className="relative w-20 h-20 mb-8">
@@ -277,7 +257,8 @@ function RegisterContent() {
               <h2 className="font-sans text-[11px] uppercase tracking-[0.3em] font-bold text-[#004E98] border-b border-[#1A1817]/10 pb-2">2. Your World (Optional)</h2>
               <div className="flex flex-col gap-2">
                 <label className="font-sans text-xs font-bold text-[#1A1817] uppercase tracking-wider">Instagram / LinkedIn / Portfolio</label>
-                <input type="url" name="creativeLink" value={formData.creativeLink} onChange={handleChange} className="bg-white/50 border border-[#1A1817]/20 rounded-xl px-4 py-3 font-sans text-base text-[#1A1817] focus:outline-none focus:border-[#004E98] focus:bg-white transition-all placeholder:text-[#1A1817]/30" placeholder="https://" />
+                {/* ✦ REMOVED: type="url" restriction ✦ */}
+                <input type="text" name="creativeLink" value={formData.creativeLink} onChange={handleChange} className="bg-white/50 border border-[#1A1817]/20 rounded-xl px-4 py-3 font-sans text-base text-[#1A1817] focus:outline-none focus:border-[#004E98] focus:bg-white transition-all placeholder:text-[#1A1817]/30" placeholder="@handle or portfolio link" />
               </div>
             </div>
 
@@ -310,13 +291,11 @@ function RegisterContent() {
                 </div>
                 <span className="font-sans text-sm text-[#5C5855] group-hover:text-[#1A1817] transition-colors">
                   I understand that this is a curated space for art, and I agree to the <Link href="/terms" target="_blank" className="font-bold text-[#1A1817] underline hover:text-[#FF6B35]">Terms & Guidelines</Link>.
-                </span>              </label>
+                </span>
+              </label>
             </div>
 
-            {/* ✦ ADDED: TICKET SELECTOR & NEW SUBMIT BUTTON UI ✦ */}
             <div className="pt-6 border-t border-[#1A1817]/10">
-              
-              {/* Ticket Counter */}
               <div className="flex items-center justify-between bg-white/60 p-4 rounded-2xl border border-[#1A1817]/10 mb-6 shadow-sm">
                 <div>
                   <span className="font-sans text-[10px] uppercase tracking-widest text-[#5C5855] font-bold block mb-1">Select Quantity</span>
@@ -324,7 +303,6 @@ function RegisterContent() {
                     {ticketCount === 1 ? `₹${eventDetails?.price || '999'} per person` : `Group Rate: ₹${eventDetails?.groupPrice || '899'} per person`}
                   </span>
                 </div>
-                
                 <div className="flex items-center bg-[#1A1817] rounded-full p-1 gap-4 text-white">
                   <button onClick={decrement} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors disabled:opacity-30" disabled={ticketCount <= 1 || isProcessing}>
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 12H4"></path></svg>
@@ -336,7 +314,6 @@ function RegisterContent() {
                 </div>
               </div>
 
-              {/* Submit Button */}
               <button disabled={isProcessing || isLoadingEvent} type="submit" className="w-full bg-[#1A1817] disabled:bg-[#5C5855] disabled:cursor-not-allowed text-white font-sans text-sm uppercase tracking-[0.2em] font-bold py-5 px-8 rounded-xl hover:bg-[#FF6B35] transition-all hover:shadow-xl hover:-translate-y-1 flex items-center justify-between group">
                 <span>{isProcessing ? "Processing..." : `Secure ${ticketCount} Ticket${ticketCount > 1 ? 's' : ''}`}</span>
                 {!isProcessing && <span className="flex items-center gap-3">Pay ₹{totalAmount} <svg className="w-5 h-5 transform group-hover:translate-x-2 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l7-7m7-7H3"></path></svg></span>}
