@@ -15,6 +15,9 @@ function RegisterContent() {
   const [eventDetails, setEventDetails] = useState(null);
   const [isLoadingEvent, setIsLoadingEvent] = useState(true);
 
+  // ✦ ADDED: Ticket Counter State
+  const [ticketCount, setTicketCount] = useState(1);
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -49,7 +52,8 @@ function RegisterContent() {
                 time: foundEvent.time,
                 location: foundEvent.location_main,
                 price: foundEvent.price || '999',
-                // ✦ WE NOW SAVE THESE SO WE CAN EMAIL THEM! ✦
+                // ✦ ADDED: Fetch Group Price
+                groupPrice: foundEvent.group_price || foundEvent.price || '999',
                 bring: foundEvent.bring || 'An open heart.',
                 provided: foundEvent.provided || 'Canvas and paints.'
               });
@@ -68,6 +72,14 @@ function RegisterContent() {
     }));
   };
 
+  // ✦ ADDED: Counter Logic
+  const increment = (e) => { e.preventDefault(); setTicketCount(prev => Math.min(5, prev + 1)); };
+  const decrement = (e) => { e.preventDefault(); setTicketCount(prev => Math.max(1, prev - 1)); };
+
+  // ✦ ADDED: Live Total Calculation
+  const unitPrice = ticketCount === 1 ? (eventDetails?.price || 999) : (eventDetails?.groupPrice || 999);
+  const totalAmount = parseInt(unitPrice) * ticketCount;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsProcessing(true);
@@ -76,7 +88,8 @@ function RegisterContent() {
       const response = await fetch('/api/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eventId: eventId }) 
+        // ✦ ADDED: Passing ticketCount to Backend
+        body: JSON.stringify({ eventId: eventId, ticketCount: ticketCount }) 
       });
       const data = await response.json();
 
@@ -91,7 +104,8 @@ function RegisterContent() {
         amount: data.order.amount,
         currency: data.order.currency,
         name: "Al-Musawwir",
-        description: eventDetails ? eventDetails.title : "Strokes & Stories",
+        // ✦ ADDED: Dynamic description showing quantity
+        description: `${ticketCount}x Ticket(s) for ${eventDetails ? eventDetails.title : "Strokes & Stories"}`,
         order_id: data.order.id, 
         
         handler: async function (response) {
@@ -108,17 +122,20 @@ function RegisterContent() {
                 reason: formData.reason,
                 reflection: formData.reflection,
                 paymentId: response.razorpay_payment_id,
-                // ✦ SENDING THE SPECIFIC EVENT DATA TO THE EMAIL SCRIPT ✦
                 eventTitle: eventDetails?.title || "Al-Musawwir",
                 eventDate: eventDetails?.date || "TBD",
                 eventTime: eventDetails?.time || "TBD",
                 eventLocation: eventDetails?.location || "TBD",
                 eventBring: eventDetails?.bring || "An open heart",
-                eventProvided: eventDetails?.provided || "Art supplies"
+                eventProvided: eventDetails?.provided || "Art supplies",
+                // ✦ ADDED: Saving Quantity and Total Paid to Google Sheet
+                ticketCount: ticketCount,
+                totalPaid: totalAmount
               })
             });
             
-            window.location.href = `/ticket?id=${response.razorpay_payment_id}&name=${encodeURIComponent(formData.name)}&eventId=${encodeURIComponent(eventId)}`;             
+            // ✦ ADDED: Passing Quantity to the Ticket Page URL
+            window.location.href = `/ticket?id=${response.razorpay_payment_id}&name=${encodeURIComponent(formData.name)}&eventId=${encodeURIComponent(eventId)}&qty=${ticketCount}`;             
           } catch (error) {
             console.error("Payment succeeded but saving failed:", error);
             alert("Payment successful, but we had trouble saving your form. Please WhatsApp us your Payment ID: " + response.razorpay_payment_id);
@@ -273,11 +290,35 @@ function RegisterContent() {
               </label>
             </div>
 
-            <div className="pt-6">
-              <button disabled={isProcessing || isLoadingEvent} type="submit" className="w-full bg-[#1A1817] disabled:bg-[#5C5855] disabled:cursor-not-allowed text-white font-sans text-sm uppercase tracking-[0.2em] font-bold py-5 px-8 rounded-xl hover:bg-[#FF6B35] transition-all hover:shadow-xl hover:-translate-y-1 flex items-center justify-center gap-3 group">
-                {isProcessing ? "Processing..." : `Submit & Pay ₹${eventDetails?.price || '...'}`}
-                {!isProcessing && <svg className="w-5 h-5 transform group-hover:translate-x-2 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l7-7m7-7H3"></path></svg>}
+            {/* ✦ ADDED: TICKET SELECTOR & NEW SUBMIT BUTTON UI ✦ */}
+            <div className="pt-6 border-t border-[#1A1817]/10">
+              
+              {/* Ticket Counter */}
+              <div className="flex items-center justify-between bg-white/60 p-4 rounded-2xl border border-[#1A1817]/10 mb-6 shadow-sm">
+                <div>
+                  <span className="font-sans text-[10px] uppercase tracking-widest text-[#5C5855] font-bold block mb-1">Select Quantity</span>
+                  <span className="font-serif text-lg text-[#1A1817] leading-none">
+                    {ticketCount === 1 ? `₹${eventDetails?.price || '999'} per person` : `Group Rate: ₹${eventDetails?.groupPrice || '899'} per person`}
+                  </span>
+                </div>
+                
+                <div className="flex items-center bg-[#1A1817] rounded-full p-1 gap-4 text-white">
+                  <button onClick={decrement} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors disabled:opacity-30" disabled={ticketCount <= 1 || isProcessing}>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 12H4"></path></svg>
+                  </button>
+                  <span className="font-sans font-bold w-4 text-center">{ticketCount}</span>
+                  <button onClick={increment} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors disabled:opacity-30" disabled={ticketCount >= 5 || isProcessing}>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <button disabled={isProcessing || isLoadingEvent} type="submit" className="w-full bg-[#1A1817] disabled:bg-[#5C5855] disabled:cursor-not-allowed text-white font-sans text-sm uppercase tracking-[0.2em] font-bold py-5 px-8 rounded-xl hover:bg-[#FF6B35] transition-all hover:shadow-xl hover:-translate-y-1 flex items-center justify-between group">
+                <span>{isProcessing ? "Processing..." : `Secure ${ticketCount} Ticket${ticketCount > 1 ? 's' : ''}`}</span>
+                {!isProcessing && <span className="flex items-center gap-3">Pay ₹{totalAmount} <svg className="w-5 h-5 transform group-hover:translate-x-2 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l7-7m7-7H3"></path></svg></span>}
               </button>
+              
               <p className="font-sans text-[10px] text-center text-[#5C5855] uppercase tracking-widest mt-4 flex items-center justify-center gap-2">
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
                 Secure Checkout by Razorpay

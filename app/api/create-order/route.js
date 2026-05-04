@@ -1,6 +1,6 @@
 import Razorpay from 'razorpay';
 import { NextResponse } from 'next/server';
-import Papa from 'papaparse'; // We need PapaParse on the backend now too!
+import Papa from 'papaparse';
 
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSSCmEDqxpPn1OEzXR3geUaynoeGhrswVO5xf8zKETC8xOq1oimP1SiapOAsSPY_nEMTHoDeacTgKC/pub?gid=0&single=true&output=csv";
 
@@ -11,43 +11,48 @@ const razorpay = new Razorpay({
 
 export async function POST(request) {
   try {
-    // 1. Find out which event they are trying to book
     const body = await request.json();
     const eventId = body.eventId;
+    
+    // ✦ 1. Catch the quantity from the frontend (default to 1 if missing) ✦
+    const ticketCount = parseInt(body.ticketCount) || 1; 
 
-    let priceToCharge = 999; // Default fallback just in case
+    let singlePrice = 999;
+    let groupPrice = 999;
 
-    // 2. Fetch the Live Price from Google Sheets
+    // ✦ 2. Fetch the live prices from your CMS sheet ✦
     if (eventId) {
       const res = await fetch(CSV_URL, { next: { revalidate: 0 } });
       const text = await res.text();
-      
       const parsed = Papa.parse(text, {
-        header: true,
-        skipEmptyLines: true,
-        transformHeader: (h) => h.trim().toLowerCase().replace(/^\uFEFF/, ''),
+        header: true, 
+        skipEmptyLines: true, 
+        transformHeader: (h) => h.trim().toLowerCase().replace(/^\uFEFF/, '')
       });
 
       const currentEvent = parsed.data.find(e => e.id && e.id.trim().toLowerCase() === eventId.trim().toLowerCase());
       
-      // If we found the event and it has a price in the column, use it!
-      if (currentEvent && currentEvent.price) {
-         // This safely turns a string like "1499" into a real number
-         const parsedPrice = parseInt(currentEvent.price.replace(/[^\d]/g, ''), 10);
-         if (!isNaN(parsedPrice)) {
-           priceToCharge = parsedPrice;
+      if (currentEvent) {
+         if (currentEvent.price) {
+             singlePrice = parseInt(currentEvent.price.replace(/[^\d]/g, ''), 10) || 999;
+         }
+         // If they didn't set a group price, fallback to the single price
+         if (currentEvent.group_price) {
+             groupPrice = parseInt(currentEvent.group_price.replace(/[^\d]/g, ''), 10) || singlePrice;
+         } else {
+             groupPrice = singlePrice;
          }
       }
     }
 
-    // 3. Razorpay expects the amount in the smallest currency unit (paise). 
-    // Example: ₹1499 = 149900 paise.
-    const amount = priceToCharge * 100; 
+    // ✦ 3. Calculate the exact total based on Quantity and Group Pricing ✦
+    const finalUnitPrice = ticketCount === 1 ? singlePrice : groupPrice;
+    const totalAmountInPaise = finalUnitPrice * ticketCount * 100; 
 
     const options = {
-      amount: amount,
+      amount: totalAmountInPaise,
       currency: "INR",
-      receipt: "receipt_" + Math.random().toString(36).substring(7),
+      receipt: "rcpt_" + Math.random().toString(36).substring(7),
     };
 
     const order = await razorpay.orders.create(options);
