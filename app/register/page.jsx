@@ -308,8 +308,9 @@ function RegisterContent() {
                   <input type="checkbox" name="consent" required checked={formData.consent} onChange={handleChange} className="peer appearance-none w-5 h-5 border-2 border-[#1A1817]/30 rounded-[4px] checked:bg-[#1A1817] checked:border-[#1A1817] transition-all cursor-pointer" />
                   <svg className="absolute w-3 h-3 text-white opacity-0 peer-checked:opacity-100 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg>
                 </div>
-                <span className="font-sans text-sm text-[#5C5855] group-hover:text-[#1A1817] transition-colors">I understand that this is a curated space for art and connection, and I agree to abide by the event guidelines.</span>
-              </label>
+                <span className="font-sans text-sm text-[#5C5855] group-hover:text-[#1A1817] transition-colors">
+                  I understand that this is a curated space for art, and I agree to the <Link href="/terms" target="_blank" className="font-bold text-[#1A1817] underline hover:text-[#FF6B35]">Terms & Guidelines</Link>.
+                </span>              </label>
             </div>
 
             {/* ✦ ADDED: TICKET SELECTOR & NEW SUBMIT BUTTON UI ✦ */}

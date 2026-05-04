@@ -1,0 +1,55 @@
+import React from 'react';
+import Link from 'next/link';
+
+export const metadata = {
+  title: 'Terms & Guidelines | Al-Musawwir',
+};
+
+export default function TermsPage() {
+  return (
+    <div className="relative min-h-screen w-full bg-[#F7F5F0] text-[#1A1817] font-sans antialiased pt-24 pb-32 px-4 md:px-6">
+      <style dangerouslySetInnerHTML={{__html: `
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Manrope:wght@200;300;400;500;600;700&display=swap');
+        .font-serif { font-family: 'Cormorant Garamond', serif; }
+        .font-sans { font-family: 'Manrope', sans-serif; }
+      `}} />
+      <nav className="fixed top-8 left-4 md:left-8 z-50">
+        <Link href="/" className="bg-white/80 backdrop-blur px-4 py-2 rounded-full font-sans text-[10px] uppercase tracking-widest font-bold hover:bg-[#1A1817] hover:text-white transition-all shadow-lg text-[#1A1817]">
+          ← Back
+        </Link>
+      </nav>
+
+      <div className="max-w-3xl mx-auto relative z-10 space-y-8 mt-12 bg-white/60 p-8 md:p-12 rounded-[2rem] border border-[#1A1817]/10">
+        <h1 className="font-serif italic text-4xl text-[#1A1817] border-b border-[#1A1817]/10 pb-6">Terms & Event Guidelines</h1>
+        
+        <div className="space-y-8 text-sm md:text-base text-[#5C5855] leading-relaxed">
+          <section>
+            <h2 className="font-sans text-[11px] uppercase tracking-[0.2em] font-bold text-[#1A1817] mb-2">1. Booking & Capacity</h2>
+            <p>Our gatherings are strictly limited in capacity to ensure an intimate and calm environment. Your spot is only secured once full payment is received and a Digital Ticket is issued. Tickets are non-transferable without prior notice to the organizers.</p>
+          </section>
+
+          <section>
+            <h2 className="font-sans text-[11px] uppercase tracking-[0.2em] font-bold text-[#FF6B35] mb-2">2. Cancellation & Refund Policy</h2>
+            <p>Because we purchase art supplies and curate materials based on exact headcount, <strong>we do not offer refunds</strong> for no-shows or last-minute cancellations.</p>
+            <p className="mt-2">If you have made a payment by mistake, you may request a cancellation <strong>within 30 minutes of booking</strong> by replying to your confirmation email or contacting us directly.</p>
+          </section>
+
+          <section>
+            <h2 className="font-sans text-[11px] uppercase tracking-[0.2em] font-bold text-[#004E98] mb-2">3. Code of Conduct</h2>
+            <p>Al-Musawwir is a safe, inclusive, and judgment-free zone. We expect all attendees to respect the venue, the materials, and each other. Any form of harassment, disruption, or disrespect will result in immediate removal from the gathering without a refund.</p>
+          </section>
+
+          <section>
+            <h2 className="font-sans text-[11px] uppercase tracking-[0.2em] font-bold text-[#E24E7A] mb-2">4. Photography & Media</h2>
+            <p>We often take photos and short videos during our gatherings to share the beauty of the community on our social media channels. By attending, you consent to being photographed. If you prefer not to be on camera, please inform the host quietly at the beginning of the event, and we will happily respect your privacy.</p>
+          </section>
+
+          <section>
+            <h2 className="font-sans text-[11px] uppercase tracking-[0.2em] font-bold text-[#1A1817] mb-2">5. Liability</h2>
+            <p>While we strive to create a perfectly safe environment, Al-Musawwir and its organizers are not liable for any personal injury, loss, or damage to personal belongings during the event. Please keep your valuables safe and handle art materials responsibly.</p>
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+}
