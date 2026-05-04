@@ -38,7 +38,14 @@ export default function App() {
           skipEmptyLines: true,
           transformHeader: (h) => h.trim().toLowerCase().replace(/^\uFEFF/, ''),
           complete: (results) => {
-            setEvents(results.data);
+            // ✦ ADDED: Filter out ghost rows. Only keep events with a valid ID AND Title. ✦
+            const validEvents = results.data.filter(event => {
+                const hasId = event.id && event.id.trim() !== '';
+                const hasTitle = event.title && event.title.trim() !== '';
+                return hasId && hasTitle;
+            });
+            
+            setEvents(validEvents);
             setIsLoading(false);
           }
         });
@@ -97,7 +104,6 @@ export default function App() {
       {/* Cinematic Hero Section */}
       <header className="relative min-h-[100vh] flex flex-col items-center justify-center px-4 md:px-6 overflow-hidden pt-20">
         <div className="absolute inset-0 z-0 bg-[#1A1817]">
-          {/* HERO — priority:true means loads immediately, no lazy load */}
           <Image
             src="/images/hero-bg.jpg"
             alt="Al-Musawwir Background"
@@ -154,6 +160,8 @@ export default function App() {
 
           {isLoading ? (
             <div className="text-center font-serif text-xl animate-pulse text-[#5C5855]">Summoning canvases...</div>
+          ) : events.length === 0 ? (
+             <div className="text-center font-serif text-xl text-[#5C5855]">No gatherings currently scheduled. Check back soon!</div>
           ) : (
             <div className="space-y-16">
               {events.map((event) => {
@@ -172,8 +180,6 @@ export default function App() {
                     <div className="w-full md:w-2/5 relative h-64 md:h-auto min-h-[16rem] overflow-hidden bg-[#1A1817]">
                       {event.image_url ? (
                         isExternalImage ? (
-                          // External URLs (e.g. Google Drive) — use regular img tag
-                          // Next.js Image requires domains to be whitelisted in next.config.js
                           <img
                             src={event.image_url}
                             className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000"
@@ -182,7 +188,6 @@ export default function App() {
                             decoding="async"
                           />
                         ) : (
-                          // Local images — use Next.js Image for full optimization
                           <Image
                             src={event.image_url}
                             alt={event.title}
