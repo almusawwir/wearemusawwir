@@ -1,11 +1,11 @@
-import React from 'react';
-import Link from 'next/link';
+"use client";
 
-export const metadata = {
-  title: 'Terms & Guidelines | Al-Musawwir',
-};
+import React from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function TermsPage() {
+  const router = useRouter();
+
   return (
     <div className="relative min-h-screen w-full bg-[#F7F5F0] text-[#1A1817] font-sans antialiased pt-24 pb-32 px-4 md:px-6">
       <style dangerouslySetInnerHTML={{__html: `
@@ -13,10 +13,15 @@ export default function TermsPage() {
         .font-serif { font-family: 'Cormorant Garamond', serif; }
         .font-sans { font-family: 'Manrope', sans-serif; }
       `}} />
+      
+      {/* ✦ DYNAMIC BACK BUTTON ✦ */}
       <nav className="fixed top-8 left-4 md:left-8 z-50">
-        <Link href="/" className="bg-white/80 backdrop-blur px-4 py-2 rounded-full font-sans text-[10px] uppercase tracking-widest font-bold hover:bg-[#1A1817] hover:text-white transition-all shadow-lg text-[#1A1817]">
+        <button 
+          onClick={() => router.back()} 
+          className="bg-white/80 backdrop-blur px-4 py-2 rounded-full font-sans text-[10px] uppercase tracking-widest font-bold hover:bg-[#1A1817] hover:text-white transition-all shadow-lg text-[#1A1817]"
+        >
           ← Back
-        </Link>
+        </button>
       </nav>
 
       <div className="max-w-3xl mx-auto relative z-10 space-y-8 mt-12 bg-white/60 p-8 md:p-12 rounded-[2rem] border border-[#1A1817]/10">
