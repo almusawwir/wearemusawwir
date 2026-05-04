@@ -12,6 +12,11 @@ export default function App() {
   const [events, setEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedCards, setExpandedCards] = useState({});
+  
+  // Navigation scroll state
+  const [isNavVisible, setIsNavVisible] = useState(false);
+  const [lastScrollY, setLastScrollY] = useState(0);
+  
   const revealRefs = useRef([]);
   const router = useRouter();
 
@@ -30,6 +35,7 @@ export default function App() {
     if (id) router.push(`/event/${id.trim()}`);
   };
 
+  // Fetch Events
   useEffect(() => {
     fetch(CSV_URL)
       .then(res => res.text())
@@ -39,7 +45,6 @@ export default function App() {
           skipEmptyLines: true,
           transformHeader: (h) => h.trim().toLowerCase().replace(/^\uFEFF/, ''),
           complete: (results) => {
-            // ✦ FILTER OUT GHOST ROWS ✦
             const validEvents = results.data.filter(event => {
                 const hasId = event.id && event.id.trim() !== '';
                 const hasTitle = event.title && event.title.trim() !== '';
@@ -53,6 +58,7 @@ export default function App() {
       });
   }, []);
 
+  // Intersection Observer for scroll animations
   useEffect(() => {
     if (isLoading) return;
     const observerOptions = { root: null, rootMargin: '0px', threshold: 0.1 };
@@ -68,6 +74,33 @@ export default function App() {
     revealRefs.current.forEach((ref) => { if (ref) observer.observe(ref); });
     return () => observer.disconnect();
   }, [isLoading, events]);
+
+  // Smart Navigation Scroll Logic
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const handleScroll = () => {
+        const currentScrollY = window.scrollY;
+        
+        // Hide at the very top
+        if (currentScrollY < 100) {
+          setIsNavVisible(false);
+        } 
+        // Show when scrolling up
+        else if (currentScrollY < lastScrollY) {
+          setIsNavVisible(true);
+        } 
+        // Hide when scrolling down
+        else {
+          setIsNavVisible(false);
+        }
+        
+        setLastScrollY(currentScrollY);
+      };
+
+      window.addEventListener('scroll', handleScroll, { passive: true });
+      return () => window.removeEventListener('scroll', handleScroll);
+    }
+  }, [lastScrollY]);
 
   return (
     <div className="relative overflow-x-hidden w-full bg-[#F7F5F0] text-[#1A1817] font-sans antialiased selection:bg-[#FF6B35] selection:text-white pb-24">
@@ -93,9 +126,13 @@ export default function App() {
 
       <div className="canvas-texture"></div>
 
-      {/* Floating Navigation (Updated Links) */}
-      <nav className="fixed top-4 left-0 right-0 z-[60] flex justify-center px-4 opacity-0 animate-fade-in-up" style={{ animationDelay: '1.2s' }}>
-        <div className="glass-card px-6 py-3 rounded-full shadow-lg flex items-center justify-between gap-4 md:gap-6 max-w-max bg-white/70">
+      {/* Smart Floating Navigation */}
+      <nav 
+        className={`fixed top-4 left-0 right-0 z-[60] flex justify-center px-4 transition-all duration-500 ease-in-out ${
+          isNavVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10 pointer-events-none'
+        }`}
+      >
+        <div className="glass-card px-6 py-3 rounded-full shadow-lg flex items-center justify-between gap-4 md:gap-6 max-w-max bg-white/80 border border-white/40">
           <span className="font-serif italic font-medium text-[#1A1817]">Al-Musawwir</span>
           <div className="w-1 h-1 rounded-full bg-[#FF6B35] hidden sm:block"></div>
           <Link href="/about" className="font-sans text-[10px] uppercase tracking-widest font-bold text-[#5C5855] hover:text-[#1A1817] transition-colors">About</Link>
@@ -104,7 +141,7 @@ export default function App() {
         </div>
       </nav>
 
-      {/* Cinematic Hero Section (Original Design Restored) */}
+      {/* Redesigned Premium Cinematic Hero Section */}
       <header className="relative min-h-[100vh] flex flex-col items-center justify-center px-4 md:px-6 overflow-hidden pt-20">
         <div className="absolute inset-0 z-0 bg-[#1A1817]">
           <Image
@@ -112,41 +149,42 @@ export default function App() {
             alt="Al-Musawwir Background"
             fill
             priority
-            quality={85}
+            quality={90}
             sizes="100vw"
             className="object-cover"
-            style={{ opacity: 0.7 }}
+            style={{ opacity: 0.6 }}
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#1A1817]/60 via-[#1A1817]/40 to-[#F7F5F0]"></div>
+          <div className="absolute inset-0 bg-gradient-to-b from-[#1A1817]/80 via-[#1A1817]/50 to-[#F7F5F0]"></div>
         </div>
 
-        <div className="relative z-10 max-w-6xl mx-auto w-full flex flex-col items-center text-center">
-          <p className="font-serif text-[#FF6B35] text-2xl md:text-3xl mb-4 tracking-[0.6em] opacity-0 animate-fade-in-up drop-shadow-lg" style={{ animationDelay: '0.2s' }}>
+        <div className="relative z-10 max-w-7xl mx-auto w-full flex flex-col items-center text-center">
+          <p className="font-sans font-medium text-white/60 text-[10px] md:text-xs uppercase tracking-[0.8em] mb-8 opacity-0 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
             المصوّر
           </p>
-          <h1 className="font-sans font-extralight text-5xl md:text-8xl lg:text-[9rem] tracking-tighter text-white leading-[0.9] mb-6 opacity-0 animate-fade-in-up drop-shadow-sm" style={{ animationDelay: '0.4s' }}>
-            AL <span className="text-[#FF6B35] italic font-serif drop-shadow-md">✦</span> MUSAWWIR
+          
+          <h1 className="font-serif font-light text-6xl md:text-8xl lg:text-[10rem] tracking-[0.1em] text-white leading-none mb-8 opacity-0 animate-fade-in-up drop-shadow-2xl" style={{ animationDelay: '0.4s' }}>
+            AL MUSAWWIR
           </h1>
           
           <div className="max-w-2xl mx-auto opacity-0 animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
-            <p className="font-serif italic text-white/90 text-2xl md:text-4xl tracking-wide mb-8 drop-shadow-sm">
+            <p className="font-serif italic text-white/80 text-2xl md:text-3xl tracking-wider mb-12 drop-shadow-md font-light">
               "You are the fashioner of your own reality."
             </p>
-            <a href="#events" className="inline-block bg-[#FF6B35] text-white font-sans text-xs md:text-sm uppercase tracking-[0.3em] font-bold py-5 px-12 rounded-full hover:bg-white hover:text-[#1A1817] transition-all duration-500 shadow-2xl hover:scale-105 mb-16">
+            <a href="#events" className="inline-block border border-white/30 bg-white/5 backdrop-blur-sm text-white font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-4 px-10 rounded-full hover:bg-white hover:text-[#1A1817] transition-all duration-500 mb-20 hover:scale-105">
               Explore Gatherings
             </a>
           </div>
           
-          <div className="glass-card p-6 md:p-10 rounded-[2rem] shadow-2xl opacity-0 animate-fade-in-up w-full max-w-2xl text-left border-white/20 bg-white/10 backdrop-blur-xl" style={{ animationDelay: '0.8s' }}>
-            <div className="flex gap-6 items-start">
-              <div className="hidden md:block w-px h-32 bg-gradient-to-b from-[#FF6B35] to-transparent"></div>
-              <div className="space-y-4">
-                <p className="font-serif text-xl md:text-2xl leading-relaxed text-white">
+          <div className="p-6 md:p-10 rounded-2xl opacity-0 animate-fade-in-up w-full max-w-3xl text-left border border-white/10 bg-white/5 backdrop-blur-md" style={{ animationDelay: '0.8s' }}>
+            <div className="flex gap-8 items-start">
+              <div className="hidden md:block w-px h-24 bg-white/20 mt-2"></div>
+              <div className="space-y-6">
+                <p className="font-serif font-light text-xl md:text-3xl leading-relaxed text-white/90">
                   We believe that art isn't a profession—it's a human right. Whether you're a seasoned painter or haven't touched a brush since school, your story deserves a canvas.
                 </p>
-                <div className="flex items-center gap-4 text-white/70 font-sans text-[10px] uppercase tracking-widest font-bold">
-                  <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#FF6B35]"></span> Bangalore</span>
-                  <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#004E98]"></span> Limited Spots</span>
+                <div className="flex items-center gap-6 text-white/50 font-sans text-[10px] uppercase tracking-widest font-bold">
+                  <span className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-white/50"></span> Bangalore</span>
+                  <span className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-white/50"></span> Limited Spots</span>
                 </div>
               </div>
             </div>
@@ -154,7 +192,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* Dynamic Events Section (Original Cards Restored) */}
+      {/* Dynamic Events Section (Untouched) */}
       <section id="events" className="py-24 px-4 md:px-6 relative z-10">
         <div className="max-w-4xl mx-auto">
           <div ref={setRef} className="text-center mb-16 reveal">
@@ -287,7 +325,7 @@ export default function App() {
         </div>
       </section>
 
-      {/* Unified Footer (Updated Links) */}
+      {/* Unified Footer (Untouched) */}
       <footer className="py-20 text-center relative z-10 border-t border-[#1A1817]/10 flex flex-col items-center">
         <p className="font-sans text-[10px] uppercase tracking-[0.5em] text-[#1A1817] mb-4 font-bold">AL-MUSAWWIR</p>
         <p className="font-serif italic text-[#5C5855] text-2xl mb-8">We create, therefore we are.</p>
