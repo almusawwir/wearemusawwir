@@ -6,6 +6,16 @@ import { useRouter } from 'next/navigation';
 export default function TermsPage() {
   const router = useRouter();
 
+  const handleBack = () => {
+    // If history length is 1 or 2, it means this was opened in a new tab
+    if (window.history.length <= 2) {
+      window.close(); // Tries to close the new tab
+      setTimeout(() => router.push('/'), 150); // Fallback: goes to home if browser blocks closing
+    } else {
+      router.back(); // Normal back behavior
+    }
+  };
+
   return (
     <div className="relative min-h-screen w-full bg-[#F7F5F0] text-[#1A1817] font-sans antialiased pt-24 pb-32 px-4 md:px-6">
       <style dangerouslySetInnerHTML={{__html: `
@@ -14,10 +24,10 @@ export default function TermsPage() {
         .font-sans { font-family: 'Manrope', sans-serif; }
       `}} />
       
-      {/* ✦ DYNAMIC BACK BUTTON ✦ */}
+      {/* ✦ SMART BACK BUTTON ✦ */}
       <nav className="fixed top-8 left-4 md:left-8 z-50">
         <button 
-          onClick={() => router.back()} 
+          onClick={handleBack} 
           className="bg-white/80 backdrop-blur px-4 py-2 rounded-full font-sans text-[10px] uppercase tracking-widest font-bold hover:bg-[#1A1817] hover:text-white transition-all shadow-lg text-[#1A1817]"
         >
           ← Back

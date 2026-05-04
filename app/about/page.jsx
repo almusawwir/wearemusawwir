@@ -1,12 +1,20 @@
-import React from 'react';
-import Link from 'next/link';
+"use client";
 
-export const metadata = {
-  title: 'About Us | Al-Musawwir',
-  description: 'We believe that art is a human right. Discover the story behind Al-Musawwir gatherings.',
-};
+import React from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function AboutPage() {
+  const router = useRouter();
+
+  const handleBack = () => {
+    if (window.history.length <= 2) {
+      window.close();
+      setTimeout(() => router.push('/'), 150);
+    } else {
+      router.back();
+    }
+  };
+
   return (
     <div className="relative min-h-screen w-full bg-[#F7F5F0] text-[#1A1817] font-sans antialiased selection:bg-[#FF6B35] selection:text-white pt-24 pb-32 px-4 md:px-6">
       <style dangerouslySetInnerHTML={{__html: `
@@ -21,10 +29,14 @@ export default function AboutPage() {
       `}} />
       <div className="canvas-texture"></div>
 
+      {/* ✦ SMART BACK BUTTON ✦ */}
       <nav className="fixed top-8 left-4 md:left-8 z-50">
-        <Link href="/" className="bg-white/80 backdrop-blur px-4 py-2 rounded-full font-sans text-[10px] uppercase tracking-widest font-bold hover:bg-[#1A1817] hover:text-white transition-all shadow-lg text-[#1A1817]">
-          ← Back to Home
-        </Link>
+        <button 
+          onClick={handleBack} 
+          className="bg-white/80 backdrop-blur px-4 py-2 rounded-full font-sans text-[10px] uppercase tracking-widest font-bold hover:bg-[#1A1817] hover:text-white transition-all shadow-lg text-[#1A1817]"
+        >
+          ← Back
+        </button>
       </nav>
 
       <div className="max-w-3xl mx-auto relative z-10 space-y-12 mt-12">
