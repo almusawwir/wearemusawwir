@@ -50,7 +50,6 @@ export async function generateMetadata({ params }) {
   };
 }
 
-// Helper — decides whether to use Next.js Image or plain img
 function EventImage({ src, alt, className, fill, sizes, priority, quality, loading }) {
   const isExternal = src && src.startsWith('http');
   if (isExternal) {
@@ -105,8 +104,8 @@ export default async function EventDetailPage({ params }) {
   const whatsappLink = `https://wa.me/?text=${encodeURIComponent(shareText + ' ' + shareUrl)}`;
 
   const isSoldOut = currentEvent.status && (currentEvent.status.toLowerCase().includes('sold') || currentEvent.status.toLowerCase().includes('closed'));
+  const hasDiscount = currentEvent.original_price && currentEvent.original_price.trim() !== '';
 
-  // ✦ Build absolute image URL for JSON-LD
   const rawImage = currentEvent.image_url || '/images/hero-bg.jpg';
   const absoluteImage = rawImage.startsWith('/')
     ? `https://almusawwir.art${rawImage}`
@@ -115,8 +114,6 @@ export default async function EventDetailPage({ params }) {
   return (
     <div className="relative min-h-screen w-full bg-[#F7F5F0] text-[#1A1817] font-sans pb-32 md:pb-40">
 
-      {/* ✦ STEP 1: AI & BOT FRIENDLY STRUCTURED DATA (JSON-LD) ✦ */}
-      {/* Invisible to users. ChatGPT, Perplexity, Google read this directly. */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
@@ -170,6 +167,8 @@ export default async function EventDetailPage({ params }) {
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         @keyframes imageFade { from { opacity: 0; filter: blur(10px); } to { opacity: 1; filter: blur(0); } }
         img { animation: imageFade 1s ease-out forwards; }
+        @keyframes pricePop { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        .price-badge { animation: pricePop 0.5s 0.3s ease-out both; }
       `}} />
 
       <div className="absolute top-8 left-4 md:left-8 z-50">
@@ -178,7 +177,7 @@ export default async function EventDetailPage({ params }) {
         </Link>
       </div>
 
-      {/* Hero Image — priority load, full width, optimized */}
+      {/* Hero Image */}
       <div className="w-full h-[50vh] md:h-[65vh] bg-[#1A1817] relative overflow-hidden">
         {currentEvent.image_url ? (
           <EventImage
@@ -196,10 +195,34 @@ export default async function EventDetailPage({ params }) {
           </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-[#F7F5F0] via-transparent to-transparent"></div>
+
+        {/* ✦ PRICE BADGE — floats over hero bottom-right */}
+        <div className="price-badge absolute bottom-6 right-4 md:right-8 z-20 flex flex-col items-end gap-1">
+          {hasDiscount && (
+            <span className="font-sans text-xs text-white/70 line-through bg-black/30 backdrop-blur px-2 py-0.5 rounded-full">
+              ₹{currentEvent.original_price}
+            </span>
+          )}
+          <div className={`flex items-baseline gap-1.5 px-5 py-3 rounded-2xl shadow-2xl backdrop-blur-md font-sans font-bold ${isSoldOut ? 'bg-[#5C5855]/80 text-white' : 'bg-[#FF6B35] text-white'}`}>
+            {hasDiscount && (
+              <span className="text-[10px] uppercase tracking-widest opacity-80 bg-white/20 px-2 py-0.5 rounded-full mr-1">
+                Save ₹{parseInt(currentEvent.original_price) - parseInt(currentEvent.price || 999)}
+              </span>
+            )}
+            <span className="text-3xl md:text-4xl tracking-tight">₹{currentEvent.price || '999'}</span>
+            <span className="text-[10px] uppercase tracking-widest opacity-70 self-end mb-1">per seat</span>
+          </div>
+          {isSoldOut && (
+            <span className="font-sans text-[9px] uppercase tracking-widest text-white bg-[#1A1817]/80 px-3 py-1 rounded-full backdrop-blur">
+              Sold Out
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="max-w-3xl mx-auto px-4 -mt-24 relative z-10 space-y-12">
         
+        {/* Title block */}
         <div className="text-center space-y-4">
           <span className="bg-[#1A1817] text-[#F7F5F0] px-4 py-1.5 rounded-full font-sans text-[10px] uppercase tracking-[0.3em] shadow-lg">
             {currentEvent.date} • {currentEvent.time}
@@ -208,6 +231,7 @@ export default async function EventDetailPage({ params }) {
           <p className="font-serif text-xl md:text-2xl text-[#5C5855]">{currentEvent.tagline}</p>
         </div>
 
+        {/* Location card */}
         <div className="bg-white/60 backdrop-blur-md rounded-[2rem] p-8 md:p-10 border border-[#1A1817]/10 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl shadow-[#1A1817]/5">
           <div className="space-y-2 text-center md:text-left">
             <span className="font-sans text-[10px] uppercase tracking-[0.3em] font-bold text-[#FF6B35]">The Location</span>
@@ -229,10 +253,12 @@ export default async function EventDetailPage({ params }) {
           </div>
         </div>
 
+        {/* Description */}
         <div className="prose prose-lg prose-p:font-serif prose-p:text-xl md:prose-p:text-2xl prose-p:leading-relaxed prose-p:text-[#1A1817]/80 mx-auto px-4 md:px-0">
           <p>{currentEvent.description}</p>
         </div>
 
+        {/* Provided / Bring */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-8">
           <div className="bg-white/40 border border-[#1A1817]/5 rounded-[2rem] p-6 md:p-8">
             <h3 className="font-sans text-[10px] uppercase tracking-[0.2em] text-[#FF6B35] font-bold mb-4 flex items-center gap-2">
@@ -263,7 +289,7 @@ export default async function EventDetailPage({ params }) {
         </div>
       </div>
 
-      {/* Suggested Events — small cards, serve tiny images */}
+      {/* Suggested Events */}
       {suggestedEvents.length > 0 && (
         <div className="max-w-5xl mx-auto px-4 mt-24">
           <div className="flex items-center justify-between mb-8">
@@ -294,6 +320,9 @@ export default async function EventDetailPage({ params }) {
                 <div className="px-2 pb-2">
                   <span className="font-sans text-[9px] uppercase tracking-widest text-[#FF6B35] font-bold block mb-1">{event.date}</span>
                   <h4 className="font-serif text-xl text-[#1A1817] line-clamp-1">{event.title}</h4>
+                  {event.price && (
+                    <span className="font-sans text-xs font-bold text-[#5C5855] mt-1 block">₹{event.price}</span>
+                  )}
                 </div>
               </Link>
             ))}
@@ -301,29 +330,37 @@ export default async function EventDetailPage({ params }) {
         </div>
       )}
 
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-lg border-t border-[#1A1817]/10 p-4 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] transform translate-y-0 transition-transform duration-300">
+      {/* ✦ STICKY BOTTOM BAR — pricing always visible on all screen sizes */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-lg border-t border-[#1A1817]/10 p-4 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
         <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
           
-          <div className="hidden sm:block">
-            <p className="font-serif text-xl md:text-2xl text-[#1A1817] leading-none mb-1">{currentEvent.title}</p>
-            <div className="flex items-center gap-2 font-sans text-[10px] uppercase tracking-widest text-[#5C5855]">
-              <span>{currentEvent.date}</span>
-              <span>•</span>
-              {currentEvent.original_price && currentEvent.original_price.trim() !== '' && (
-                <span className="line-through opacity-60">₹{currentEvent.original_price}</span>
+          {/* Left: title + price — always visible, stacked on mobile */}
+          <div className="flex flex-col min-w-0">
+            <p className="font-serif text-lg md:text-2xl text-[#1A1817] leading-none mb-1.5 truncate">{currentEvent.title}</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-sans text-[10px] uppercase tracking-widest text-[#5C5855]">{currentEvent.date}</span>
+              <span className="text-[#5C5855]/40">•</span>
+              {hasDiscount && (
+                <span className="font-sans text-xs text-[#5C5855] line-through opacity-60">₹{currentEvent.original_price}</span>
               )}
-              <span className="font-bold text-[#1A1817]">₹{currentEvent.price || '999'}</span>
+              <span className="font-sans text-base font-bold text-[#FF6B35]">₹{currentEvent.price || '999'}</span>
+              {hasDiscount && (
+                <span className="font-sans text-[9px] uppercase tracking-wider bg-[#FF6B35]/10 text-[#FF6B35] px-2 py-0.5 rounded-full font-bold border border-[#FF6B35]/20">
+                  Save ₹{parseInt(currentEvent.original_price) - parseInt(currentEvent.price || 999)}
+                </span>
+              )}
             </div>
           </div>
 
+          {/* Right: CTA button */}
           {isSoldOut ? (
-            <div className="w-full sm:w-auto bg-[#5C5855] text-white font-sans text-xs md:text-sm uppercase tracking-[0.2em] font-bold py-4 px-10 rounded-full text-center shadow-xl flex items-center justify-center gap-2 flex-grow sm:flex-grow-0 cursor-not-allowed opacity-80">
+            <div className="shrink-0 bg-[#5C5855] text-white font-sans text-xs md:text-sm uppercase tracking-[0.2em] font-bold py-4 px-8 rounded-full text-center shadow-xl flex items-center justify-center gap-2 cursor-not-allowed opacity-80 whitespace-nowrap">
               {currentEvent.button_text || 'Sold Out'}
             </div>
           ) : (
             <Link 
               href={`/register?eventId=${currentEvent.id}`} 
-              className="w-full sm:w-auto bg-[#1A1817] text-white font-sans text-xs md:text-sm uppercase tracking-[0.2em] font-bold py-4 px-10 rounded-full hover:bg-[#FF6B35] transition-all text-center shadow-xl hover:-translate-y-1 flex items-center justify-center gap-2 flex-grow sm:flex-grow-0"
+              className="shrink-0 bg-[#1A1817] text-white font-sans text-xs md:text-sm uppercase tracking-[0.2em] font-bold py-4 px-8 rounded-full hover:bg-[#FF6B35] transition-all text-center shadow-xl hover:-translate-y-1 flex items-center justify-center gap-2 whitespace-nowrap"
             >
               {currentEvent.button_text || 'Secure Canvas'}
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
