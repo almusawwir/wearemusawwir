@@ -52,20 +52,37 @@ export default function App() {
     if (id) window.location.href = `/event/${id.trim()}`;
   };
 
-  // Handle scroll state for navigation styling and visibility
+  // Highly optimized scroll handler using requestAnimationFrame
   useEffect(() => {
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-      setScrolled(currentScrollY > 50);
+    let ticking = false;
 
-      // Hide navbar if scrolling down past 300px, show if scrolling up
-      if (currentScrollY > lastScrollY.current && currentScrollY > 300) {
-        setIsNavVisible(false);
-      } else if (currentScrollY < lastScrollY.current) {
-        setIsNavVisible(true);
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const currentScrollY = window.scrollY;
+          
+          // Only update if state actually changed to prevent re-renders
+          setScrolled(prev => {
+            const next = currentScrollY > 50;
+            return prev !== next ? next : prev;
+          });
+
+          // Hide navbar if scrolling down past 300px, show if scrolling up
+          setIsNavVisible(prev => {
+            let next = prev;
+            if (currentScrollY > lastScrollY.current && currentScrollY > 300) {
+              next = false;
+            } else if (currentScrollY < lastScrollY.current) {
+              next = true;
+            }
+            return prev !== next ? next : prev;
+          });
+          
+          lastScrollY.current = currentScrollY;
+          ticking = false;
+        });
+        ticking = true;
       }
-      
-      lastScrollY.current = currentScrollY;
     };
     
     window.addEventListener('scroll', handleScroll, { passive: true });
@@ -109,10 +126,7 @@ export default function App() {
 
   return (
     <div className="relative overflow-x-hidden w-full bg-[#F7F5F0] text-[#1A1817] font-sans antialiased selection:bg-[#FF6B35] selection:text-white pb-24">
-      {/* UPDATED FONTS: 
-        Playfair Display for an editorial, high-end art gallery serif.
-        Outfit for a crisp, geometric, dynamic sans-serif.
-      */}
+      {/* UPDATED FONTS */}
       <style dangerouslySetInnerHTML={{__html: `
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap');
         
@@ -127,7 +141,7 @@ export default function App() {
           mix-blend-mode: multiply;
         }
 
-        /* Cinematic Animations */
+        /* Cinematic Animations with GPU Acceleration */
         @keyframes fadeUpIn {
           0% { opacity: 0; transform: translateY(30px); filter: blur(4px); }
           100% { opacity: 1; transform: translateY(0); filter: blur(0); }
@@ -137,13 +151,21 @@ export default function App() {
           100% { opacity: 1; transform: translateY(0); }
         }
         @keyframes kenBurns {
-          0% { transform: scale(1); }
-          100% { transform: scale(1.15); }
+          0% { transform: scale(1) translateZ(0); }
+          100% { transform: scale(1.15) translateZ(0); }
         }
         
         .animate-fade-up { animation: fadeUpIn 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; }
         .animate-fade-down { animation: fadeDownIn 1s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; }
-        .animate-ken-burns { animation: kenBurns 30s ease-out forwards; }
+        
+        .animate-ken-burns { 
+          animation: kenBurns 30s ease-out forwards; 
+          will-change: transform;
+          -webkit-backface-visibility: hidden;
+          backface-visibility: hidden;
+          -webkit-transform-style: preserve-3d;
+          transform-style: preserve-3d;
+        }
 
         /* General element reveals */
         .reveal { opacity: 0; transform: translateY(40px); transition: all 1.2s cubic-bezier(0.16, 1, 0.3, 1); }
@@ -190,7 +212,7 @@ export default function App() {
         <div className="absolute inset-0 z-0 overflow-hidden">
           <div className="absolute inset-0 animate-ken-burns">
             <img
-              src="/images/hero-bg.jpg" // Note: ensure this exists, or it falls back gracefully due to background colors
+              src="/images/hero-bg.jpg"
               alt="Artistic Canvas Background"
               className="w-full h-full object-cover opacity-60 mix-blend-luminosity"
             />
@@ -201,31 +223,39 @@ export default function App() {
         </div>
 
         {/* Hero Content */}
-        <div className="relative z-20 w-full max-w-7xl mx-auto px-4 md:px-8 flex flex-col items-center justify-center mt-12">
+        {/* Added pt-24 here to push the hero content down so it clears the floating navigation */}
+        <div className="relative z-20 w-full max-w-7xl mx-auto px-4 md:px-8 flex flex-col items-center justify-center pt-24 pb-12">
           
-          {/* Geometric Lines Lotus (Background Geometry) */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[180vw] sm:w-[120vw] md:w-[90vw] lg:w-[800px] aspect-square z-0 opacity-0 animate-fade-up pointer-events-none flex items-center justify-center" style={{ animationDelay: '0.4s' }}>
-            <svg viewBox="0 0 200 200" className="w-full h-full text-white/[0.08] animate-[spin_180s_linear_infinite]" fill="none" stroke="currentColor" strokeWidth="0.5">
-              <g transform="translate(100, 100)">
-                {/* Overlapping Petals */}
-                {[0, 30, 60, 90, 120, 150].map((deg) => (
-                  <path key={`petal-${deg}`} d="M 0,-95 C 25,-40 25,40 0,95 C -25,40 -25,-40 0,-95 Z" transform={`rotate(${deg})`} />
-                ))}
-                {/* Inner Sacred Geometry */}
-                <circle cx="0" cy="0" r="35" />
-                <circle cx="0" cy="0" r="50" strokeDasharray="1 3" />
-                <circle cx="0" cy="0" r="95" strokeWidth="0.2" />
-                {/* Connecting subtle rays */}
-                {[15, 45, 75, 105, 135, 165].map((deg) => (
-                   <line key={`ray-${deg}`} x1="0" y1="-35" x2="0" y2="-95" transform={`rotate(${deg})`} strokeDasharray="1 2" strokeWidth="0.3" />
-                ))}
-              </g>
-            </svg>
-          </div>
-          
-          {/* Main Typographic Lockup */}
-          <div className="relative z-10 flex flex-col items-center text-center animate-fade-up" style={{ animationDelay: '0.6s' }}>
-            <h1 className="font-serif text-white flex flex-col items-center leading-[0.85] md:leading-[0.8]">
+          {/* Wrapper for Title & Geometry to keep them perfectly aligned */}
+          <div className="relative flex flex-col items-center text-center animate-fade-up" style={{ animationDelay: '0.4s' }}>
+            
+            {/* Geometric Lines Lotus (Background Geometry) - Optimized for GPU & Resized */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[140vw] sm:w-[90vw] md:w-[70vw] lg:w-[600px] aspect-square z-0 pointer-events-none flex items-center justify-center">
+              <svg viewBox="0 0 200 200" 
+                   className="w-full h-full text-white/[0.08] animate-[spin_180s_linear_infinite]" 
+                   fill="none" 
+                   stroke="currentColor" 
+                   strokeWidth="0.5"
+                   style={{ willChange: 'transform', transform: 'translateZ(0)', backfaceVisibility: 'hidden' }}>
+                <g transform="translate(100, 100)">
+                  {/* Overlapping Petals */}
+                  {[0, 30, 60, 90, 120, 150].map((deg) => (
+                    <path key={`petal-${deg}`} d="M 0,-95 C 25,-40 25,40 0,95 C -25,40 -25,-40 0,-95 Z" transform={`rotate(${deg})`} />
+                  ))}
+                  {/* Inner Sacred Geometry */}
+                  <circle cx="0" cy="0" r="35" />
+                  <circle cx="0" cy="0" r="50" strokeDasharray="1 3" />
+                  <circle cx="0" cy="0" r="95" strokeWidth="0.2" />
+                  {/* Connecting subtle rays */}
+                  {[15, 45, 75, 105, 135, 165].map((deg) => (
+                     <line key={`ray-${deg}`} x1="0" y1="-35" x2="0" y2="-95" transform={`rotate(${deg})`} strokeDasharray="1 2" strokeWidth="0.3" />
+                  ))}
+                </g>
+              </svg>
+            </div>
+            
+            {/* Main Typographic Lockup */}
+            <h1 className="relative z-10 font-serif text-white flex flex-col items-center leading-[0.85] md:leading-[0.8]">
               <span className="text-6xl md:text-[8rem] lg:text-[10rem] font-light tracking-[0.1em] text-white/90">
                 AL
               </span>
@@ -233,6 +263,7 @@ export default function App() {
                 MUSAWWIR
               </span>
             </h1>
+
           </div>
           
           {/* Divider Line */}
@@ -250,8 +281,8 @@ export default function App() {
             </a>
           </div>
           
-          {/* Gallery Placard (Replaces old glass card for a more sophisticated look) */}
-          <div className="mt-20 md:mt-32 w-full max-w-lg md:max-w-3xl ml-auto mr-auto md:mr-0 md:ml-auto animate-fade-up bg-white/5 backdrop-blur-2xl border border-white/10 p-6 md:p-8 rounded-sm relative" style={{ animationDelay: '1.2s' }}>
+          {/* Gallery Placard */}
+          <div className="mt-16 md:mt-24 w-full max-w-lg md:max-w-3xl ml-auto mr-auto md:mr-0 md:ml-auto animate-fade-up bg-white/5 backdrop-blur-2xl border border-white/10 p-6 md:p-8 rounded-sm relative" style={{ animationDelay: '1.2s' }}>
             {/* Corner accents */}
             <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-white/40"></div>
             <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-white/40"></div>
