@@ -14,7 +14,7 @@ export default function App() {
   const [expandedCards, setExpandedCards] = useState({});
   
   // Navigation scroll state
-  const [isNavVisible, setIsNavVisible] = useState(false);
+  const [isNavVisible, setIsNavVisible] = useState(true); // Changed: Start visible
   const [lastScrollY, setLastScrollY] = useState(0);
   
   const revealRefs = useRef([]);
@@ -81,9 +81,9 @@ export default function App() {
       const handleScroll = () => {
         const currentScrollY = window.scrollY;
         
-        // Hide at the very top
-        if (currentScrollY < 100) {
-          setIsNavVisible(false);
+        // Always show at the very top
+        if (currentScrollY <= 50) {
+          setIsNavVisible(true);
         } 
         // Show when scrolling up
         else if (currentScrollY < lastScrollY) {
@@ -126,23 +126,25 @@ export default function App() {
 
       <div className="canvas-texture"></div>
 
-      {/* Smart Floating Navigation */}
+      {/* Smart Floating Navigation - FIXED */}
       <nav 
         className={`fixed top-4 left-0 right-0 z-[60] flex justify-center px-4 transition-all duration-500 ease-in-out ${
           isNavVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10 pointer-events-none'
         }`}
       >
-        <div className="glass-card px-6 py-3 rounded-full shadow-lg flex items-center justify-between gap-4 md:gap-6 max-w-max bg-white/80 border border-white/40">
-          <span className="font-serif italic font-medium text-[#1A1817]">Al-Musawwir</span>
+        <div className="glass-card px-4 sm:px-6 py-2 sm:py-3 rounded-full shadow-lg flex items-center justify-between gap-3 sm:gap-6 max-w-max bg-white/90 sm:bg-white/80 border border-white/40">
+          <span className="font-serif italic font-medium text-[#1A1817] text-sm sm:text-base mr-1 sm:mr-0">Al-Musawwir</span>
           <div className="w-1 h-1 rounded-full bg-[#FF6B35] hidden sm:block"></div>
-          <Link href="/about" className="font-sans text-[10px] uppercase tracking-widest font-bold text-[#5C5855] hover:text-[#1A1817] transition-colors">About</Link>
-          <div className="w-1 h-1 rounded-full bg-[#1A1817]/20"></div>
-          <a href="#events" className="font-sans text-[10px] uppercase tracking-widest font-bold text-[#004E98] hover:text-[#FF6B35] transition-colors">Gatherings</a>
+          {/* Increased touch target (py-2 px-1) and adjusted font size for mobile */}
+          <Link href="/about" className="font-sans text-[11px] sm:text-[10px] uppercase tracking-widest font-bold text-[#5C5855] hover:text-[#1A1817] transition-colors py-2 px-1 sm:p-0">About</Link>
+          {/* Fixed symmetry: added hidden sm:block so both dots disappear on mobile */}
+          <div className="w-1 h-1 rounded-full bg-[#1A1817]/20 hidden sm:block"></div>
+          <a href="#events" className="font-sans text-[11px] sm:text-[10px] uppercase tracking-widest font-bold text-[#004E98] hover:text-[#FF6B35] transition-colors py-2 px-1 sm:p-0">Gatherings</a>
         </div>
       </nav>
 
-      {/* Redesigned Premium Cinematic Hero Section */}
-      <header className="relative min-h-[100vh] flex flex-col items-center justify-center px-4 md:px-6 overflow-hidden pt-20">
+      {/* Redesigned Premium Cinematic Hero Section - FIXED */}
+      <header className="relative min-h-[100vh] flex flex-col items-center justify-center px-4 md:px-6 overflow-hidden pt-24 pb-12 md:py-20">
         <div className="absolute inset-0 z-0 bg-[#1A1817]">
           <Image
             src="/images/hero-bg.jpg"
@@ -157,32 +159,36 @@ export default function App() {
           <div className="absolute inset-0 bg-gradient-to-b from-[#1A1817]/80 via-[#1A1817]/50 to-[#F7F5F0]"></div>
         </div>
 
-        <div className="relative z-10 max-w-7xl mx-auto w-full flex flex-col items-center text-center">
-          <p className="font-sans font-medium text-white/60 text-[10px] md:text-xs uppercase tracking-[0.8em] mb-8 opacity-0 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+        <div className="relative z-10 max-w-7xl mx-auto w-full flex flex-col items-center text-center mt-auto md:mt-0">
+          <p className="font-sans font-medium text-white/60 text-[10px] md:text-xs uppercase tracking-[0.8em] mb-6 md:mb-8 opacity-0 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
             المصوّر
           </p>
           
-          <h1 className="font-serif font-light text-6xl md:text-8xl lg:text-[10rem] tracking-[0.1em] text-white leading-none mb-8 opacity-0 animate-fade-in-up drop-shadow-2xl" style={{ animationDelay: '0.4s' }}>
+          {/* Responsive Font Size & Tracking to prevent ugly mobile wrapping */}
+          <h1 className="font-serif font-light text-5xl sm:text-6xl md:text-8xl lg:text-[10rem] tracking-[0.05em] md:tracking-[0.1em] text-white leading-none mb-6 md:mb-8 opacity-0 animate-fade-in-up drop-shadow-2xl" style={{ animationDelay: '0.4s' }}>
             AL MUSAWWIR
           </h1>
           
           <div className="max-w-2xl mx-auto opacity-0 animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
-            <p className="font-serif italic text-white/80 text-2xl md:text-3xl tracking-wider mb-12 drop-shadow-md font-light">
+            <p className="font-serif italic text-white/80 text-xl sm:text-2xl md:text-3xl tracking-wider mb-8 md:mb-12 drop-shadow-md font-light px-4">
               "You are the fashioner of your own reality."
             </p>
-            <a href="#events" className="inline-block border border-white/30 bg-white/5 backdrop-blur-sm text-white font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-4 px-10 rounded-full hover:bg-white hover:text-[#1A1817] transition-all duration-500 mb-20 hover:scale-105">
+            {/* Reduced bottom margin on mobile (mb-10) vs desktop (md:mb-20) */}
+            <a href="#events" className="inline-block border border-white/30 bg-white/5 backdrop-blur-sm text-white font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-3 px-8 md:py-4 md:px-10 rounded-full hover:bg-white hover:text-[#1A1817] transition-all duration-500 mb-10 md:mb-20 hover:scale-105">
               Explore Gatherings
             </a>
           </div>
           
-          <div className="p-6 md:p-10 rounded-2xl opacity-0 animate-fade-in-up w-full max-w-3xl text-left border border-white/10 bg-white/5 backdrop-blur-md" style={{ animationDelay: '0.8s' }}>
-            <div className="flex gap-8 items-start">
+          {/* Centered on mobile, left-aligned on desktop */}
+          <div className="p-6 md:p-10 rounded-2xl opacity-0 animate-fade-in-up w-full max-w-3xl text-center md:text-left border border-white/10 bg-white/5 backdrop-blur-md mt-auto" style={{ animationDelay: '0.8s' }}>
+            <div className="flex flex-col md:flex-row gap-4 md:gap-8 items-center md:items-start">
               <div className="hidden md:block w-px h-24 bg-white/20 mt-2"></div>
-              <div className="space-y-6">
-                <p className="font-serif font-light text-xl md:text-3xl leading-relaxed text-white/90">
+              <div className="space-y-4 md:space-y-6">
+                <p className="font-serif font-light text-lg sm:text-xl md:text-3xl leading-relaxed text-white/90">
                   We believe that art isn't a profession—it's a human right. Whether you're a seasoned painter or haven't touched a brush since school, your story deserves a canvas.
                 </p>
-                <div className="flex items-center gap-6 text-white/50 font-sans text-[10px] uppercase tracking-widest font-bold">
+                {/* Centered tags on mobile */}
+                <div className="flex items-center justify-center md:justify-start gap-6 text-white/50 font-sans text-[10px] uppercase tracking-widest font-bold">
                   <span className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-white/50"></span> Bangalore</span>
                   <span className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-white/50"></span> Limited Spots</span>
                 </div>
