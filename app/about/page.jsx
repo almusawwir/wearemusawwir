@@ -47,30 +47,40 @@ export default function AboutPage() {
 
         <div className="prose prose-lg prose-p:font-serif prose-p:text-xl md:prose-p:text-2xl prose-p:leading-relaxed prose-p:text-[#1A1817]/80 mx-auto bg-white/60 p-8 md:p-12 rounded-[2rem] border border-[#1A1817]/10 shadow-2xl shadow-[#1A1817]/5">
           <p className="first-letter:text-7xl first-letter:font-bold first-letter:text-[#FF6B35] first-letter:mr-3 first-letter:float-left">
-            Al-Musawwir translates to "The Fashioner" or "The Shaper of Beauty." We started this initiative because we noticed a gap in how society treats creativity. Somewhere along the way, art became restricted to galleries, professionals, and critics. We wanted to change that.
+            Al-Musawwir translates to "The Fashioner"—the one who gives form to the formless. We started this initiative after noticing how creativity slowly became something many people felt distant from. Somewhere along the way, art began to feel reserved for professionals, perfection, or performance.
           </p>
           <p>
-            We believe that art isn't a profession—it's a human right. Whether you're a seasoned painter, a poet, or someone who hasn't held a brush since middle school, your story deserves a canvas.
+            We wanted to create a space that gently brings creativity back to people. Al-Musawwir is not just about painting. It is about expression, presence, and human connection.
           </p>
           <p>
-            Our gatherings are not workshops. They are safe, curated spaces where you can disconnect from the noise of the city, sit under the trees, meet incredibly beautiful souls, and simply create. No judgment, no grades, no pressure.
+            Our gatherings are designed as calm, intentional spaces where people can slow down, create freely, meet like-minded people, and reconnect with their creative instinct without pressure or expectations. Whether you are an experienced artist, someone rediscovering creativity, or simply curious to begin, there is space for you here.
           </p>
           
-          <div className="my-10 p-8 bg-[#1A1817] text-white rounded-2xl">
-            <h3 className="font-sans text-xs uppercase tracking-widest text-[#FF6B35] mb-2">Our Promise</h3>
-            <p className="font-serif text-xl m-0 text-[#F7F5F0]">We promise to provide the canvas, the colors, and the community. All you have to bring is an open heart.</p>
+          <p>
+            We believe creation is deeply human. To imagine, shape, express, and give form is part of who we are. And perhaps, in some way, we are all <i className="font-serif">musawwir</i>.
+          </p>
+
+          <div className="my-10 p-8 bg-[#1A1817] text-white rounded-2xl shadow-lg">
+            <h3 className="font-sans text-xs uppercase tracking-widest text-[#FF6B35] mb-2 font-bold">Our Promise</h3>
+            <p className="font-serif text-2xl m-0 text-[#F7F5F0] italic">
+              "We provide the canvas, the colors, and the community. You simply arrive as you are."
+            </p>
           </div>
 
           <p>
-            This platform is entirely built by the community, for the community. We charge a small fee to cover the high-quality art supplies, venue costs, and to ensure that everyone who RSVPs actually shows up to respect the limited capacity.
+            This platform is built by the community, for the community. Contributions help us cover art supplies, venues, and maintain intimate gatherings with limited spots.
           </p>
           <p>
-            Come create with us. We can't wait to see what you fashion.
+            Come create with us. Because we create, therefore we are.
           </p>
 
           <div className="mt-12 pt-8 border-t border-[#1A1817]/10 flex items-center justify-between">
-            <div className="font-sans text-sm font-bold uppercase tracking-widest">— Nazim & The Team</div>
-            <a href="mailto:wearemusawwir@gmail.com" className="font-sans text-[10px] text-[#004E98] tracking-widest uppercase font-bold hover:text-[#FF6B35] transition-colors">Contact Us</a>
+            <div className="font-sans text-sm font-bold uppercase tracking-widest text-[#1A1817]">
+              — Nazim & The Al-Musawwir Team
+            </div>
+            <a href="mailto:wearemusawwir@gmail.com" className="font-sans text-[10px] text-[#004E98] tracking-widest uppercase font-bold hover:text-[#FF6B35] transition-colors">
+              Contact Us
+            </a>
           </div>
         </div>
       </div>

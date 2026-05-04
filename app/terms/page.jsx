@@ -40,28 +40,32 @@ export default function TermsPage() {
         <div className="space-y-8 text-sm md:text-base text-[#5C5855] leading-relaxed">
           <section>
             <h2 className="font-sans text-[11px] uppercase tracking-[0.2em] font-bold text-[#1A1817] mb-2">1. Booking & Capacity</h2>
-            <p>Our gatherings are strictly limited in capacity to ensure an intimate and calm environment. Your spot is only secured once full payment is received and a Digital Ticket is issued. Tickets are non-transferable without prior notice to the organizers.</p>
+            <p>Our gatherings are intentionally limited in capacity to maintain a calm and intimate experience.</p>
+            <p className="mt-2">Your spot is confirmed only after full payment has been received and your digital ticket has been issued. If you wish to transfer your ticket to someone else, please inform the organizers in advance.</p>
           </section>
 
           <section>
-            <h2 className="font-sans text-[11px] uppercase tracking-[0.2em] font-bold text-[#FF6B35] mb-2">2. Cancellation & Refund Policy</h2>
-            <p>Because we purchase art supplies and curate materials based on exact headcount, <strong>we do not offer refunds</strong> for no-shows or last-minute cancellations.</p>
-            <p className="mt-2">If you have made a payment by mistake, you may request a cancellation <strong>within 30 minutes of booking</strong> by replying to your confirmation email or contacting us directly.</p>
+            <h2 className="font-sans text-[11px] uppercase tracking-[0.2em] font-bold text-[#FF6B35] mb-2">2. Cancellation & Refunds</h2>
+            <p>Because art materials and venue arrangements are prepared based on confirmed attendance, <strong>we are unable to offer refunds</strong> for no-shows or last-minute cancellations.</p>
+            <p className="mt-2">If you made a payment by mistake, you may request a cancellation <strong>within 30 minutes of booking</strong> by contacting us directly.</p>
           </section>
 
           <section>
-            <h2 className="font-sans text-[11px] uppercase tracking-[0.2em] font-bold text-[#004E98] mb-2">3. Code of Conduct</h2>
-            <p>Al-Musawwir is a safe, inclusive, and judgment-free zone. We expect all attendees to respect the venue, the materials, and each other. Any form of harassment, disruption, or disrespect will result in immediate removal from the gathering without a refund.</p>
+            <h2 className="font-sans text-[11px] uppercase tracking-[0.2em] font-bold text-[#004E98] mb-2">3. Community Guidelines</h2>
+            <p>Al-Musawwir is built as a respectful, welcoming, and judgment-free space.</p>
+            <p className="mt-2">We ask all attendees to treat the venue, materials, and one another with care and kindness. Any form of harassment, disruptive behavior, or disrespect toward participants or organizers may result in removal from the gathering without refund.</p>
           </section>
 
           <section>
-            <h2 className="font-sans text-[11px] uppercase tracking-[0.2em] font-bold text-[#E24E7A] mb-2">4. Photography & Media</h2>
-            <p>We often take photos and short videos during our gatherings to share the beauty of the community on our social media channels. By attending, you consent to being photographed. If you prefer not to be on camera, please inform the host quietly at the beginning of the event, and we will happily respect your privacy.</p>
+            <h2 className="font-sans text-[11px] uppercase tracking-[0.2em] font-bold text-[#E24E7A] mb-2">4. Photography & Privacy</h2>
+            <p>We occasionally capture photographs and short videos during gatherings to document and share moments from the community.</p>
+            <p className="mt-2">By attending, you consent to being photographed or filmed. If you would prefer not to appear in any media, please quietly let the host know before the session begins, and we will fully respect your preference.</p>
           </section>
 
           <section>
-            <h2 className="font-sans text-[11px] uppercase tracking-[0.2em] font-bold text-[#1A1817] mb-2">5. Liability</h2>
-            <p>While we strive to create a perfectly safe environment, Al-Musawwir and its organizers are not liable for any personal injury, loss, or damage to personal belongings during the event. Please keep your valuables safe and handle art materials responsibly.</p>
+            <h2 className="font-sans text-[11px] uppercase tracking-[0.2em] font-bold text-[#1A1817] mb-2">5. Personal Responsibility</h2>
+            <p>While we do our best to create a safe and comfortable environment, attendees remain responsible for their personal belongings and well-being during the gathering.</p>
+            <p className="mt-2">Please handle art materials responsibly and keep valuables with you at all times.</p>
           </section>
         </div>
       </div>
