@@ -316,10 +316,11 @@ export default function App() {
 
       {/* What is Al-Musawwir Section */}
       <section id="about-section" className="py-24 px-4 md:px-6 relative z-10">
-        <div className="max-w-3xl mx-auto text-center" ref={setRef}>
-          <h2 className="font-serif text-4xl md:text-5xl font-light text-[#1A1817] mb-10 reveal">What is Al-Musawwir?</h2>
+        {/* FIX: Moved the 'reveal' class to the parent that has the ref */}
+        <div className="max-w-3xl mx-auto text-center reveal" ref={setRef}>
+          <h2 className="font-serif text-4xl md:text-5xl font-light text-[#1A1817] mb-10">What is Al-Musawwir?</h2>
           
-          <div className="reveal space-y-6 font-serif text-xl md:text-2xl text-[#5C5855] font-light leading-relaxed px-2">
+          <div className="space-y-6 font-serif text-xl md:text-2xl text-[#5C5855] font-light leading-relaxed px-2">
             <p className="font-sans text-[12px] uppercase tracking-[0.4em] text-[#FF6B35] font-bold">Al-Musawwir</p>
             <p className="text-[#1A1817] font-medium">The Fashioner. The one who gives form to the formless.</p>
             <p>
