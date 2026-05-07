@@ -269,23 +269,39 @@ export default async function EventDetailPage({ params }) {
           </div>
         </div>
 
-        {/* ── THE FLOW SECTION ── */}
+        {/* ── EVENT FLOW SECTION ── */}
         {flowList.length > 0 && (
-          <div className="pt-16 pb-8 flex flex-col items-center">
-            <h3 className="font-sans text-[10px] uppercase tracking-[0.3em] font-bold text-[#1A1817]/50 mb-10 text-center">
-              Event Flow
-            </h3>
-            <div className="flex flex-col items-center w-full">
-              {flowList.map((step, idx) => (
-                <div key={idx} className="flex flex-col items-center">
-                  <span className="font-serif text-2xl md:text-3xl text-[#1A1817] text-center px-4">
-                    {step}
-                  </span>
-                  {idx < flowList.length - 1 && (
-                    <span className="w-[1px] h-8 md:h-10 bg-[#1A1817]/15 my-3"></span>
-                  )}
+          <div className="pt-8">
+            <div className="bg-white/40 backdrop-blur-sm border border-[#1A1817]/5 rounded-[2rem] p-8 md:p-12 relative overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+              
+              {/* Subtle background glow to make it feel premium */}
+              <div className="absolute top-0 right-0 w-64 h-64 bg-[#FF6B35]/5 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none"></div>
+              <div className="absolute bottom-0 left-0 w-64 h-64 bg-[#004E98]/5 rounded-full blur-3xl -ml-32 -mb-32 pointer-events-none"></div>
+
+              <div className="relative z-10">
+                <h3 className="font-sans text-[10px] uppercase tracking-[0.3em] font-bold text-[#1A1817]/50 mb-12 text-center flex justify-center items-center gap-2">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                  Event Flow
+                </h3>
+
+                <div className="max-w-sm mx-auto relative">
+                  {/* Subtle elegant gradient line */}
+                  <div className="absolute left-1/2 top-2 bottom-2 w-[1px] bg-gradient-to-b from-transparent via-[#1A1817]/15 to-transparent -translate-x-1/2"></div>
+
+                  <div className="flex flex-col gap-10">
+                    {flowList.map((step, idx) => (
+                      <div key={idx} className="relative flex flex-col items-center group">
+                        {/* Dot indicator */}
+                        <div className="w-2 h-2 rounded-full bg-[#1A1817]/20 group-hover:bg-[#FF6B35] transition-colors duration-500 mb-4 z-10 ring-4 ring-[#F7F5F0]/50"></div>
+                        {/* Text */}
+                        <span className="font-serif text-2xl md:text-3xl text-[#1A1817] text-center px-4">
+                          {step}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
+              </div>
             </div>
           </div>
         )}
