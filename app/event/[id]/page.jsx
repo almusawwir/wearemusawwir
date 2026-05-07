@@ -96,8 +96,9 @@ export default async function EventDetailPage({ params }) {
     );
   }
 
-  const providedList = currentEvent.provided ? currentEvent.provided.split(',').map(i => i.trim()) : [];
-  const bringList = currentEvent.bring ? currentEvent.bring.split(',').map(i => i.trim()) : [];
+  const providedList = currentEvent.provided ? currentEvent.provided.split(',').map(i => i.trim()).filter(Boolean) : [];
+  const bringList = currentEvent.bring ? currentEvent.bring.split(',').map(i => i.trim()).filter(Boolean) : [];
+  const flowList = currentEvent.flow ? currentEvent.flow.split(',').map(i => i.trim()).filter(Boolean) : [];
 
   const shareText = `Join me at ${currentEvent.title}!\n${currentEvent.tagline}\n\nSecure your canvas here:`;
   const shareUrl = `https://almusawwir.art/event/${targetId}`;
@@ -267,6 +268,27 @@ export default async function EventDetailPage({ params }) {
             </ul>
           </div>
         </div>
+
+        {/* ── THE FLOW SECTION ── */}
+        {flowList.length > 0 && (
+          <div className="pt-16 pb-8 flex flex-col items-center">
+            <h3 className="font-sans text-[10px] uppercase tracking-[0.3em] font-bold text-[#1A1817]/50 mb-10 text-center">
+              The Flow
+            </h3>
+            <div className="flex flex-col items-center w-full">
+              {flowList.map((step, idx) => (
+                <div key={idx} className="flex flex-col items-center">
+                  <span className="font-serif text-2xl md:text-3xl text-[#1A1817] text-center px-4">
+                    {step}
+                  </span>
+                  {idx < flowList.length - 1 && (
+                    <span className="w-[1px] h-8 md:h-10 bg-[#1A1817]/15 my-3"></span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Suggested events */}
@@ -333,7 +355,7 @@ export default async function EventDetailPage({ params }) {
               <span className="font-sans text-lg font-bold text-[#1A1817]">₹{currentEvent.price || '999'}</span>
             </div>
 
-            {/* CTA Button — No more countdowns, direct to Form */}
+            {/* CTA Button */}
             <div className="flex flex-col items-end gap-1 w-[70%] sm:w-auto">
               {isSoldOut ? (
                 <div className="w-full bg-[#5C5855] text-white font-sans text-xs md:text-sm uppercase tracking-[0.2em] font-bold py-4 px-6 rounded-full text-center shadow-xl flex items-center justify-center gap-2 cursor-not-allowed opacity-80">
