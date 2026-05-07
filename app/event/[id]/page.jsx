@@ -273,7 +273,7 @@ export default async function EventDetailPage({ params }) {
         {flowList.length > 0 && (
           <div className="pt-16 pb-8 flex flex-col items-center">
             <h3 className="font-sans text-[10px] uppercase tracking-[0.3em] font-bold text-[#1A1817]/50 mb-10 text-center">
-              The Flow
+              Event Flow
             </h3>
             <div className="flex flex-col items-center w-full">
               {flowList.map((step, idx) => (
