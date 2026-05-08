@@ -40,7 +40,7 @@ export default function TermsPage() {
         <div className="space-y-8 text-sm md:text-base text-[#5C5855] leading-relaxed">
           <section>
             <h2 className="font-sans text-[11px] uppercase tracking-[0.2em] font-bold text-[#1A1817] mb-2">1. Booking & Capacity</h2>
-            <p>Our gatherings are intentionally limited in capacity to maintain a calm and intimate experience.</p>
+            <p>Our gatherings are intentionally limited in capacity to maintain a calm and exclusive experience.</p>
             <p className="mt-2">Your spot is confirmed only after full payment has been received and your digital ticket has been issued. If you wish to transfer your ticket to someone else, please inform the organizers in advance.</p>
           </section>
 
