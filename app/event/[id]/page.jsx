@@ -380,7 +380,7 @@ export default async function EventDetailPage({ params }) {
                 </div>
               ) : (
                 <a
-                  href="https://forms.gle/9oJaV4ZBM1rCcyLa8"
+                  href="https://openinapp.link/j3u9q"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full bg-[#1A1817] text-white font-sans text-xs md:text-sm uppercase tracking-[0.2em] font-bold py-4 px-6 rounded-full hover:bg-[#FF6B35] transition-all text-center shadow-xl hover:-translate-y-1 flex items-center justify-center gap-2"
