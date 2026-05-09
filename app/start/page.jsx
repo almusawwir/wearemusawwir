@@ -2,29 +2,6 @@
 import React from 'react';
 
 export default function StarterGuidePage() {
-  
-  // Categorized Supply Links
-  const supplyLinks = {
-    colours: [
-      { id: 1, title: "Essential Colour Set 1", url: "https://amzn.in/d/0bUuHxRo" },
-      { id: 2, title: "Essential Colour Set 2", url: "https://amzn.in/d/0961PyQx" },
-    ],
-    brushes: [
-      { id: 3, title: "Starter Brush Kit 1", url: "https://amzn.in/d/00B9cGa7" },
-      { id: 4, title: "Starter Brush Kit 2", url: "https://amzn.in/d/00iPzdOo" },
-    ],
-    canvas: [
-      { id: 5, title: "Smooth Texture Canvas 1", url: "https://amzn.in/d/07m9Iabc" },
-      { id: 6, title: "Smooth Texture Canvas 2", url: "https://amzn.in/d/0j0i8nQL" },
-    ],
-    others: [
-      { id: 7, title: "Mixing Palette", url: "https://amzn.in/d/00reea4P" },
-      { id: 8, title: "Artist Accessory 1", url: "https://amzn.in/d/0fXjyfm8" },
-      { id: 9, title: "Artist Accessory 2", url: "https://amzn.in/d/08JNpwPR" },
-      { id: 10, title: "Artist Accessory 3", url: "https://amzn.in/d/0dMSmFtu" },
-    ]
-  };
-
   return (
     <div className="relative min-h-screen w-full bg-[#F7F5F0] text-[#1A1817] font-sans pb-32">
       {/* Injecting Fonts and Custom Styles */}
@@ -35,12 +12,9 @@ export default function StarterGuidePage() {
       `}} />
 
       {/* Navigation */}
-      <div className="absolute top-8 left-4 md:left-8 z-50 flex gap-4">
-        <a href="/" className="bg-white/80 backdrop-blur px-4 py-2 rounded-full font-sans text-[10px] uppercase tracking-widest font-bold hover:bg-[#1A1817] hover:text-white transition-all shadow-[0_4px_20px_rgba(0,0,0,0.05)] text-[#1A1817] border border-[#1A1817]/5">
-          ← Return Home
-        </a>
-        <a href="/ref" className="bg-[#FF6B35]/10 backdrop-blur px-4 py-2 rounded-full font-sans text-[10px] uppercase tracking-widest font-bold hover:bg-[#FF6B35] hover:text-white transition-all shadow-[0_4px_20px_rgba(0,0,0,0.05)] text-[#FF6B35] border border-[#FF6B35]/20">
-          Color Guide →
+      <div className="absolute top-8 left-4 md:left-8 z-50">
+        <a href="/" className="bg-white/80 backdrop-blur px-4 py-2 rounded-full font-sans text-[10px] uppercase tracking-widest font-bold hover:bg-[#1A1817] hover:text-white transition-all shadow-[0_4px_20px_rgba(0,0,0,0.05)] text-[#1A1817] border border-[#1A1817]/5 inline-flex items-center gap-2">
+          <span>←</span> Return Home
         </a>
       </div>
 
@@ -59,9 +33,9 @@ export default function StarterGuidePage() {
         <header className="text-center space-y-6 max-w-3xl mx-auto bg-white/60 backdrop-blur-md rounded-[2.5rem] p-8 md:p-12 border border-[#1A1817]/10 shadow-xl shadow-[#1A1817]/5">
           <h1 className="font-serif italic text-4xl md:text-5xl text-[#1A1817] leading-tight">Welcome to the Canvas</h1>
           <p className="font-sans text-base md:text-lg text-[#5C5855] leading-relaxed">
-            As we discussed in the workshop, it is perfectly okay to use ready-made colors. But when you are starting out, mixing your own primary colors unlocks a beautiful <strong>surprise element</strong>. It teaches you the soul of the paint, allowing you to literally achieve any shade you desire. 
+            As we discussed in the workshop, while ready-made colours are perfectly fine, mixing your own primary colours unlocks a beautiful <strong>surprise element</strong>. It teaches you the soul of the paint, allowing you to literally achieve any shade you desire. 
             <br/><br/>
-            Below is your promised beginner's guide to the exact supplies you need to start painting at home today.
+            Below is your beginner's guide to the supplies you need to start painting at home today.
           </p>
         </header>
 
@@ -73,7 +47,6 @@ export default function StarterGuidePage() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Essential */}
             <div className="space-y-4">
               <h3 className="font-sans text-[12px] uppercase tracking-[0.2em] font-bold text-[#1A1817]">The Core Essentials</h3>
               <ul className="space-y-3 font-serif text-lg text-[#5C5855]">
@@ -85,7 +58,6 @@ export default function StarterGuidePage() {
               </ul>
             </div>
 
-            {/* Additional */}
             <div className="space-y-4">
               <h3 className="font-sans text-[12px] uppercase tracking-[0.2em] font-bold text-[#1A1817]">Optional Add-ons</h3>
               <ul className="space-y-3 font-serif text-lg text-[#5C5855]">
@@ -133,70 +105,119 @@ export default function StarterGuidePage() {
               <div className="bg-white/50 rounded-2xl p-6 border border-[#1A1817]/5 h-full flex flex-col justify-center space-y-6">
                 <div>
                   <h4 className="font-serif text-xl text-[#1A1817]">Smooth Texture Canvas</h4>
-                  <p className="font-sans text-sm text-[#5C5855] mt-1">As a beginner, a smoother texture prevents the paint from fighting the fabric, making blending much easier.</p>
+                  <p className="font-sans text-sm text-[#5C5855] mt-1">A smoother texture prevents the paint from fighting the fabric, making blending much easier for beginners.</p>
                 </div>
                 <div>
                   <h4 className="font-serif text-xl text-[#1A1817]">Mixing Palette</h4>
-                  <p className="font-sans text-sm text-[#5C5855] mt-1">Any flat surface to mix your wonderful new colour combinations.</p>
+                  <p className="font-sans text-sm text-[#5C5855] mt-1">Any flat surface or dedicated palette to mix your wonderful new colour combinations.</p>
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* SECTION 3: Curated Shop Links */}
-        <section className="space-y-10">
+        {/* SECTION 3: Amazon Wishlists (The Shop Section) */}
+        <section className="space-y-8 pt-8">
           <div className="text-center">
             <span className="font-sans text-[10px] uppercase tracking-[0.3em] font-bold text-[#1A1817]">Shop The Look</span>
-            <h2 className="font-serif italic text-4xl text-[#1A1817] mt-2">Curated Supply Links</h2>
-            <div className="w-12 h-px bg-[#1A1817]/20 mx-auto mt-4"></div>
+            <h2 className="font-serif italic text-4xl text-[#1A1817] mt-2">Curated Supply Kits</h2>
+            <p className="font-sans text-sm text-[#5C5855] mt-4 max-w-xl mx-auto">
+              We've created easy one-click Amazon lists. Choose the Basic Kit if you're just starting out, or the Complete Kit for all the extras.
+            </p>
           </div>
 
-          {/* Colours */}
-          <ShopCategory title="Colours" items={supplyLinks.colours} />
-          {/* Brushes */}
-          <ShopCategory title="Brushes" items={supplyLinks.brushes} />
-          {/* Canvas */}
-          <ShopCategory title="Canvas" items={supplyLinks.canvas} />
-          {/* Palettes & Other */}
-          <ShopCategory title="Palette & Other Accessories" items={supplyLinks.others} />
-          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* Basic Kit Card */}
+            <a 
+              href="https://www.amazon.in/hz/wishlist/ls/1L55H0ABA2YM3?ref_=wl_share" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="group relative bg-white/80 backdrop-blur-md rounded-3xl p-8 border border-[#1A1817]/10 hover:border-[#FF6B35]/30 hover:shadow-2xl hover:shadow-[#FF6B35]/10 transition-all duration-300 flex flex-col justify-between overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-orange-400/5 rounded-bl-full -z-10 group-hover:scale-150 transition-transform duration-500"></div>
+              
+              <div>
+                <div className="w-12 h-12 bg-[#F7F5F0] rounded-full flex items-center justify-center mb-6 group-hover:bg-[#FF6B35] group-hover:text-white transition-colors duration-300">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                  </svg>
+                </div>
+                <h3 className="font-serif text-3xl text-[#1A1817] mb-2">Basic Supplies</h3>
+                <p className="font-sans text-sm text-[#5C5855] mb-8">The absolute core essentials you need to start painting immediately. Perfect for your first masterpiece.</p>
+              </div>
+              
+              <div className="flex items-center text-[#FF6B35] font-sans text-[11px] font-bold uppercase tracking-widest">
+                <span>View List on Amazon</span>
+                <svg className="w-4 h-4 ml-2 transform group-hover:translate-x-2 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                </svg>
+              </div>
+            </a>
+
+            {/* All Supplies Card */}
+            <a 
+              href="https://www.amazon.in/hz/wishlist/ls/4NLFXC0AI796?ref_=wl_share" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="group relative bg-[#1A1817] text-white rounded-3xl p-8 border border-[#1A1817] hover:shadow-2xl hover:shadow-[#1A1817]/20 transition-all duration-300 flex flex-col justify-between overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-full -z-10 group-hover:scale-150 transition-transform duration-500"></div>
+              
+              <div>
+                <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center mb-6 group-hover:bg-white group-hover:text-[#1A1817] transition-colors duration-300">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                  </svg>
+                </div>
+                <h3 className="font-serif text-3xl mb-2">All Supplies</h3>
+                <p className="font-sans text-sm text-gray-400 mb-8">The complete collection including our recommended optional add-ons, extra colors, and extended tools.</p>
+              </div>
+              
+              <div className="flex items-center text-white font-sans text-[11px] font-bold uppercase tracking-widest">
+                <span>View List on Amazon</span>
+                <svg className="w-4 h-4 ml-2 transform group-hover:translate-x-2 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                </svg>
+              </div>
+            </a>
+
+          </div>
         </section>
-      </div>
-    </div>
-  );
-}
 
-/* --- Reusable Components --- */
+        {/* SECTION 4: Link to Reference Guide */}
+        <section className="pt-16 pb-8">
+          <div className="bg-gradient-to-br from-white/80 to-[#F7F5F0] backdrop-blur-md rounded-[2.5rem] p-8 md:p-12 border border-[#1A1817]/10 shadow-[0_20px_40px_rgba(0,0,0,0.04)] relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-8">
+            
+            {/* Decorative Background Elements */}
+            <div className="absolute -top-20 -left-20 w-48 h-48 bg-blue-400/10 rounded-full blur-3xl"></div>
+            <div className="absolute -bottom-20 -right-20 w-48 h-48 bg-orange-400/10 rounded-full blur-3xl"></div>
 
-function ShopCategory({ title, items }) {
-  return (
-    <div className="space-y-4">
-      <h3 className="font-sans text-sm uppercase tracking-[0.2em] font-bold text-[#5C5855] pl-2">{title}</h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {items.map((item) => (
-          <a 
-            key={item.id} 
-            href={item.url} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="group block bg-white/60 backdrop-blur-sm rounded-2xl p-5 border border-[#1A1817]/10 hover:border-[#FF6B35]/50 hover:bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-[#FF6B35]/5"
-          >
-            <div className="w-full aspect-video bg-[#F7F5F0] rounded-xl mb-4 flex items-center justify-center border border-[#1A1817]/5 group-hover:bg-[#FF6B35]/5 transition-colors">
-              {/* Amazon Icon Placeholder */}
-              <svg className="w-8 h-8 text-[#1A1817]/20 group-hover:text-[#FF6B35]/40 transition-colors" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M13.982 10.741a3.076 3.076 0 00-1.077-2.338c-.896-.759-2.222-1.121-3.755-1.121-1.408 0-2.613.313-3.468.852v2.247c.928-.616 1.954-.925 2.929-.925 1.517 0 2.235.617 2.235 1.706 0 .399-.104.773-.306 1.096-.201.324-.52.597-.93.791-.41.196-.928.31-1.52.338L6 13.486c-1.28.06-2.261.357-2.883.864C2.495 14.856 2 15.549 2 16.438c0 .942.348 1.688 1.026 2.19.704.52 1.65.794 2.784.794 1.341 0 2.443-.377 3.232-1.098a3.528 3.528 0 001.218-2.223h.044v1.895h2.827v-3.784c0-.986.284-2.146.851-3.471zm-4.305 5.564c-1.378 0-1.879-.806-1.879-1.543 0-.585.244-1.031.716-1.312.47-.282 1.171-.439 2.053-.464l1.839-.053v.525c0 1.644-1.144 2.847-2.729 2.847zM20.89 21.056c-2.43 1.327-5.594 1.977-8.948 1.977-3.627 0-6.844-.75-9.39-2.115-.436-.233-.561-.806-.279-1.195.286-.395.845-.48 1.29-.227 2.185 1.233 5.093 1.905 8.38 1.905 3.013 0 5.86-.582 8.083-1.748.472-.249 1.058-.124 1.32.327.265.45.109 1.034-.366 1.291l-.09.085z"></path>
-              </svg>
+            <div className="relative z-10 max-w-lg text-center md:text-left">
+              <span className="inline-block px-3 py-1 bg-[#1A1817]/5 text-[#1A1817] rounded-full font-sans text-[10px] uppercase tracking-widest font-bold mb-4 border border-[#1A1817]/10">
+                Next Steps
+              </span>
+              <h2 className="font-serif text-3xl md:text-4xl text-[#1A1817] mb-3">Master the Basics</h2>
+              <p className="font-sans text-base text-[#5C5855]">
+                Ready to paint? Review the basic techniques, color mixing secrets, and visual reference guides we covered during the workshop.
+              </p>
             </div>
-            <h4 className="font-serif text-lg text-[#1A1817] mb-2 leading-tight group-hover:text-[#FF6B35] transition-colors">{title}</h4>
-            <div className="flex items-center text-[#5C5855] text-xs font-bold uppercase tracking-wider group-hover:text-[#1A1817] transition-colors">
-              <span>View on Amazon</span>
-              <svg className="w-4 h-4 ml-1 transform group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
-              </svg>
+
+            <div className="relative z-10 w-full md:w-auto flex-shrink-0">
+              <a 
+                href="/ref" 
+                className="group w-full md:w-auto flex items-center justify-center gap-3 bg-[#FF6B35] text-white px-8 py-4 rounded-full font-sans text-[12px] font-bold uppercase tracking-widest hover:bg-[#E55A2B] hover:shadow-[0_10px_20px_rgba(255,107,53,0.25)] hover:-translate-y-1 transition-all duration-300"
+              >
+                <span>View Reference Card</span>
+                <svg className="w-5 h-5 transform group-hover:rotate-12 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                </svg>
+              </a>
             </div>
-          </a>
-        ))}
+
+          </div>
+        </section>
+
       </div>
     </div>
   );
