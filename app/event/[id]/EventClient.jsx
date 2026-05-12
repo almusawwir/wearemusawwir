@@ -170,47 +170,7 @@ export default function EventClient({ currentEvent, suggestedEvents, targetId })
           )}
         </div>
 
-        {/* The Event Flow Section (Compact 2-Column List) */}
-        {flowList.length > 0 && (
-          <div className="px-4 md:px-0 pt-4">
-            <h3 className="font-serif italic text-3xl text-[#1A1817] mb-6 text-center md:text-left">The Flow</h3>
-            <div className="bg-white/40 border border-[#1A1817]/5 rounded-[2rem] p-6 md:p-10 shadow-sm">
-              <ul className={`grid gap-x-8 gap-y-4 ${flowList.length > 5 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
-                {flowList.map((step, idx) => (
-                  <li key={idx} className="font-sans text-sm md:text-base font-medium text-[#1A1817] flex items-start gap-3">
-                    <span className="text-[#1A1817]/40 font-bold mt-0.5">{idx + 1}.</span> 
-                    <span>{step}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        )}
-
-        {/* Media Section: Horizontal Gallery + Portrait Video */}
-        {(galleryImages.length > 0 || videoSrc) && (
-          <div className="pt-8 space-y-8">
-            <h3 className="font-serif italic text-3xl text-[#1A1817] px-4 md:px-0 text-center md:text-left">A Glimpse</h3>
-            
-            <div className="flex gap-4 overflow-x-auto pb-6 snap-x hide-scrollbar px-4 md:px-0 items-stretch">
-              {/* Portrait Video (If exists) */}
-              {videoSrc && (
-                <div className="snap-center shrink-0 w-[240px] md:w-[300px] aspect-[9/16] relative rounded-[2rem] overflow-hidden bg-black shadow-lg">
-                  <video src={videoSrc} autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover opacity-90"></video>
-                </div>
-              )}
-              
-              {/* Image Gallery */}
-              {galleryImages.map((img, idx) => (
-                <div key={idx} className="snap-center shrink-0 w-[280px] md:w-[360px] aspect-[4/5] relative rounded-[2rem] overflow-hidden shadow-lg border border-[#1A1817]/5 group">
-                  <EventImage src={img} alt={`Gallery ${idx}`} fill sizes="(max-width: 768px) 280px, 360px" className="object-cover group-hover:scale-105 transition-transform duration-700" />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* RESTORED: What's Provided / What To Bring (Original Pill Design) */}
+         {/* RESTORED: What's Provided / What To Bring (Original Pill Design) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-8">
           <div className="bg-white/40 border border-[#1A1817]/5 rounded-[2rem] p-6 md:p-8">
             <h3 className="font-sans text-[10px] uppercase tracking-[0.2em] text-[#FF6B35] font-bold mb-4 flex items-center gap-2">
@@ -242,7 +202,49 @@ export default function EventClient({ currentEvent, suggestedEvents, targetId })
 
       </div>
 
-      
+       
+
+        {/* Media Section: Horizontal Gallery + Portrait Video */}
+        {(galleryImages.length > 0 || videoSrc) && (
+          <div className="pt-8 space-y-8">
+            <h3 className="font-serif italic text-3xl text-[#1A1817] px-4 md:px-0 text-center md:text-left">A Glimpse</h3>
+            
+            <div className="flex gap-4 overflow-x-auto pb-6 snap-x hide-scrollbar px-4 md:px-0 items-stretch">
+              {/* Portrait Video (If exists) */}
+              {videoSrc && (
+                <div className="snap-center shrink-0 w-[240px] md:w-[300px] aspect-[9/16] relative rounded-[2rem] overflow-hidden bg-black shadow-lg">
+                  <video src={videoSrc} autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover opacity-90"></video>
+                </div>
+              )}
+              
+              {/* Image Gallery */}
+              {galleryImages.map((img, idx) => (
+                <div key={idx} className="snap-center shrink-0 w-[280px] md:w-[360px] aspect-[4/5] relative rounded-[2rem] overflow-hidden shadow-lg border border-[#1A1817]/5 group">
+                  <EventImage src={img} alt={`Gallery ${idx}`} fill sizes="(max-width: 768px) 280px, 360px" className="object-cover group-hover:scale-105 transition-transform duration-700" />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+
+
+       {/* The Event Flow Section (Compact 2-Column List) */}
+        {flowList.length > 0 && (
+          <div className="px-4 md:px-0 pt-4">
+            <h3 className="font-serif italic text-3xl text-[#1A1817] mb-6 text-center md:text-left">The Flow</h3>
+            <div className="bg-white/40 border border-[#1A1817]/5 rounded-[2rem] p-6 md:p-10 shadow-sm">
+              <ul className={`grid gap-x-8 gap-y-4 ${flowList.length > 5 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+                {flowList.map((step, idx) => (
+                  <li key={idx} className="font-sans text-sm md:text-base font-medium text-[#1A1817] flex items-start gap-3">
+                    <span className="text-[#1A1817]/40 font-bold mt-0.5">{idx + 1}.</span> 
+                    <span>{step}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
 
       {/* Suggested events */}
       {suggestedEvents.length > 0 && (
