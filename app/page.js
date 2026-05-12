@@ -156,7 +156,8 @@ export default function App() {
           <div className="w-1 h-1 rounded-full bg-[#FF6B35] hidden sm:block"></div>
           <Link href="/about" className="font-sans text-[11px] sm:text-[10px] uppercase tracking-widest font-bold text-[#5C5855] hover:text-[#1A1817] transition-colors py-2 px-1 sm:p-0">About</Link>
           <div className="w-1 h-1 rounded-full bg-[#1A1817]/20 hidden sm:block"></div>
-          <a href="#events" className="font-sans text-[11px] sm:text-[10px] uppercase tracking-widest font-bold text-[#004E98] hover:text-[#FF6B35] transition-colors py-2 px-1 sm:p-0">Gatherings</a>
+          {/* UPDATED: Navigates to /events */}
+          <Link href="/events" className="font-sans text-[11px] sm:text-[10px] uppercase tracking-widest font-bold text-[#004E98] hover:text-[#FF6B35] transition-colors py-2 px-1 sm:p-0">Gatherings</Link>
         </div>
       </nav>
 
@@ -201,9 +202,10 @@ export default function App() {
               <p>That is the spirit of Al-Musawwir.</p>
               <p>A gathering space for people to paint, reflect, connect, and explore creativity without pressure, perfection, or labels.</p>
             </div>
-            <a href="#events" className="inline-block border border-white/30 bg-white/5 backdrop-blur-sm text-white font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-3 px-8 md:py-4 md:px-10 rounded-full hover:bg-white hover:text-[#1A1817] transition-all duration-500 hover:scale-105 mb-4">
+            {/* UPDATED: Navigates to /events */}
+            <Link href="/events" className="inline-block border border-white/30 bg-white/5 backdrop-blur-sm text-white font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-3 px-8 md:py-4 md:px-10 rounded-full hover:bg-white hover:text-[#1A1817] transition-all duration-500 hover:scale-105 mb-4">
               Explore Gatherings
-            </a>
+            </Link>
           </div>
         </div>
       </header>
@@ -279,123 +281,135 @@ export default function App() {
           ) : events.length === 0 ? (
              <div className="text-center font-serif text-xl text-[#5C5855]">No gatherings currently scheduled. Check back soon!</div>
           ) : (
-            <div className="space-y-16">
-              {events.map((event) => {
-                const isExpanded = expandedCards[event.id];
-                const desc = event.description || "";
-                const isLongDesc = desc.length > 120;
-                const displayDesc = isExpanded ? desc : (isLongDesc ? desc.slice(0, 120) + '...' : desc);
-                const isSoldOut = event.status && (event.status.toLowerCase().includes('sold') || event.status.toLowerCase().includes('closed'));
-                const isExternalImage = event.image_url && event.image_url.startsWith('http');
+            <>
+              <div className="space-y-16">
+                {/* UPDATED: Only slicing the first 3 events to show on the homepage */}
+                {events.slice(0, 3).map((event) => {
+                  const isExpanded = expandedCards[event.id];
+                  const desc = event.description || "";
+                  const isLongDesc = desc.length > 120;
+                  const displayDesc = isExpanded ? desc : (isLongDesc ? desc.slice(0, 120) + '...' : desc);
+                  const isSoldOut = event.status && (event.status.toLowerCase().includes('sold') || event.status.toLowerCase().includes('closed'));
+                  const isExternalImage = event.image_url && event.image_url.startsWith('http');
 
-                return (
-                  <div key={event.id} ref={setRef} onClick={() => handleCardClick(event.id)}
-                    className="cursor-pointer reveal glass-card rounded-[2rem] overflow-hidden shadow-2xl shadow-[#1A1817]/5 flex flex-col md:flex-row group hover:-translate-y-2 transition-all duration-500 bg-white/60">
-                    
-                    {/* Event Card Image */}
-                    <div className="w-full md:w-2/5 relative h-64 md:h-auto min-h-[16rem] overflow-hidden bg-[#1A1817]">
-                      {event.image_url ? (
-                        isExternalImage ? (
-                          <img
-                            src={event.image_url}
-                            className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000"
-                            alt={event.title}
-                            loading="lazy"
-                            decoding="async"
-                          />
+                  return (
+                    <div key={event.id} ref={setRef} onClick={() => handleCardClick(event.id)}
+                      className="cursor-pointer reveal glass-card rounded-[2rem] overflow-hidden shadow-2xl shadow-[#1A1817]/5 flex flex-col md:flex-row group hover:-translate-y-2 transition-all duration-500 bg-white/60">
+                      
+                      {/* Event Card Image */}
+                      <div className="w-full md:w-2/5 relative h-64 md:h-auto min-h-[16rem] overflow-hidden bg-[#1A1817]">
+                        {event.image_url ? (
+                          isExternalImage ? (
+                            <img
+                              src={event.image_url}
+                              className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000"
+                              alt={event.title}
+                              loading="lazy"
+                              decoding="async"
+                            />
+                          ) : (
+                            <Image
+                              src={event.image_url}
+                              alt={event.title}
+                              fill
+                              quality={75}
+                              sizes="(max-width: 768px) 100vw, 40vw"
+                              className="object-cover group-hover:scale-105 transition-transform duration-1000"
+                              loading="lazy"
+                            />
+                          )
                         ) : (
-                          <Image
-                            src={event.image_url}
-                            alt={event.title}
-                            fill
-                            quality={75}
-                            sizes="(max-width: 768px) 100vw, 40vw"
-                            className="object-cover group-hover:scale-105 transition-transform duration-1000"
-                            loading="lazy"
-                          />
-                        )
-                      ) : (
-                        <div className="absolute inset-0 flex items-center justify-center bg-[#004E98]/20">
-                          <span className="font-serif italic text-[#F7F5F0]/50 text-sm">Artwork Pending</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="w-full md:w-3/5 p-8 md:p-10 flex flex-col">
-                      <span className="font-sans text-[10px] uppercase tracking-[0.4em] text-[#FF6B35] mb-2 font-bold">{event.id}</span>
-                      <h3 className="font-serif text-3xl md:text-4xl text-[#1A1817] mb-2">{event.title}</h3>
-                      <p className="font-serif italic text-lg md:text-xl text-[#5C5855] mb-6">{event.tagline}</p>
-
-                      <div className="mb-8">
-                        <p className="font-sans text-sm md:text-base text-[#1A1817]/80 leading-relaxed transition-all duration-300">
-                          {displayDesc}
-                          {isLongDesc && (
-                            <button onClick={(e) => toggleExpand(e, event.id)} className="ml-2 font-bold text-[#FF6B35] text-[10px] uppercase tracking-widest hover:text-[#004E98] transition-colors">
-                              {isExpanded ? "See Less" : "See More"}
-                            </button>
-                          )}
-                        </p>
+                          <div className="absolute inset-0 flex items-center justify-center bg-[#004E98]/20">
+                            <span className="font-serif italic text-[#F7F5F0]/50 text-sm">Artwork Pending</span>
+                          </div>
+                        )}
                       </div>
 
-                      <div className="grid grid-cols-2 gap-y-6 gap-x-4 mb-8">
-                        <div>
-                          <span className="font-sans text-[9px] md:text-[10px] uppercase tracking-[0.2em] text-[#5C5855] mb-1.5 font-semibold flex items-center gap-1.5">
-                            <svg className="w-3.5 h-3.5 text-[#004E98]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                            When
-                          </span>
-                          <span className="font-serif text-lg text-[#1A1817] leading-tight block">{event.date}<br/><span className="text-sm italic text-[#5C5855]">{event.time}</span></span>
-                        </div>
-                        <div>
-                          <span className="font-sans text-[9px] md:text-[10px] uppercase tracking-[0.2em] text-[#5C5855] mb-1.5 font-semibold flex items-center gap-1.5">
-                            <svg className="w-3.5 h-3.5 text-[#E24E7A]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                            Where
-                          </span>
-                          <span className="font-serif text-lg text-[#1A1817] leading-tight block">{event.location_main}<br/><span className="text-sm italic text-[#5C5855]">{event.location_sub}</span></span>
-                        </div>
-                        <div>
-                          <span className="font-sans text-[9px] md:text-[10px] uppercase tracking-[0.2em] text-[#5C5855] mb-1.5 font-semibold flex items-center gap-1.5">
-                            <svg className="w-3.5 h-3.5 text-[#FF6B35]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path></svg>
-                            Provided
-                          </span>
-                          <span className="font-serif text-base text-[#1A1817] leading-tight block line-clamp-2">{event.provided}</span>
-                        </div>
-                        <div>
-                          <span className="font-sans text-[9px] md:text-[10px] uppercase tracking-[0.2em] text-[#5C5855] mb-1.5 font-semibold flex items-center gap-1.5">
-                            <svg className="w-3.5 h-3.5 text-[#F9A03F]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
-                            To Bring
-                          </span>
-                          <span className="font-serif text-base text-[#1A1817] leading-tight block line-clamp-2">{event.bring}</span>
-                        </div>
-                      </div>
+                      <div className="w-full md:w-3/5 p-8 md:p-10 flex flex-col">
+                        <span className="font-sans text-[10px] uppercase tracking-[0.4em] text-[#FF6B35] mb-2 font-bold">{event.id}</span>
+                        <h3 className="font-serif text-3xl md:text-4xl text-[#1A1817] mb-2">{event.title}</h3>
+                        <p className="font-serif italic text-lg md:text-xl text-[#5C5855] mb-6">{event.tagline}</p>
 
-                      <div className="mt-auto pt-6 border-t border-[#1A1817]/10 flex items-center justify-between">
-                        <div className="flex flex-col gap-1">
-                          <span className={`font-sans text-[10px] md:text-[11px] uppercase tracking-widest font-bold flex items-center gap-2 ${isSoldOut ? 'text-[#5C5855]' : 'text-red-500'}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${isSoldOut ? 'bg-[#5C5855]' : 'bg-red-500 animate-pulse'}`}></span>
-                            {event.status || 'RSVP Open'}
-                          </span>
-                          <div className="font-serif text-xl text-[#1A1817] flex items-center gap-2">
-                            {event.original_price && event.original_price.trim() !== '' && (
-                              <span className="text-[#5C5855]/60 line-through text-sm md:text-base">₹{event.original_price}</span>
+                        <div className="mb-8">
+                          <p className="font-sans text-sm md:text-base text-[#1A1817]/80 leading-relaxed transition-all duration-300">
+                            {displayDesc}
+                            {isLongDesc && (
+                              <button onClick={(e) => toggleExpand(e, event.id)} className="ml-2 font-bold text-[#FF6B35] text-[10px] uppercase tracking-widest hover:text-[#004E98] transition-colors">
+                                {isExpanded ? "See Less" : "See More"}
+                              </button>
                             )}
-                            <span>₹{event.price || '999'}</span>
+                          </p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-y-6 gap-x-4 mb-8">
+                          <div>
+                            <span className="font-sans text-[9px] md:text-[10px] uppercase tracking-[0.2em] text-[#5C5855] mb-1.5 font-semibold flex items-center gap-1.5">
+                              <svg className="w-3.5 h-3.5 text-[#004E98]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                              When
+                            </span>
+                            <span className="font-serif text-lg text-[#1A1817] leading-tight block">{event.date}<br/><span className="text-sm italic text-[#5C5855]">{event.time}</span></span>
+                          </div>
+                          <div>
+                            <span className="font-sans text-[9px] md:text-[10px] uppercase tracking-[0.2em] text-[#5C5855] mb-1.5 font-semibold flex items-center gap-1.5">
+                              <svg className="w-3.5 h-3.5 text-[#E24E7A]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                              Where
+                            </span>
+                            <span className="font-serif text-lg text-[#1A1817] leading-tight block">{event.location_main}<br/><span className="text-sm italic text-[#5C5855]">{event.location_sub}</span></span>
+                          </div>
+                          <div>
+                            <span className="font-sans text-[9px] md:text-[10px] uppercase tracking-[0.2em] text-[#5C5855] mb-1.5 font-semibold flex items-center gap-1.5">
+                              <svg className="w-3.5 h-3.5 text-[#FF6B35]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path></svg>
+                              Provided
+                            </span>
+                            <span className="font-serif text-base text-[#1A1817] leading-tight block line-clamp-2">{event.provided}</span>
+                          </div>
+                          <div>
+                            <span className="font-sans text-[9px] md:text-[10px] uppercase tracking-[0.2em] text-[#5C5855] mb-1.5 font-semibold flex items-center gap-1.5">
+                              <svg className="w-3.5 h-3.5 text-[#F9A03F]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                              To Bring
+                            </span>
+                            <span className="font-serif text-base text-[#1A1817] leading-tight block line-clamp-2">{event.bring}</span>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-3">
-                          <span className="hidden sm:block font-sans text-[10px] uppercase tracking-widest text-[#1A1817] font-bold group-hover:text-[#FF6B35] transition-colors">
-                            {event.button_text || 'View Details'}
-                          </span>
-                          <div className="w-10 h-10 rounded-full bg-[#1A1817] text-white flex items-center justify-center group-hover:bg-[#FF6B35] transition-colors shadow-md">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                        <div className="mt-auto pt-6 border-t border-[#1A1817]/10 flex items-center justify-between">
+                          <div className="flex flex-col gap-1">
+                            <span className={`font-sans text-[10px] md:text-[11px] uppercase tracking-widest font-bold flex items-center gap-2 ${isSoldOut ? 'text-[#5C5855]' : 'text-red-500'}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${isSoldOut ? 'bg-[#5C5855]' : 'bg-red-500 animate-pulse'}`}></span>
+                              {event.status || 'RSVP Open'}
+                            </span>
+                            <div className="font-serif text-xl text-[#1A1817] flex items-center gap-2">
+                              {event.original_price && event.original_price.trim() !== '' && (
+                                <span className="text-[#5C5855]/60 line-through text-sm md:text-base">₹{event.original_price}</span>
+                              )}
+                              <span>₹{event.price || '999'}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <span className="hidden sm:block font-sans text-[10px] uppercase tracking-widest text-[#1A1817] font-bold group-hover:text-[#FF6B35] transition-colors">
+                              {event.button_text || 'View Details'}
+                            </span>
+                            <div className="w-10 h-10 rounded-full bg-[#1A1817] text-white flex items-center justify-center group-hover:bg-[#FF6B35] transition-colors shadow-md">
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+              
+              {/* UPDATED: Show More Events Button that connects to /events */}
+              {events.length > 3 && (
+                <div className="text-center mt-16 reveal animate-fade-in-up" ref={setRef}>
+                  <Link href="/events" className="inline-block border border-[#1A1817]/20 bg-transparent text-[#1A1817] font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-4 px-10 rounded-full hover:bg-[#1A1817] hover:text-white transition-all duration-500 hover:-translate-y-1 shadow-sm">
+                    View All Volumes
+                  </Link>
+                </div>
+              )}
+            </>
           )}
         </div>
       </section>
@@ -445,9 +459,10 @@ export default function App() {
             
             {/* Action Buttons: Events & Inline WhatsApp */}
             <div className="pt-10 flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6">
-              <a href="#events" className="w-full sm:w-auto inline-block border border-[#1A1817]/20 bg-[#1A1817] text-white font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-4 px-8 md:px-10 rounded-full hover:bg-[#FF6B35] hover:border-[#FF6B35] transition-all duration-500 hover:-translate-y-1 shadow-lg">
+              {/* UPDATED: Navigates to /events */}
+              <Link href="/events" className="w-full sm:w-auto inline-block border border-[#1A1817]/20 bg-[#1A1817] text-white font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-4 px-8 md:px-10 rounded-full hover:bg-[#FF6B35] hover:border-[#FF6B35] transition-all duration-500 hover:-translate-y-1 shadow-lg">
                 Come create with us.
-              </a>
+              </Link>
               <a href="https://chat.whatsapp.com/B68V6Q62HZPHHsGMG0t4jP" target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 border border-[#25D366]/30 bg-[#25D366]/10 text-[#128C7E] font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-4 px-8 md:px-10 rounded-full hover:bg-[#25D366] hover:text-white transition-all duration-500 hover:-translate-y-1 shadow-lg">
                 <svg className="w-4 h-4 md:w-5 md:h-5" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M12.031 0C5.385 0 0 5.385 0 12.031c0 2.115.552 4.148 1.597 5.952L.15 23.473l5.65-1.48c1.745.962 3.712 1.472 5.755 1.472h.004c6.645 0 12.03-5.384 12.03-12.03S18.676 0 12.031 0zm0 21.492c-1.782 0-3.535-.48-5.076-1.385l-.364-.216-3.766.988.997-3.67-.238-.376A9.972 9.972 0 012.052 12.03c0-5.503 4.478-9.98 9.983-9.98 2.668 0 5.176 1.04 7.062 2.927a9.92 9.92 0 012.924 7.054c0 5.503-4.478 9.98-9.98 9.98zm5.474-7.48c-.3-.15-1.776-.877-2.05-.978-.276-.1-.476-.15-.677.15-.2.3-.775.978-.95 1.178-.175.2-.35.225-.65.075-.3-.15-1.267-.468-2.414-1.488-.89-.79-1.49-1.767-1.665-2.067-.175-.3-.018-.462.132-.612.135-.135.3-.35.45-.525.15-.175.2-.3.3-.5.1-.2.05-.375-.025-.525-.075-.15-.676-1.626-.926-2.226-.244-.585-.49-.505-.677-.515-.175-.01-.375-.01-.575-.01-.2 0-.525.075-.8.375-.275.3-1.05 1.025-1.05 2.5s1.075 2.9 1.225 3.1c.15.2 2.112 3.226 5.112 4.526.715.31 1.272.494 1.706.632.716.228 1.368.196 1.884.118.577-.087 1.775-.726 2.025-1.426.25-.7.25-1.3.175-1.426-.075-.125-.275-.2-.575-.35z"></path>
