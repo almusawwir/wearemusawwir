@@ -15,6 +15,7 @@ function EventImage({ src, alt, className, fill, sizes, priority, quality }) {
 export default function EventClient({ currentEvent, suggestedEvents, targetId }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isDescExpanded, setIsDescExpanded] = useState(false);
 
   if (!currentEvent) {
     return (
@@ -25,26 +26,46 @@ export default function EventClient({ currentEvent, suggestedEvents, targetId })
     );
   }
 
-  // Detect Google Sheet Line Breaks (\n)
+  // Detect Google Sheet Line Breaks (\n) for Description
   const paragraphs = currentEvent.description ? currentEvent.description.split('\n').filter(p => p.trim() !== '') : [];
+  const displayParagraphs = isDescExpanded ? paragraphs : paragraphs.slice(0, 2);
 
-  // Consolidate Lists
+  // Lists (Provided & Bring)
   const providedList = currentEvent.provided ? currentEvent.provided.split(',').map(i => i.trim()) : [];
   const bringList = currentEvent.bring ? currentEvent.bring.split(',').map(i => i.trim()) : [];
+
+  // Event Flow (Split by new lines)
+  const flowList = currentEvent.flow ? currentEvent.flow.split('\n').filter(i => i.trim() !== '') : [];
 
   // Parse Gallery and Video
   const galleryImages = currentEvent.gallery ? currentEvent.gallery.split(',').map(i => i.trim()).filter(i => i) : [];
   const videoSrc = currentEvent.video ? currentEvent.video.trim() : null;
 
-  // Sharing Links
+  // Sharing Links & Native Share Logic
   const shareText = `Join me at ${currentEvent.title}!\n${currentEvent.tagline}\n\nSecure your canvas here:`;
   const shareUrl = `https://almusawwir.art/event/${targetId}`;
-  const whatsappShareLink = `https://wa.me/?text=${encodeURIComponent(shareText + ' ' + shareUrl)}`;
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(shareUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleNativeShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: currentEvent.title,
+          text: shareText,
+          url: shareUrl,
+        });
+      } catch (err) {
+        console.error("Error sharing", err);
+      }
+    } else {
+      // Fallback if browser doesn't support native sharing (like older desktops)
+      handleCopyLink();
+    }
   };
 
   // Status & Booking Logic
@@ -77,7 +98,7 @@ export default function EventClient({ currentEvent, suggestedEvents, targetId })
 
       {/* Back Button */}
       <div className="absolute top-8 left-4 md:left-8 z-50">
-        <Link href="/events" className="bg-white/80 backdrop-blur px-4 py-2 rounded-full font-sans text-[10px] uppercase tracking-widest font-bold hover:bg-[#1A1817] hover:text-white transition-all shadow-lg text-[#1A1817]">
+        <Link href="/event" className="bg-white/80 backdrop-blur px-4 py-2 rounded-full font-sans text-[10px] uppercase tracking-widest font-bold hover:bg-[#1A1817] hover:text-white transition-all shadow-lg text-[#1A1817]">
           ← Back to Archives
         </Link>
       </div>
@@ -111,7 +132,7 @@ export default function EventClient({ currentEvent, suggestedEvents, targetId })
             <p className="font-sans text-sm text-[#5C5855]">{currentEvent.location_sub}</p>
           </div>
 
-          <div className="w-full md:w-1/2 flex flex-col gap-4">
+          <div className="w-full md:w-1/2 flex flex-col gap-3">
             {/* Open Map Button - On Top */}
             {currentEvent.map_link && (
               <a href={currentEvent.map_link} target="_blank" rel="noreferrer" className="w-full bg-[#1A1817]/5 text-[#1A1817] font-sans text-[10px] uppercase tracking-[0.2em] font-bold py-3.5 rounded-full hover:bg-[#1A1817] hover:text-white transition-all text-center flex items-center justify-center gap-2">
@@ -119,35 +140,57 @@ export default function EventClient({ currentEvent, suggestedEvents, targetId })
               </a>
             )}
 
-            {/* 3 Circular Share Buttons Row */}
-            <div className="flex items-center justify-center md:justify-end gap-4">
-              <button onClick={handleCopyLink} className="w-12 h-12 rounded-full bg-white border border-[#1A1817]/10 flex items-center justify-center hover:bg-[#1A1817] hover:text-white transition-all text-[#1A1817] shadow-sm relative group" aria-label="Copy Link">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
-                {copied && <span className="absolute -top-8 bg-[#1A1817] text-white text-[9px] uppercase tracking-widest px-2 py-1 rounded shadow">Copied</span>}
+            {/* 2 Rectangular Share Buttons Row */}
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={handleCopyLink} className="w-full bg-white border border-[#1A1817]/10 font-sans text-[10px] uppercase tracking-widest font-bold py-3.5 rounded-full hover:bg-[#1A1817] hover:text-white transition-all text-[#1A1817] shadow-sm flex items-center justify-center gap-2 relative">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                {copied ? 'Copied!' : 'Copy Link'}
               </button>
               
-              <a href={whatsappShareLink} target="_blank" rel="noreferrer" className="w-12 h-12 rounded-full bg-[#25D366]/10 border border-[#25D366]/20 flex items-center justify-center hover:bg-[#25D366] text-[#25D366] hover:text-white transition-all shadow-sm" aria-label="Share on WhatsApp">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 0C5.385 0 0 5.385 0 12.031c0 2.115.552 4.148 1.597 5.952L.15 23.473l5.65-1.48c1.745.962 3.712 1.472 5.755 1.472h.004c6.645 0 12.03-5.384 12.03-12.03S18.676 0 12.031 0zm0 21.492c-1.782 0-3.535-.48-5.076-1.385l-.364-.216-3.766.988.997-3.67-.238-.376A9.972 9.972 0 012.052 12.03c0-5.503 4.478-9.98 9.983-9.98 2.668 0 5.176 1.04 7.062 2.927a9.92 9.92 0 012.924 7.054c0 5.503-4.478 9.98-9.98 9.98z"></path></svg>
-              </a>
-
-              <a href="https://instagram.com" target="_blank" rel="noreferrer" className="w-12 h-12 rounded-full bg-[#E1306C]/10 border border-[#E1306C]/20 flex items-center justify-center hover:bg-[#E1306C] text-[#E1306C] hover:text-white transition-all shadow-sm" aria-label="Instagram">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 1.76-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 1.76 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-1.76 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-1.778-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"></path></svg>
-              </a>
+              <button onClick={handleNativeShare} className="w-full bg-[#25D366]/10 border border-[#25D366]/20 font-sans text-[10px] uppercase tracking-widest font-bold py-3.5 rounded-full hover:bg-[#25D366] text-[#25D366] hover:text-white transition-all shadow-sm flex items-center justify-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path></svg>
+                Share
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Dynamic Multi-Paragraph Description */}
-        <div className="prose prose-lg prose-p:font-serif prose-p:text-xl md:prose-p:text-2xl prose-p:leading-relaxed prose-p:text-[#1A1817]/80 mx-auto px-4 md:px-0 text-center md:text-left">
-          {paragraphs.map((p, idx) => (
+        {/* Dynamic Multi-Paragraph Description (Capped at 2 paragraphs) */}
+        <div className="prose prose-lg prose-p:font-serif prose-p:text-xl md:prose-p:text-2xl prose-p:leading-relaxed prose-p:text-[#1A1817]/80 mx-auto px-4 md:px-0 text-center md:text-left flex flex-col items-center md:items-start">
+          {displayParagraphs.map((p, idx) => (
             <p key={idx} className="mb-6">{p}</p>
           ))}
+          {paragraphs.length > 2 && (
+            <button 
+              onClick={() => setIsDescExpanded(!isDescExpanded)} 
+              className="mt-2 bg-transparent border border-[#1A1817]/20 text-[#1A1817] font-sans text-[10px] uppercase tracking-widest font-bold py-2.5 px-6 rounded-full hover:bg-[#1A1817] hover:text-white transition-colors"
+            >
+              {isDescExpanded ? "See Less" : "See More"}
+            </button>
+          )}
         </div>
+
+        {/* The Event Flow Section (Compact 2-Column List) */}
+        {flowList.length > 0 && (
+          <div className="px-4 md:px-0 pt-4">
+            <h3 className="font-serif italic text-3xl text-[#1A1817] mb-6 text-center md:text-left">The Flow</h3>
+            <div className="bg-white/40 border border-[#1A1817]/5 rounded-[2rem] p-6 md:p-10 shadow-sm">
+              <ul className={`grid gap-x-8 gap-y-4 ${flowList.length > 5 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+                {flowList.map((step, idx) => (
+                  <li key={idx} className="font-sans text-sm md:text-base font-medium text-[#1A1817] flex items-start gap-3">
+                    <span className="text-[#1A1817]/40 font-bold mt-0.5">{idx + 1}.</span> 
+                    <span>{step}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
 
         {/* Media Section: Horizontal Gallery + Portrait Video */}
         {(galleryImages.length > 0 || videoSrc) && (
           <div className="pt-8 space-y-8">
-            <h3 className="font-serif italic text-3xl text-[#1A1817] px-4 md:px-0">A Glimpse</h3>
+            <h3 className="font-serif italic text-3xl text-[#1A1817] px-4 md:px-0 text-center md:text-left">A Glimpse</h3>
             
             <div className="flex gap-4 overflow-x-auto pb-6 snap-x hide-scrollbar px-4 md:px-0 items-stretch">
               {/* Portrait Video (If exists) */}
@@ -167,38 +210,33 @@ export default function EventClient({ currentEvent, suggestedEvents, targetId })
           </div>
         )}
 
-        {/* Consolidated Provided / Bring Lists */}
-        <div className="bg-white/40 border border-[#1A1817]/5 rounded-[2rem] p-8 md:p-12 shadow-sm">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-            {/* Provided */}
-            <div>
-              <h3 className="font-sans text-[10px] uppercase tracking-[0.2em] text-[#FF6B35] font-bold mb-6 flex items-center gap-2">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path></svg>
-                What's Provided
-              </h3>
-              <ul className={`grid gap-x-4 gap-y-3 ${providedList.length > 5 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                {providedList.map((item, idx) => (
-                  <li key={idx} className="font-sans text-sm font-semibold text-[#1A1817] flex items-start gap-2">
-                    <span className="text-[#FF6B35] mt-0.5">•</span> {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            
-            {/* Bring */}
-            <div>
-              <h3 className="font-sans text-[10px] uppercase tracking-[0.2em] text-[#004E98] font-bold mb-6 flex items-center gap-2">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
-                What To Bring
-              </h3>
-              <ul className={`grid gap-x-4 gap-y-3 ${bringList.length > 5 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                {bringList.map((item, idx) => (
-                  <li key={idx} className="font-sans text-sm font-semibold text-[#1A1817] flex items-start gap-2">
-                    <span className="text-[#004E98] mt-0.5">•</span> {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
+        {/* RESTORED: What's Provided / What To Bring (Original Pill Design) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-8">
+          <div className="bg-white/40 border border-[#1A1817]/5 rounded-[2rem] p-6 md:p-8">
+            <h3 className="font-sans text-[10px] uppercase tracking-[0.2em] text-[#FF6B35] font-bold mb-4 flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path></svg>
+              What's Provided
+            </h3>
+            <ul className="flex flex-wrap gap-2">
+              {providedList.map((item, idx) => (
+                <li key={idx} className="font-sans text-xs md:text-sm font-bold text-[#1A1817] bg-[#FF6B35]/10 px-4 py-2 rounded-full border border-[#FF6B35]/20 shadow-sm">
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="bg-white/40 border border-[#1A1817]/5 rounded-[2rem] p-6 md:p-8">
+            <h3 className="font-sans text-[10px] uppercase tracking-[0.2em] text-[#004E98] font-bold mb-4 flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+              What To Bring
+            </h3>
+            <ul className="flex flex-wrap gap-2">
+              {bringList.map((item, idx) => (
+                <li key={idx} className="font-sans text-xs md:text-sm font-bold text-[#1A1817] bg-[#004E98]/10 px-4 py-2 rounded-full border border-[#004E98]/20 shadow-sm">
+                  {item}
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
 
