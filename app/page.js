@@ -8,39 +8,13 @@ import Papa from 'papaparse';
 
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSSCmEDqxpPn1OEzXR3geUaynoeGhrswVO5xf8zKETC8xOq1oimP1SiapOAsSPY_nEMTHoDeacTgKC/pub?gid=0&single=true&output=csv";
 
-// Smart Image Component to handle .png, .jpg, and .jpeg dynamically
-const GalleryImage = ({ num }) => {
-  const extensions = ['.png', '.jpg', '.jpeg'];
-  const [extIndex, setExtIndex] = useState(0);
-  const [hasFailed, setHasFailed] = useState(false);
-
-  const handleError = () => {
-    if (extIndex < extensions.length - 1) {
-      setExtIndex((prev) => prev + 1);
-    } else {
-      setHasFailed(true);
-    }
-  };
-
-  if (hasFailed) return null;
-
-  return (
-    <Image 
-      src={`/images/home/h${num}${extensions[extIndex]}`} 
-      alt={`Al-Musawwir Gathering ${num}`} 
-      fill 
-      quality={85}
-      sizes="(max-width: 768px) 260px, (max-width: 1024px) 350px, 400px"
-      className="object-cover group-hover:scale-105 transition-transform duration-1000" 
-      onError={handleError}
-    />
-  );
-};
-
 export default function App() {
   const [events, setEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedCards, setExpandedCards] = useState({});
+  
+  // NEW: State to hold your dynamic gallery images
+  const [galleryImages, setGalleryImages] = useState([]);
   
   // Navigation scroll state
   const [isNavVisible, setIsNavVisible] = useState(true);
@@ -64,8 +38,9 @@ export default function App() {
     if (id) router.push(`/event/${id.trim()}`);
   };
 
-  // Fetch Events
+  // Fetch Events AND Gallery Images
   useEffect(() => {
+    // 1. Fetch CSV Events
     fetch(CSV_URL)
       .then(res => res.text())
       .then(text => {
@@ -85,6 +60,16 @@ export default function App() {
           }
         });
       });
+
+    // 2. NEW: Fetch dynamic images from our custom API
+    fetch('/api/gallery')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setGalleryImages(data);
+        }
+      })
+      .catch(err => console.error("Could not load gallery images:", err));
   }, []);
 
   // Intersection Observer for scroll animations
@@ -126,9 +111,6 @@ export default function App() {
     }
   }, [lastScrollY]);
 
-  // Gallery array creation [1 to 10]
-  const galleryImages = Array.from({ length: 10 }, (_, i) => i + 1);
-
   return (
     <div className="relative overflow-x-hidden w-full bg-[#F7F5F0] text-[#1A1817] font-sans antialiased selection:bg-[#FF6B35] selection:text-white pb-24">
       <style dangerouslySetInnerHTML={{__html: `
@@ -154,19 +136,6 @@ export default function App() {
       `}} />
 
       <div className="canvas-texture"></div>
-
-      {/* Floating WhatsApp Button */}
-      <a 
-        href="https://chat.whatsapp.com/B68V6Q62HZPHHsGMG0t4jP" 
-        target="_blank" 
-        rel="noopener noreferrer" 
-        className="fixed bottom-6 right-6 md:bottom-8 md:right-8 z-[70] bg-[#25D366] text-white p-3 md:p-4 rounded-full shadow-[0_4px_14px_0_rgba(37,211,102,0.39)] hover:scale-110 transition-transform duration-300 flex items-center justify-center group"
-        aria-label="Chat on WhatsApp"
-      >
-        <svg className="w-6 h-6 md:w-8 md:h-8" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M12.031 0C5.385 0 0 5.385 0 12.031c0 2.115.552 4.148 1.597 5.952L.15 23.473l5.65-1.48c1.745.962 3.712 1.472 5.755 1.472h.004c6.645 0 12.03-5.384 12.03-12.03S18.676 0 12.031 0zm0 21.492c-1.782 0-3.535-.48-5.076-1.385l-.364-.216-3.766.988.997-3.67-.238-.376A9.972 9.972 0 012.052 12.03c0-5.503 4.478-9.98 9.983-9.98 2.668 0 5.176 1.04 7.062 2.927a9.92 9.92 0 012.924 7.054c0 5.503-4.478 9.98-9.98 9.98zm5.474-7.48c-.3-.15-1.776-.877-2.05-.978-.276-.1-.476-.15-.677.15-.2.3-.775.978-.95 1.178-.175.2-.35.225-.65.075-.3-.15-1.267-.468-2.414-1.488-.89-.79-1.49-1.767-1.665-2.067-.175-.3-.018-.462.132-.612.135-.135.3-.35.45-.525.15-.175.2-.3.3-.5.1-.2.05-.375-.025-.525-.075-.15-.676-1.626-.926-2.226-.244-.585-.49-.505-.677-.515-.175-.01-.375-.01-.575-.01-.2 0-.525.075-.8.375-.275.3-1.05 1.025-1.05 2.5s1.075 2.9 1.225 3.1c.15.2 2.112 3.226 5.112 4.526.715.31 1.272.494 1.706.632.716.228 1.368.196 1.884.118.577-.087 1.775-.726 2.025-1.426.25-.7.25-1.3.175-1.426-.075-.125-.275-.2-.575-.35z"></path>
-        </svg>
-      </a>
 
       {/* Smart Floating Navigation */}
       <nav 
@@ -431,24 +400,33 @@ export default function App() {
         </div>
       </section>
 
-      {/* Picture Gallery Section */}
-      <section className="py-12 md:py-24 relative z-10 overflow-hidden">
-        <div ref={setRef} className="max-w-6xl mx-auto px-4 mb-8 md:mb-12 text-center reveal">
-          <h2 className="font-serif text-4xl md:text-5xl font-light text-[#1A1817]">Moments Collected</h2>
-          <span className="font-sans text-[10px] uppercase tracking-[0.3em] text-[#5C5855] block mt-4 hidden md:block">Scroll →</span>
-        </div>
-        
-        <div className="flex gap-4 overflow-x-auto pb-8 snap-x hide-scrollbar px-4 md:px-8">
-          {galleryImages.map((num) => (
-            <div 
-              key={num} 
-              className="snap-center shrink-0 w-[260px] md:w-[350px] lg:w-[400px] h-[320px] md:h-[450px] relative rounded-3xl overflow-hidden shadow-xl border border-white/40 group bg-[#1A1817]/5"
-            >
-              <GalleryImage num={num} />
-            </div>
-          ))}
-        </div>
-      </section>
+      {/* Picture Gallery Section - Now Powered by API! */}
+      {galleryImages.length > 0 && (
+        <section className="py-12 md:py-24 relative z-10 overflow-hidden">
+          <div ref={setRef} className="max-w-6xl mx-auto px-4 mb-8 md:mb-12 text-center reveal">
+            <h2 className="font-serif text-4xl md:text-5xl font-light text-[#1A1817]">Moments Collected</h2>
+            <span className="font-sans text-[10px] uppercase tracking-[0.3em] text-[#5C5855] block mt-4 hidden md:block">Scroll →</span>
+          </div>
+          
+          <div className="flex gap-4 overflow-x-auto pb-8 snap-x hide-scrollbar px-4 md:px-8">
+            {galleryImages.map((filename, index) => (
+              <div 
+                key={index} 
+                className="snap-center shrink-0 w-[260px] md:w-[350px] lg:w-[400px] h-[320px] md:h-[450px] relative rounded-3xl overflow-hidden shadow-xl border border-white/40 group bg-[#1A1817]/5"
+              >
+                <Image 
+                  src={`/images/home/${filename}`} 
+                  alt={`Al-Musawwir Gathering - ${filename}`} 
+                  fill 
+                  quality={85}
+                  sizes="(max-width: 768px) 260px, (max-width: 1024px) 350px, 400px"
+                  className="object-cover group-hover:scale-105 transition-transform duration-1000" 
+                />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* What is Al-Musawwir Section */}
       <section id="about-section" className="py-16 md:py-24 px-4 md:px-6 relative z-10">
@@ -464,9 +442,17 @@ export default function App() {
               without pressure, perfection, or labels.
             </p>
             <p className="italic text-[#1A1817]">You do not need permission to call yourself an artist.</p>
-            <div className="pt-8">
-              <a href="#events" className="inline-block border border-[#1A1817]/20 bg-[#1A1817] text-white font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-4 px-8 md:px-10 rounded-full hover:bg-[#FF6B35] hover:border-[#FF6B35] transition-all duration-500 hover:-translate-y-1 shadow-lg">
+            
+            {/* Action Buttons: Events & Inline WhatsApp */}
+            <div className="pt-10 flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6">
+              <a href="#events" className="w-full sm:w-auto inline-block border border-[#1A1817]/20 bg-[#1A1817] text-white font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-4 px-8 md:px-10 rounded-full hover:bg-[#FF6B35] hover:border-[#FF6B35] transition-all duration-500 hover:-translate-y-1 shadow-lg">
                 Come create with us.
+              </a>
+              <a href="https://chat.whatsapp.com/B68V6Q62HZPHHsGMG0t4jP" target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 border border-[#25D366]/30 bg-[#25D366]/10 text-[#128C7E] font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-4 px-8 md:px-10 rounded-full hover:bg-[#25D366] hover:text-white transition-all duration-500 hover:-translate-y-1 shadow-lg">
+                <svg className="w-4 h-4 md:w-5 md:h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12.031 0C5.385 0 0 5.385 0 12.031c0 2.115.552 4.148 1.597 5.952L.15 23.473l5.65-1.48c1.745.962 3.712 1.472 5.755 1.472h.004c6.645 0 12.03-5.384 12.03-12.03S18.676 0 12.031 0zm0 21.492c-1.782 0-3.535-.48-5.076-1.385l-.364-.216-3.766.988.997-3.67-.238-.376A9.972 9.972 0 012.052 12.03c0-5.503 4.478-9.98 9.983-9.98 2.668 0 5.176 1.04 7.062 2.927a9.92 9.92 0 012.924 7.054c0 5.503-4.478 9.98-9.98 9.98zm5.474-7.48c-.3-.15-1.776-.877-2.05-.978-.276-.1-.476-.15-.677.15-.2.3-.775.978-.95 1.178-.175.2-.35.225-.65.075-.3-.15-1.267-.468-2.414-1.488-.89-.79-1.49-1.767-1.665-2.067-.175-.3-.018-.462.132-.612.135-.135.3-.35.45-.525.15-.175.2-.3.3-.5.1-.2.05-.375-.025-.525-.075-.15-.676-1.626-.926-2.226-.244-.585-.49-.505-.677-.515-.175-.01-.375-.01-.575-.01-.2 0-.525.075-.8.375-.275.3-1.05 1.025-1.05 2.5s1.075 2.9 1.225 3.1c.15.2 2.112 3.226 5.112 4.526.715.31 1.272.494 1.706.632.716.228 1.368.196 1.884.118.577-.087 1.775-.726 2.025-1.426.25-.7.25-1.3.175-1.426-.075-.125-.275-.2-.575-.35z"></path>
+                </svg>
+                Join Community
               </a>
             </div>
           </div>
