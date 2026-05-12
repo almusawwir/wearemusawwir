@@ -146,7 +146,7 @@ export default function App() {
         <div className="glass-card px-4 sm:px-6 py-2 sm:py-3 rounded-full shadow-lg flex items-center justify-between gap-3 sm:gap-6 max-w-max bg-white/90 sm:bg-white/80 border border-white/40">
           <a href="#about-section" className="cursor-pointer mr-1 sm:mr-0 shrink-0 flex items-center">
             <Image 
-              src="/images/logo.png" 
+              src="/images/logo_black.png" 
               alt="Al-Musawwir" 
               width={120} 
               height={30} 
