@@ -10,9 +10,7 @@ const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSSCmEDqxpPn1O
 
 export default function EventsPage() {
   const [events, setEvents] = useState([]);
-  const [filteredEvents, setFilteredEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeFilter, setActiveFilter] = useState('all'); // 'all', 'open', 'past'
   const [expandedCards, setExpandedCards] = useState({});
   const router = useRouter();
 
@@ -46,29 +44,11 @@ export default function EventsPage() {
             });
             
             setEvents(validEvents);
-            setFilteredEvents(validEvents); // Default to all
             setIsLoading(false);
           }
         });
       });
   }, []);
-
-  // Filter Logic
-  useEffect(() => {
-    if (activeFilter === 'all') {
-      setFilteredEvents(events);
-    } else if (activeFilter === 'open') {
-      setFilteredEvents(events.filter(e => {
-        const status = (e.status || '').toLowerCase();
-        return !status.includes('sold') && !status.includes('closed');
-      }));
-    } else if (activeFilter === 'past') {
-      setFilteredEvents(events.filter(e => {
-        const status = (e.status || '').toLowerCase();
-        return status.includes('sold') || status.includes('closed');
-      }));
-    }
-  }, [activeFilter, events]);
 
   // Smart Navigation Scroll Logic
   useEffect(() => {
@@ -132,39 +112,20 @@ export default function EventsPage() {
         </p>
       </header>
 
-      {/* Filtering Section */}
-      <div className="sticky top-20 z-50 py-6 px-4 flex justify-center pointer-events-none">
-        <div className="pointer-events-auto bg-white/80 backdrop-blur-md p-1.5 rounded-full border border-[#1A1817]/10 shadow-lg flex items-center gap-1">
-          {['all', 'open', 'past'].map((filterType) => (
-            <button
-              key={filterType}
-              onClick={() => setActiveFilter(filterType)}
-              className={`font-sans text-[10px] uppercase tracking-widest font-bold py-2.5 px-6 rounded-full transition-all duration-300 ${
-                activeFilter === filterType 
-                  ? 'bg-[#1A1817] text-white shadow-md' 
-                  : 'text-[#5C5855] hover:text-[#1A1817] hover:bg-black/5'
-              }`}
-            >
-              {filterType === 'all' ? 'All' : filterType === 'open' ? 'Open Spots' : 'Past Volumes'}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* Events List */}
-      <section className="py-12 px-4 md:px-6 relative z-10 min-h-[50vh]">
+      <section className="py-16 px-4 md:px-6 relative z-10 min-h-[50vh]">
         <div className="max-w-4xl mx-auto">
           {isLoading ? (
             <div className="text-center font-serif text-xl animate-pulse text-[#5C5855] mt-12">Summoning canvases...</div>
-          ) : filteredEvents.length === 0 ? (
+          ) : events.length === 0 ? (
             <div className="text-center mt-20 flex flex-col items-center animate-fade-in-up">
                <svg className="w-16 h-16 text-[#1A1817]/20 mb-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                <h3 className="font-serif text-3xl text-[#1A1817] mb-2">No volumes found.</h3>
-               <p className="font-sans text-sm text-[#5C5855] uppercase tracking-widest">Try adjusting your filters.</p>
+               <p className="font-sans text-sm text-[#5C5855] uppercase tracking-widest">Check back soon.</p>
             </div>
           ) : (
             <div className="space-y-16">
-              {filteredEvents.map((event, index) => {
+              {events.map((event, index) => {
                 const isExpanded = expandedCards[event.id];
                 const desc = event.description || "";
                 const isLongDesc = desc.length > 120;

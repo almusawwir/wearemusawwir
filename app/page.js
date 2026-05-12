@@ -157,7 +157,7 @@ export default function App() {
           <Link href="/about" className="font-sans text-[11px] sm:text-[10px] uppercase tracking-widest font-bold text-[#5C5855] hover:text-[#1A1817] transition-colors py-2 px-1 sm:p-0">About</Link>
           <div className="w-1 h-1 rounded-full bg-[#1A1817]/20 hidden sm:block"></div>
           {/* UPDATED: Navigates to /events */}
-          <Link href="/events" className="font-sans text-[11px] sm:text-[10px] uppercase tracking-widest font-bold text-[#004E98] hover:text-[#FF6B35] transition-colors py-2 px-1 sm:p-0">Gatherings</Link>
+          <Link href="/event" className="font-sans text-[11px] sm:text-[10px] uppercase tracking-widest font-bold text-[#004E98] hover:text-[#FF6B35] transition-colors py-2 px-1 sm:p-0">Gatherings</Link>
         </div>
       </nav>
 
@@ -203,7 +203,7 @@ export default function App() {
               <p>A gathering space for people to paint, reflect, connect, and explore creativity without pressure, perfection, or labels.</p>
             </div>
             {/* UPDATED: Navigates to /events */}
-            <Link href="/events" className="inline-block border border-white/30 bg-white/5 backdrop-blur-sm text-white font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-3 px-8 md:py-4 md:px-10 rounded-full hover:bg-white hover:text-[#1A1817] transition-all duration-500 hover:scale-105 mb-4">
+            <Link href="/event" className="inline-block border border-white/30 bg-white/5 backdrop-blur-sm text-white font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-3 px-8 md:py-4 md:px-10 rounded-full hover:bg-white hover:text-[#1A1817] transition-all duration-500 hover:scale-105 mb-4">
               Explore Gatherings
             </Link>
           </div>
@@ -270,7 +270,7 @@ export default function App() {
       </section>
 
       {/* Dynamic Events Section */}
-      <section id="events" className="py-12 md:py-24 px-4 md:px-6 relative z-10">
+      <section id="event" className="py-12 md:py-24 px-4 md:px-6 relative z-10">
         <div className="max-w-4xl mx-auto">
           <div ref={setRef} className="text-center mb-16 reveal">
             <h2 className="font-serif text-4xl md:text-6xl font-light text-[#1A1817]">Current Volumes</h2>
@@ -404,7 +404,7 @@ export default function App() {
               {/* UPDATED: Show More Events Button that connects to /events */}
               {events.length > 3 && (
                 <div className="text-center mt-16 reveal animate-fade-in-up" ref={setRef}>
-                  <Link href="/events" className="inline-block border border-[#1A1817]/20 bg-transparent text-[#1A1817] font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-4 px-10 rounded-full hover:bg-[#1A1817] hover:text-white transition-all duration-500 hover:-translate-y-1 shadow-sm">
+                  <Link href="/event" className="inline-block border border-[#1A1817]/20 bg-transparent text-[#1A1817] font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-4 px-10 rounded-full hover:bg-[#1A1817] hover:text-white transition-all duration-500 hover:-translate-y-1 shadow-sm">
                     View All Volumes
                   </Link>
                 </div>
@@ -460,7 +460,7 @@ export default function App() {
             {/* Action Buttons: Events & Inline WhatsApp */}
             <div className="pt-10 flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6">
               {/* UPDATED: Navigates to /events */}
-              <Link href="/events" className="w-full sm:w-auto inline-block border border-[#1A1817]/20 bg-[#1A1817] text-white font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-4 px-8 md:px-10 rounded-full hover:bg-[#FF6B35] hover:border-[#FF6B35] transition-all duration-500 hover:-translate-y-1 shadow-lg">
+              <Link href="/event" className="w-full sm:w-auto inline-block border border-[#1A1817]/20 bg-[#1A1817] text-white font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-4 px-8 md:px-10 rounded-full hover:bg-[#FF6B35] hover:border-[#FF6B35] transition-all duration-500 hover:-translate-y-1 shadow-lg">
                 Come create with us.
               </Link>
               <a href="https://chat.whatsapp.com/B68V6Q62HZPHHsGMG0t4jP" target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 border border-[#25D366]/30 bg-[#25D366]/10 text-[#128C7E] font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-4 px-8 md:px-10 rounded-full hover:bg-[#25D366] hover:text-white transition-all duration-500 hover:-translate-y-1 shadow-lg">
