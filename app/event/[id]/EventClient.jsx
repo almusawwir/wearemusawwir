@@ -242,39 +242,7 @@ export default function EventClient({ currentEvent, suggestedEvents, targetId })
 
       </div>
 
-      {/* ── FINAL INLINE CTA ── */}
-        <div className="pt-16 md:pt-24 pb-4">
-          <div className="bg-[#1A1817] rounded-[2rem] p-10 md:p-16 text-center shadow-2xl relative overflow-hidden group">
-            <div className="relative z-10">
-              <h2 className="font-serif text-4xl md:text-5xl text-white mb-6">Your canvas is waiting.</h2>
-              <p className="font-sans text-sm md:text-base text-white/70 max-w-lg mx-auto mb-10 leading-relaxed">
-                Join us for a morning of slow art, warm chai, and good company. We keep our gatherings to just 10 spots so everyone feels at home.
-              </p>
-
-              {isSoldOut ? (
-                 <div className="inline-block bg-[#5C5855] text-white font-sans text-xs uppercase tracking-[0.2em] font-bold py-4 px-10 rounded-full opacity-80 cursor-not-allowed">
-                   Volume Sold Out
-                 </div>
-              ) : bookingLinks.length === 0 ? (
-                 <div className="inline-block bg-white/20 text-white font-sans text-xs uppercase tracking-[0.2em] font-bold py-4 px-10 rounded-full cursor-not-allowed">
-                   Coming Soon
-                 </div>
-              ) : (
-                <a
-                  href={bookingLinks.length === 1 ? bookingLinks[0].url : '#'}
-                  onClick={handleBookingClick}
-                  className="inline-flex items-center justify-center gap-3 bg-[#FF6B35] text-white font-sans text-[10px] md:text-xs uppercase tracking-[0.2em] font-bold py-4 px-10 rounded-full hover:bg-white hover:text-[#1A1817] transition-all duration-500 shadow-lg hover:scale-105"
-                >
-                  Secure Your Spot
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-                </a>
-              )}
-            </div>
-            
-            {/* Subtle background glow effect */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] bg-[#FF6B35]/10 blur-[100px] rounded-full pointer-events-none group-hover:bg-[#FF6B35]/20 transition-colors duration-1000"></div>
-          </div>
-        </div>
+      
 
       {/* Suggested events */}
       {suggestedEvents.length > 0 && (
