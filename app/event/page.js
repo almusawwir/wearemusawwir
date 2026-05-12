@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -18,6 +18,17 @@ export default function EventsPage() {
   const [isNavVisible, setIsNavVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
 
+  // Gallery State
+  const [galleryImages, setGalleryImages] = useState([]);
+  const [visibleGalleryCount, setVisibleGalleryCount] = useState(6);
+  const revealRefs = useRef([]);
+
+  const setRef = (el) => {
+    if (el && !revealRefs.current.includes(el)) {
+      revealRefs.current.push(el);
+    }
+  };
+
   const toggleExpand = (e, id) => {
     e.stopPropagation();
     setExpandedCards(prev => ({ ...prev, [id]: !prev[id] }));
@@ -27,8 +38,13 @@ export default function EventsPage() {
     if (id) router.push(`/event/${id.trim()}`);
   };
 
-  // Fetch Events
+  const loadMoreImages = () => {
+    setVisibleGalleryCount(prev => prev + 6);
+  };
+
+  // Fetch Events and Gallery Images
   useEffect(() => {
+    // 1. Fetch CSV Events
     fetch(CSV_URL)
       .then(res => res.text())
       .then(text => {
@@ -48,7 +64,34 @@ export default function EventsPage() {
           }
         });
       });
+
+    // 2. Fetch dynamic images from our custom API
+    fetch('/api/gallery')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setGalleryImages(data);
+        }
+      })
+      .catch(err => console.error("Could not load gallery images:", err));
   }, []);
+
+  // Intersection Observer for scroll animations
+  useEffect(() => {
+    if (isLoading) return;
+    const observerOptions = { root: null, rootMargin: '0px', threshold: 0.1 };
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('active');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, observerOptions);
+    
+    revealRefs.current.forEach((ref) => { if (ref) observer.observe(ref); });
+    return () => observer.disconnect();
+  }, [isLoading, events, visibleGalleryCount]);
 
   // Smart Navigation Scroll Logic
   useEffect(() => {
@@ -77,6 +120,8 @@ export default function EventsPage() {
           background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
           mix-blend-mode: multiply;
         }
+        .reveal { opacity: 0; transform: translateY(40px); transition: all 1.2s cubic-bezier(0.16, 1, 0.3, 1); }
+        .reveal.active { opacity: 1; transform: translateY(0); }
         .glass-card {
           background: rgba(255, 255, 255, 0.5); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
           border: 1px solid rgba(255, 255, 255, 0.7);
@@ -95,12 +140,12 @@ export default function EventsPage() {
       >
         <div className="glass-card px-4 sm:px-6 py-2 sm:py-3 rounded-full shadow-lg flex items-center justify-between gap-3 sm:gap-6 max-w-max bg-white/90 sm:bg-white/80 border border-white/40">
           <Link href="/" className="cursor-pointer mr-1 sm:mr-0 shrink-0 flex items-center hover:opacity-70 transition-opacity">
-            <Image src="/images/logo.png" alt="Al-Musawwir" width={120} height={30} className="h-5 sm:h-6 w-auto object-contain" />
+            <Image src="/images/logo_black.png" alt="Al-Musawwir" width={120} height={30} className="h-5 sm:h-6 w-auto object-contain" />
           </Link>
           <div className="w-1 h-1 rounded-full bg-[#FF6B35] hidden sm:block"></div>
           <Link href="/about" className="font-sans text-[11px] sm:text-[10px] uppercase tracking-widest font-bold text-[#5C5855] hover:text-[#1A1817] transition-colors py-2 px-1 sm:p-0">About</Link>
           <div className="w-1 h-1 rounded-full bg-[#1A1817]/20 hidden sm:block"></div>
-          <Link href="/events" className="font-sans text-[11px] sm:text-[10px] uppercase tracking-widest font-bold text-[#FF6B35] transition-colors py-2 px-1 sm:p-0">Gatherings</Link>
+          <Link href="/event" className="font-sans text-[11px] sm:text-[10px] uppercase tracking-widest font-bold text-[#FF6B35] transition-colors py-2 px-1 sm:p-0">Gatherings</Link>
         </div>
       </nav>
 
@@ -113,7 +158,7 @@ export default function EventsPage() {
       </header>
 
       {/* Events List */}
-      <section className="py-16 px-4 md:px-6 relative z-10 min-h-[50vh]">
+      <section className="py-16 px-4 md:px-6 relative z-10 min-h-[40vh]">
         <div className="max-w-4xl mx-auto">
           {isLoading ? (
             <div className="text-center font-serif text-xl animate-pulse text-[#5C5855] mt-12">Summoning canvases...</div>
@@ -205,8 +250,52 @@ export default function EventsPage() {
         </div>
       </section>
 
+      {/* DEDICATED ARCHIVE GALLERY GRID */}
+      {galleryImages.length > 0 && (
+        <section className="py-20 px-4 md:px-6 relative z-10 border-t border-[#1A1817]/5">
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-16 reveal" ref={setRef}>
+              <h2 className="font-serif text-4xl md:text-5xl font-light text-[#1A1817]">Moments in Time</h2>
+              <p className="font-sans text-sm tracking-widest text-[#5C5855] uppercase mt-4">Glimpses from past volumes</p>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+              {galleryImages.slice(0, visibleGalleryCount).map((filename, index) => (
+                <div 
+                  key={index} 
+                  className="relative aspect-square rounded-[2rem] overflow-hidden shadow-lg border border-[#1A1817]/10 group reveal"
+                  ref={setRef}
+                >
+                  <Image 
+                    src={`/images/home/${filename}`} 
+                    alt={`Al-Musawwir Archive - ${filename}`} 
+                    fill 
+                    quality={80}
+                    sizes="(max-width: 768px) 50vw, 33vw"
+                    className="object-cover group-hover:scale-110 transition-all duration-1000 md:grayscale group-hover:grayscale-0" 
+                  />
+                  <div className="absolute inset-0 bg-[#1A1817]/0 group-hover:bg-[#1A1817]/10 transition-colors duration-500"></div>
+                </div>
+              ))}
+            </div>
+
+            {/* Load More Button */}
+            {visibleGalleryCount < galleryImages.length && (
+              <div className="text-center mt-16 reveal" ref={setRef}>
+                <button 
+                  onClick={loadMoreImages}
+                  className="inline-block border border-[#1A1817]/20 bg-transparent text-[#1A1817] font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-4 px-10 rounded-full hover:bg-[#1A1817] hover:text-white transition-all duration-500 hover:-translate-y-1 shadow-sm"
+                >
+                  Load More Memories
+                </button>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
       {/* Newsletter / WhatsApp CTA */}
-      <section className="py-24 px-4 md:px-6 relative z-10 mt-12">
+      <section className="py-24 px-4 md:px-6 relative z-10">
         <div className="max-w-2xl mx-auto glass-card rounded-[2rem] p-10 md:p-14 text-center shadow-xl">
           <svg className="w-10 h-10 mx-auto text-[#25D366] mb-6" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12.031 0C5.385 0 0 5.385 0 12.031c0 2.115.552 4.148 1.597 5.952L.15 23.473l5.65-1.48c1.745.962 3.712 1.472 5.755 1.472h.004c6.645 0 12.03-5.384 12.03-12.03S18.676 0 12.031 0zm0 21.492c-1.782 0-3.535-.48-5.076-1.385l-.364-.216-3.766.988.997-3.67-.238-.376A9.972 9.972 0 012.052 12.03c0-5.503 4.478-9.98 9.983-9.98 2.668 0 5.176 1.04 7.062 2.927a9.92 9.92 0 012.924 7.054c0 5.503-4.478 9.98-9.98 9.98zm5.474-7.48c-.3-.15-1.776-.877-2.05-.978-.276-.1-.476-.15-.677.15-.2.3-.775.978-.95 1.178-.175.2-.35.225-.65.075-.3-.15-1.267-.468-2.414-1.488-.89-.79-1.49-1.767-1.665-2.067-.175-.3-.018-.462.132-.612.135-.135.3-.35.45-.525.15-.175.2-.3.3-.5.1-.2.05-.375-.025-.525-.075-.15-.676-1.626-.926-2.226-.244-.585-.49-.505-.677-.515-.175-.01-.375-.01-.575-.01-.2 0-.525.075-.8.375-.275.3-1.05 1.025-1.05 2.5s1.075 2.9 1.225 3.1c.15.2 2.112 3.226 5.112 4.526.715.31 1.272.494 1.706.632.716.228 1.368.196 1.884.118.577-.087 1.775-.726 2.025-1.426.25-.7.25-1.3.175-1.426-.075-.125-.275-.2-.575-.35z"></path>
