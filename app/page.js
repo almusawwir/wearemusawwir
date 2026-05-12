@@ -213,7 +213,7 @@ export default function App() {
           
           <div className="relative w-[85vw] max-w-[700px] h-[120px] sm:h-[180px] md:h-[220px] lg:h-[280px] mb-8 opacity-0 animate-fade-in-up drop-shadow-2xl flex justify-center items-center" style={{ animationDelay: '0.2s' }}>
             <Image
-              src="/images/logo.png"
+              src="/images/white_logo.png"
               alt="Al-Musawwir Logo"
               fill
               priority
@@ -477,7 +477,7 @@ export default function App() {
       <footer className="py-20 text-center relative z-10 border-t border-[#1A1817]/10 flex flex-col items-center">
         <div className="w-40 h-12 relative mb-6">
           <Image 
-            src="/images/logo.png" 
+            src="/images/white_logo.png" 
             alt="Al-Musawwir Logo" 
             fill 
             className="object-contain opacity-80" 
