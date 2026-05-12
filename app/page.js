@@ -477,7 +477,7 @@ export default function App() {
       <footer className="py-20 text-center relative z-10 border-t border-[#1A1817]/10 flex flex-col items-center">
         <div className="w-40 h-12 relative mb-6">
           <Image 
-            src="/images/white_logo.png" 
+            src="/images/logo_black.png" 
             alt="Al-Musawwir Logo" 
             fill 
             className="object-contain opacity-80" 
