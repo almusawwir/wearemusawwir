@@ -61,7 +61,7 @@ export default function App() {
         });
       });
 
-    // 2. NEW: Fetch dynamic images from our custom API
+    // 2. Fetch dynamic images from our custom API
     fetch('/api/gallery')
       .then(res => res.json())
       .then(data => {
@@ -137,7 +137,7 @@ export default function App() {
 
       <div className="canvas-texture"></div>
 
-      {/* Smart Floating Navigation */}
+      {/* TOP: Smart Floating Navigation */}
       <nav 
         className={`fixed top-4 left-0 right-0 z-[60] flex justify-center px-4 transition-all duration-500 ease-in-out ${
           isNavVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10 pointer-events-none'
@@ -156,10 +156,21 @@ export default function App() {
           <div className="w-1 h-1 rounded-full bg-[#FF6B35] hidden sm:block"></div>
           <Link href="/about" className="font-sans text-[11px] sm:text-[10px] uppercase tracking-widest font-bold text-[#5C5855] hover:text-[#1A1817] transition-colors py-2 px-1 sm:p-0">About</Link>
           <div className="w-1 h-1 rounded-full bg-[#1A1817]/20 hidden sm:block"></div>
-          {/* UPDATED: Navigates to /events */}
           <Link href="/event" className="font-sans text-[11px] sm:text-[10px] uppercase tracking-widest font-bold text-[#004E98] hover:text-[#FF6B35] transition-colors py-2 px-1 sm:p-0">Gatherings</Link>
         </div>
       </nav>
+
+      {/* BOTTOM: Inverse Sticky CTA */}
+      <div 
+        className={`fixed bottom-6 md:bottom-8 left-0 right-0 z-[60] flex justify-center px-4 transition-all duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
+          !isNavVisible && lastScrollY > 300 ? 'opacity-100 translate-y-0 delay-100' : 'opacity-0 translate-y-12 pointer-events-none'
+        }`}
+      >
+        <Link href="/event" className="bg-[#1A1817]/95 backdrop-blur-md text-white shadow-2xl px-8 py-4 rounded-full font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold hover:bg-[#FF6B35] hover:scale-105 transition-all flex items-center gap-3 border border-white/10 group">
+          See Gatherings
+          <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+        </Link>
+      </div>
 
       {/* Redesigned Premium Cinematic Hero Section */}
       <header className="relative min-h-[100vh] flex flex-col items-center justify-center px-4 md:px-6 overflow-hidden pt-24 pb-12 md:py-20">
@@ -202,7 +213,6 @@ export default function App() {
               <p>That is the spirit of Al-Musawwir.</p>
               <p>A gathering space for people to paint, reflect, connect, and explore creativity without pressure, perfection, or labels.</p>
             </div>
-            {/* UPDATED: Navigates to /events */}
             <Link href="/event" className="inline-block border border-white/30 bg-white/5 backdrop-blur-sm text-white font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-3 px-8 md:py-4 md:px-10 rounded-full hover:bg-white hover:text-[#1A1817] transition-all duration-500 hover:scale-105 mb-4">
               Explore Gatherings
             </Link>
@@ -283,7 +293,6 @@ export default function App() {
           ) : (
             <>
               <div className="space-y-16">
-                {/* UPDATED: Only slicing the first 3 events to show on the homepage */}
                 {events.slice(0, 3).map((event) => {
                   const isExpanded = expandedCards[event.id];
                   const desc = event.description || "";
@@ -401,7 +410,6 @@ export default function App() {
                 })}
               </div>
               
-              {/* UPDATED: Show More Events Button that connects to /events */}
               {events.length > 3 && (
                 <div className="text-center mt-16 reveal animate-fade-in-up" ref={setRef}>
                   <Link href="/event" className="inline-block border border-[#1A1817]/20 bg-transparent text-[#1A1817] font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-4 px-10 rounded-full hover:bg-[#1A1817] hover:text-white transition-all duration-500 hover:-translate-y-1 shadow-sm">
@@ -414,7 +422,7 @@ export default function App() {
         </div>
       </section>
 
-      {/* Picture Gallery Section - Now Powered by API! */}
+      {/* Picture Gallery Section */}
       {galleryImages.length > 0 && (
         <section className="py-12 md:py-24 relative z-10 overflow-hidden">
           <div ref={setRef} className="max-w-6xl mx-auto px-4 mb-8 md:mb-12 text-center reveal">
@@ -457,9 +465,7 @@ export default function App() {
             </p>
             <p className="italic text-[#1A1817]">You do not need permission to call yourself an artist.</p>
             
-            {/* Action Buttons: Events & Inline WhatsApp */}
             <div className="pt-10 flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6">
-              {/* UPDATED: Navigates to /events */}
               <Link href="/event" className="w-full sm:w-auto inline-block border border-[#1A1817]/20 bg-[#1A1817] text-white font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-4 px-8 md:px-10 rounded-full hover:bg-[#FF6B35] hover:border-[#FF6B35] transition-all duration-500 hover:-translate-y-1 shadow-lg">
                 Come create with us.
               </Link>
