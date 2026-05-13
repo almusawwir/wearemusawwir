@@ -13,7 +13,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [expandedCards, setExpandedCards] = useState({});
   
-  // NEW: State to hold your dynamic gallery images
+  // State to hold your dynamic gallery images
   const [galleryImages, setGalleryImages] = useState([]);
   
   // Navigation scroll state
@@ -175,16 +175,18 @@ export default function App() {
       {/* Redesigned Premium Cinematic Hero Section */}
       <header className="relative min-h-[100vh] flex flex-col items-center justify-center px-4 md:px-6 overflow-hidden pt-24 pb-12 md:py-20">
         <div className="absolute inset-0 z-0 bg-[#1A1817]">
-          <Image
-            src="/images/hero-bg.jpg"
-            alt="Al-Musawwir Background"
-            fill
-            priority
-            quality={90}
-            sizes="100vw"
-            className="object-cover"
+          {/* Background Video with an instant-load Fallback Image */}
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            poster="/images/hero-bg.jpg"
+            className="absolute inset-0 w-full h-full object-cover"
             style={{ opacity: 0.6 }}
-          />
+          >
+            <source src="/videos/homepage.mp4" type="video/mp4" />
+          </video>
           <div className="absolute inset-0 bg-gradient-to-b from-[#1A1817]/80 via-[#1A1817]/50 to-[#F7F5F0]"></div>
         </div>
 
