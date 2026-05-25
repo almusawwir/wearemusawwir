@@ -48,13 +48,13 @@ export default function JoinPage() {
     return () => observer.disconnect();
   }, [galleryImages]);
 
-  // Accidental Exit Prevention (Warns user if they have unsaved data)
+  // Accidental Exit Prevention
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       const isDirty = formData.name || formData.whatsapp || formData.interest || formData.message;
       if (isDirty && status !== 'success') {
         e.preventDefault();
-        e.returnValue = ''; // Triggers the browser's default "Are you sure you want to leave?" prompt
+        e.returnValue = ''; 
       }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -99,36 +99,31 @@ export default function JoinPage() {
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         
-        /* Texture & Glass */
+        /* Fast CSS Texture */
         .canvas-texture {
-            position: fixed; inset: 0; z-index: 50; pointer-events: none;
-            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+            position: fixed; inset: 0; z-index: 0; pointer-events: none;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E");
             mix-blend-mode: multiply;
-        }
-        .glass-card {
-            background: rgba(255, 255, 255, 0.65);
-            backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
-            border: 1px solid rgba(255, 255, 255, 0.8);
         }
         
         /* Animations */
-        .reveal { opacity: 0; transform: translateY(40px); transition: all 1.2s cubic-bezier(0.16, 1, 0.3, 1); }
+        .reveal { opacity: 0; transform: translateY(30px); transition: all 1s cubic-bezier(0.16, 1, 0.3, 1); }
         .reveal.active { opacity: 1; transform: translateY(0); }
         
-        @keyframes fadeInUp { 0% { opacity: 0; transform: translateY(30px); } 100% { opacity: 1; transform: translateY(0); } }
-        .animate-fade-in-up { animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes fadeInUp { 0% { opacity: 0; transform: translateY(20px); } 100% { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in-up { animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         
-        @keyframes fadeIn { 0% { opacity: 0; backdrop-filter: blur(0px); } 100% { opacity: 1; backdrop-filter: blur(16px); } }
-        .animate-fade-in-blur { animation: fadeIn 0.6s ease-out forwards; }
+        @keyframes fadeIn { 0% { opacity: 0; backdrop-filter: blur(0px); } 100% { opacity: 1; backdrop-filter: blur(12px); } }
+        .animate-fade-in-blur { animation: fadeIn 0.4s ease-out forwards; }
       `}} />
 
       <div className="canvas-texture"></div>
 
       {/* --- SUCCESS MODAL OVERLAY --- */}
       {status === 'success' && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#F7F5F0]/80 animate-fade-in-blur px-4">
-          <div className="glass-card p-10 md:p-14 rounded-[2rem] shadow-2xl text-center max-w-lg w-full flex flex-col items-center animate-fade-in-up relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-[#ff0064] rounded-full filter blur-[60px] opacity-20"></div>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#F7F5F0]/90 animate-fade-in-blur px-4">
+          <div className="bg-white/80 border border-[#1A1817]/10 p-10 md:p-14 rounded-[2rem] shadow-2xl text-center max-w-lg w-full flex flex-col items-center animate-fade-in-up relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-[#ff0064] rounded-full filter blur-[60px] opacity-10"></div>
             <div className="w-16 h-16 bg-[#25D366]/10 text-[#25D366] rounded-full flex items-center justify-center mb-6">
               <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path>
@@ -136,7 +131,7 @@ export default function JoinPage() {
             </div>
             <h2 className="font-serif italic text-4xl text-[#1A1817] mb-4">You're on the list.</h2>
             <p className="font-sans text-sm md:text-base text-[#5C5855] leading-relaxed mb-8">
-              We have received your details. When the next gathering is ready, we will reach out to you via WhatsApp.
+              We have received your details. We will keep you updated via WhatsApp when the next gathering is ready.
             </p>
             <Link href="/" className="bg-[#1A1817] text-white font-sans text-xs uppercase tracking-[0.2em] font-bold py-4 px-8 rounded-xl hover:bg-[#ff0064] transition-all hover:shadow-xl hover:-translate-y-1">
               Return Home
@@ -146,35 +141,28 @@ export default function JoinPage() {
       )}
 
       {/* --- 1. HERO & FORM SECTION --- */}
-      <section className="relative pt-24 pb-20 px-4 flex flex-col items-center min-h-[90vh]">
+      <section className="relative pt-16 pb-20 px-4 flex flex-col items-center min-h-screen justify-center z-10">
         
-        {/* Cinematic Video Background */}
-        <div className="absolute inset-0 z-0 bg-[#1A1817] overflow-hidden">
-          <video autoPlay loop muted playsInline poster="/images/hero-bg.jpg" className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-overlay">
-            <source src="/videos/homepage.mp4" type="video/mp4" />
-          </video>
-          {/* Gradient to fade bottom into the page color */}
-          <div className="absolute inset-0 bg-gradient-to-b from-[#F7F5F0]/20 via-[#F7F5F0]/80 to-[#F7F5F0]"></div>
-        </div>
-
-        {/* Logo Integration */}
-        <div className="w-48 h-16 relative mb-8 z-10 animate-fade-in-up">
+        {/* Logo Fast Load */}
+        <div className="w-48 h-16 relative mb-8 animate-fade-in-up">
           <Image src="/images/logo_black.png" alt="Al-Musawwir Logo" fill priority className="object-contain" />
         </div>
 
-        <div className="text-center mb-10 max-w-xl z-10 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
-          <h1 className="font-serif italic text-4xl md:text-5xl text-[#1A1817] mb-4 drop-shadow-sm">An Invitation to Create</h1>
-          <p className="font-sans text-sm md:text-base text-[#1A1817]/80 leading-relaxed font-medium">
-            Not everybody wants to become a professional artist. But everybody deserves a space to express, explore, and create without fear of judgment.
+        {/* Simplified Header */}
+        <div className="text-center mb-10 max-w-xl animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
+          <h1 className="font-serif italic text-4xl md:text-5xl text-[#1A1817] mb-4">Join the Community</h1>
+          <p className="font-sans text-sm md:text-base text-[#5C5855] leading-relaxed font-medium">
+            Curated creative gatherings for expression and creation.
           </p>
         </div>
 
-        <div className="w-full max-w-xl glass-card rounded-[2rem] shadow-2xl shadow-[#1A1817]/10 overflow-hidden z-10 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+        {/* Clean, Fast Form Card */}
+        <div className="w-full max-w-xl bg-white/60 backdrop-blur-xl border border-white/80 rounded-[2rem] shadow-2xl shadow-[#1A1817]/5 overflow-hidden animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
           
           <div className="bg-[#ff0064] text-[#F7F5F0] p-8 md:p-10 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-40 h-40 bg-white rounded-full filter blur-[60px] opacity-20"></div>
-            <h2 className="font-serif text-3xl text-white relative z-10">Join the Gathering</h2>
-            <p className="font-sans text-[10px] tracking-widest uppercase text-[#F7F5F0]/90 relative z-10 mt-2 font-bold">Leave your details below</p>
+            <h2 className="font-serif text-3xl text-white relative z-10">Stay in the loop</h2>
+            <p className="font-sans text-[10px] tracking-widest uppercase text-[#F7F5F0]/90 relative z-10 mt-2 font-bold">Leave your details and we'll keep you updated</p>
           </div>
 
           <form onSubmit={handleSubmit} className="p-8 md:p-10 flex flex-col gap-8 bg-white/40">
@@ -183,14 +171,14 @@ export default function JoinPage() {
               <div className="flex flex-col gap-2">
                 <label className="font-sans text-xs font-bold text-[#1A1817] uppercase tracking-wider">Full Name *</label>
                 <input type="text" name="name" value={formData.name} onChange={handleChange} required 
-                  className="bg-white/70 border border-[#1A1817]/20 rounded-xl px-4 py-3 font-serif text-lg text-[#1A1817] focus:outline-none focus:border-[#ff0064] focus:ring-1 focus:ring-[#ff0064]/30 focus:bg-white transition-all placeholder:text-[#1A1817]/30 shadow-inner" 
+                  className="bg-white/70 border border-[#1A1817]/10 rounded-xl px-4 py-3 font-serif text-lg text-[#1A1817] focus:outline-none focus:border-[#ff0064] focus:ring-1 focus:ring-[#ff0064]/30 focus:bg-white transition-all placeholder:text-[#1A1817]/30" 
                   placeholder="Your name" />
               </div>
 
               <div className="flex flex-col gap-2">
                 <label className="font-sans text-xs font-bold text-[#1A1817] uppercase tracking-wider">WhatsApp Number *</label>
                 <input type="tel" name="whatsapp" value={formData.whatsapp} onChange={handleChange} required 
-                  className="bg-white/70 border border-[#1A1817]/20 rounded-xl px-4 py-3 font-sans text-base text-[#1A1817] focus:outline-none focus:border-[#ff0064] focus:ring-1 focus:ring-[#ff0064]/30 focus:bg-white transition-all placeholder:text-[#1A1817]/30 shadow-inner" 
+                  className="bg-white/70 border border-[#1A1817]/10 rounded-xl px-4 py-3 font-sans text-base text-[#1A1817] focus:outline-none focus:border-[#ff0064] focus:ring-1 focus:ring-[#ff0064]/30 focus:bg-white transition-all placeholder:text-[#1A1817]/30" 
                   placeholder="+91 00000 00000" />
               </div>
             </div>
@@ -221,7 +209,7 @@ export default function JoinPage() {
             <div className="space-y-2">
               <label className="font-sans text-xs font-bold text-[#1A1817] uppercase tracking-wider">Anything you want to say? (Optional)</label>
               <textarea name="message" value={formData.message} onChange={handleChange} rows="3" 
-                className="bg-white/70 border border-[#1A1817]/20 rounded-xl px-4 py-3 font-serif text-lg text-[#1A1817] focus:outline-none focus:border-[#ff0064] focus:ring-1 focus:ring-[#ff0064]/30 focus:bg-white transition-all placeholder:text-[#1A1817]/30 resize-none w-full shadow-inner" 
+                className="bg-white/70 border border-[#1A1817]/10 rounded-xl px-4 py-3 font-serif text-lg text-[#1A1817] focus:outline-none focus:border-[#ff0064] focus:ring-1 focus:ring-[#ff0064]/30 focus:bg-white transition-all placeholder:text-[#1A1817]/30 resize-none w-full" 
                 placeholder="A thought, a question, or what art means to you..."></textarea>
             </div>
 
@@ -279,7 +267,7 @@ export default function JoinPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Strokes and Stories */}
-          <div ref={setRef} className="glass-card p-8 md:p-10 rounded-[2rem] reveal hover:-translate-y-2 transition-transform duration-500">
+          <div ref={setRef} className="bg-white/60 border border-white/80 p-8 md:p-10 rounded-[2rem] reveal hover:-translate-y-2 transition-transform duration-500 shadow-xl shadow-[#1A1817]/5">
             <span className="font-sans text-[10px] uppercase tracking-[0.4em] text-[#ff0064] font-bold block mb-4">Format 01</span>
             <h3 className="font-serif text-3xl text-[#1A1817] mb-4">Strokes & Stories</h3>
             <p className="font-serif italic text-xl text-[#1A1817] mb-4">A guided painting gathering built around expression, connection, and shared creativity.</p>
@@ -294,7 +282,7 @@ export default function JoinPage() {
           </div>
 
           {/* BCC */}
-          <div ref={setRef} className="glass-card p-8 md:p-10 rounded-[2rem] reveal hover:-translate-y-2 transition-transform duration-500" style={{ transitionDelay: '0.1s' }}>
+          <div ref={setRef} className="bg-white/60 border border-white/80 p-8 md:p-10 rounded-[2rem] reveal hover:-translate-y-2 transition-transform duration-500 shadow-xl shadow-[#1A1817]/5" style={{ transitionDelay: '0.1s' }}>
             <span className="font-sans text-[10px] uppercase tracking-[0.4em] text-[#ff0064] font-bold block mb-4">Format 02</span>
             <h3 className="font-serif text-3xl text-[#1A1817] mb-4">Broken Camera Crew</h3>
             <p className="font-serif italic text-xl text-[#1A1817] mb-4">A one-day cinematic chaos experience across Bangalore.</p>
@@ -310,7 +298,7 @@ export default function JoinPage() {
         </div>
       </section>
 
-      {/* --- 4. SOCIAL PROOF / GALLERY (Fast Image Processing) --- */}
+      {/* --- 4. SOCIAL PROOF / GALLERY (Fast Lazy Loading) --- */}
       {galleryImages.length > 0 && (
         <section className="py-24 relative z-10 overflow-hidden bg-[#ff0064]">
           <div ref={setRef} className="max-w-6xl mx-auto px-4 mb-12 text-center reveal">
@@ -322,15 +310,16 @@ export default function JoinPage() {
             {galleryImages.map((filename, index) => (
               <div 
                 key={index} 
-                className="snap-center shrink-0 w-[260px] md:w-[350px] lg:w-[400px] h-[320px] md:h-[450px] relative rounded-3xl overflow-hidden shadow-2xl border border-white/20 group"
+                className="snap-center shrink-0 w-[260px] md:w-[350px] lg:w-[400px] h-[320px] md:h-[450px] relative rounded-3xl overflow-hidden shadow-2xl border border-white/20 group bg-black/10"
               >
                 <Image 
                   src={`/images/home/${filename}`} 
                   alt={`Al-Musawwir Gathering - ${filename}`} 
                   fill 
-                  quality={85}
+                  quality={75}
                   sizes="(max-width: 768px) 260px, (max-width: 1024px) 350px, 400px"
                   className="object-cover group-hover:scale-105 transition-transform duration-1000" 
+                  loading="lazy"
                 />
               </div>
             ))}
