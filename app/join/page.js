@@ -89,7 +89,7 @@ export default function JoinPage() {
   };
 
   return (
-    <div className="bg-[#F7F5F0] text-[#1A1817] font-sans antialiased selection:bg-[#ff0064] selection:text-white min-h-screen relative overflow-x-hidden">
+    <div className="bg-[#0A0A0B] text-[#F5F3EF] font-sans antialiased selection:bg-[#FF2D78] selection:text-white min-h-screen relative overflow-x-hidden">
       
       <style dangerouslySetInnerHTML={{__html: `
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Manrope:wght@200;300;400;500;600;700&display=swap');
@@ -102,8 +102,8 @@ export default function JoinPage() {
         /* Fast CSS Texture */
         .canvas-texture {
             position: fixed; inset: 0; z-index: 0; pointer-events: none;
-            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E");
-            mix-blend-mode: multiply;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.06'/%3E%3C/svg%3E");
+            mix-blend-mode: screen; opacity: 0.5;
         }
         
         /* Animations */
@@ -121,19 +121,19 @@ export default function JoinPage() {
 
       {/* --- SUCCESS MODAL OVERLAY --- */}
       {status === 'success' && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#F7F5F0]/90 animate-fade-in-blur px-4">
-          <div className="bg-white/80 border border-[#1A1817]/10 p-10 md:p-14 rounded-[2rem] shadow-2xl text-center max-w-lg w-full flex flex-col items-center animate-fade-in-up relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-[#ff0064] rounded-full filter blur-[60px] opacity-10"></div>
-            <div className="w-16 h-16 bg-[#25D366]/10 text-[#25D366] rounded-full flex items-center justify-center mb-6">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0A0A0B]/90 animate-fade-in-blur px-4">
+          <div className="bg-white/[0.05] border border-white/10 p-10 md:p-14 rounded-[2rem] shadow-2xl text-center max-w-lg w-full flex flex-col items-center animate-fade-in-up relative overflow-hidden backdrop-blur-xl">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-[#FF2D78] rounded-full filter blur-[60px] opacity-20"></div>
+            <div className="w-16 h-16 bg-[#25D366]/15 text-[#25D366] rounded-full flex items-center justify-center mb-6">
               <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path>
               </svg>
             </div>
-            <h2 className="font-serif italic text-4xl text-[#1A1817] mb-4">You're on the list.</h2>
-            <p className="font-sans text-sm md:text-base text-[#5C5855] leading-relaxed mb-8">
-              We have received your details. We will keep you updated via WhatsApp when the next gathering is ready.
+            <h2 className="font-serif italic text-4xl text-white mb-4">You're on the list.</h2>
+            <p className="font-sans text-sm md:text-base text-white/60 leading-relaxed mb-8">
+              We've got your details. We'll reach out on WhatsApp when the next gathering opens up.
             </p>
-            <Link href="/" className="bg-[#1A1817] text-white font-sans text-xs uppercase tracking-[0.2em] font-bold py-4 px-8 rounded-xl hover:bg-[#ff0064] transition-all hover:shadow-xl hover:-translate-y-1">
+            <Link href="/" className="bg-white text-[#0A0A0B] font-sans text-xs uppercase tracking-[0.2em] font-bold py-4 px-8 rounded-xl hover:bg-[#FF2D78] hover:text-white transition-all hover:shadow-xl hover:-translate-y-1">
               Return Home
             </Link>
           </div>
@@ -145,61 +145,61 @@ export default function JoinPage() {
         
         {/* Logo Fast Load */}
         <div className="w-48 h-16 relative mb-8 animate-fade-in-up">
-          <Image src="/images/logo_black.png" alt="Al-Musawwir Logo" fill priority className="object-contain" />
+          <Image src="/images/white_logo.png" alt="3AM Ideas Logo" fill priority className="object-contain" />
         </div>
 
         {/* Simplified Header */}
         <div className="text-center mb-10 max-w-xl animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
-          <h1 className="font-serif italic text-4xl md:text-5xl text-[#1A1817] mb-4">Join the Community</h1>
-          <p className="font-sans text-sm md:text-base text-[#5C5855] leading-relaxed font-medium">
-            Curated creative gatherings for expression and creation.
+          <h1 className="font-serif italic text-4xl md:text-5xl text-white mb-4">Join the Community</h1>
+          <p className="font-sans text-sm md:text-base text-white/60 leading-relaxed font-medium">
+            Curated rooms built on creation, curation, and real connection.
           </p>
         </div>
 
         {/* Clean, Fast Form Card */}
-        <div className="w-full max-w-xl bg-white/60 backdrop-blur-xl border border-white/80 rounded-[2rem] shadow-2xl shadow-[#1A1817]/5 overflow-hidden animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+        <div className="w-full max-w-xl bg-white/[0.04] backdrop-blur-xl border border-white/10 rounded-[2rem] shadow-2xl shadow-black/40 overflow-hidden animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
           
-          <div className="bg-[#ff0064] text-[#F7F5F0] p-8 md:p-10 relative overflow-hidden">
+          <div className="bg-[#FF2D78] text-white p-8 md:p-10 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-40 h-40 bg-white rounded-full filter blur-[60px] opacity-20"></div>
             <h2 className="font-serif text-3xl text-white relative z-10">Stay in the loop</h2>
-            <p className="font-sans text-[10px] tracking-widest uppercase text-[#F7F5F0]/90 relative z-10 mt-2 font-bold">Leave your details and we'll keep you updated</p>
+            <p className="font-sans text-[10px] tracking-widest uppercase text-white/90 relative z-10 mt-2 font-bold">Leave your details and we'll keep you posted</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-8 md:p-10 flex flex-col gap-8 bg-white/40">
+          <form onSubmit={handleSubmit} className="p-8 md:p-10 flex flex-col gap-8 bg-white/[0.02]">
             
             <div className="space-y-6">
               <div className="flex flex-col gap-2">
-                <label className="font-sans text-xs font-bold text-[#1A1817] uppercase tracking-wider">Full Name *</label>
+                <label className="font-sans text-xs font-bold text-white uppercase tracking-wider">Full Name *</label>
                 <input type="text" name="name" value={formData.name} onChange={handleChange} required 
-                  className="bg-white/70 border border-[#1A1817]/10 rounded-xl px-4 py-3 font-serif text-lg text-[#1A1817] focus:outline-none focus:border-[#ff0064] focus:ring-1 focus:ring-[#ff0064]/30 focus:bg-white transition-all placeholder:text-[#1A1817]/30" 
+                  className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 font-serif text-lg text-white focus:outline-none focus:border-[#FF2D78] focus:ring-1 focus:ring-[#FF2D78]/30 focus:bg-white/10 transition-all placeholder:text-white/30" 
                   placeholder="Your name" />
               </div>
 
               <div className="flex flex-col gap-2">
-                <label className="font-sans text-xs font-bold text-[#1A1817] uppercase tracking-wider">WhatsApp Number *</label>
+                <label className="font-sans text-xs font-bold text-white uppercase tracking-wider">WhatsApp Number *</label>
                 <input type="tel" name="whatsapp" value={formData.whatsapp} onChange={handleChange} required 
-                  className="bg-white/70 border border-[#1A1817]/10 rounded-xl px-4 py-3 font-sans text-base text-[#1A1817] focus:outline-none focus:border-[#ff0064] focus:ring-1 focus:ring-[#ff0064]/30 focus:bg-white transition-all placeholder:text-[#1A1817]/30" 
+                  className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 font-sans text-base text-white focus:outline-none focus:border-[#FF2D78] focus:ring-1 focus:ring-[#FF2D78]/30 focus:bg-white/10 transition-all placeholder:text-white/30" 
                   placeholder="+91 00000 00000" />
               </div>
             </div>
 
             <div className="space-y-4">
-              <label className="font-sans text-xs font-bold text-[#1A1817] uppercase tracking-wider">What are you drawn to? *</label>
+              <label className="font-sans text-xs font-bold text-white uppercase tracking-wider">What are you drawn to? *</label>
               <div className="grid grid-cols-1 gap-3">
                 
-                <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${formData.interest === 'Strokes and Stories' ? 'border-[#ff0064] bg-[#ff0064]/5 shadow-sm' : 'border-[#1A1817]/10 bg-white/50 hover:bg-white/80'}`}>
-                  <input type="radio" name="interest" value="Strokes and Stories" checked={formData.interest === 'Strokes and Stories'} onChange={handleChange} required className="w-4 h-4 text-[#ff0064] focus:ring-[#ff0064] accent-[#ff0064]" />
+                <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${formData.interest === 'Strokes and Stories' ? 'border-[#FF2D78] bg-[#FF2D78]/10 shadow-sm' : 'border-white/10 bg-white/[0.03] hover:bg-white/[0.06]'}`}>
+                  <input type="radio" name="interest" value="Strokes and Stories" checked={formData.interest === 'Strokes and Stories'} onChange={handleChange} required className="w-4 h-4 text-[#FF2D78] focus:ring-[#FF2D78] accent-[#FF2D78]" />
                   <div>
-                    <span className="font-serif text-[1.1rem] text-[#1A1817] block leading-tight">Strokes & Stories</span>
-                    <span className="font-sans text-[10px] text-[#5C5855] uppercase tracking-widest">Guided painting & connection</span>
+                    <span className="font-serif text-[1.1rem] text-white block leading-tight">Strokes & Stories</span>
+                    <span className="font-sans text-[10px] text-white/50 uppercase tracking-widest">Guided painting & connection</span>
                   </div>
                 </label>
 
-                <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${formData.interest === 'Broken Camera Crew' ? 'border-[#ff0064] bg-[#ff0064]/5 shadow-sm' : 'border-[#1A1817]/10 bg-white/50 hover:bg-white/80'}`}>
-                  <input type="radio" name="interest" value="Broken Camera Crew" checked={formData.interest === 'Broken Camera Crew'} onChange={handleChange} required className="w-4 h-4 text-[#ff0064] focus:ring-[#ff0064] accent-[#ff0064]" />
+                <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${formData.interest === 'Broken Camera Crew' ? 'border-[#FF2D78] bg-[#FF2D78]/10 shadow-sm' : 'border-white/10 bg-white/[0.03] hover:bg-white/[0.06]'}`}>
+                  <input type="radio" name="interest" value="Broken Camera Crew" checked={formData.interest === 'Broken Camera Crew'} onChange={handleChange} required className="w-4 h-4 text-[#FF2D78] focus:ring-[#FF2D78] accent-[#FF2D78]" />
                   <div>
-                    <span className="font-serif text-[1.1rem] text-[#1A1817] block leading-tight">Broken Camera Crew (BCC)</span>
-                    <span className="font-sans text-[10px] text-[#5C5855] uppercase tracking-widest">Cinematic chaos experiment</span>
+                    <span className="font-serif text-[1.1rem] text-white block leading-tight">Broken Camera Crew (BCC)</span>
+                    <span className="font-sans text-[10px] text-white/50 uppercase tracking-widest">Cinematic chaos experiment</span>
                   </div>
                 </label>
 
@@ -207,16 +207,16 @@ export default function JoinPage() {
             </div>
 
             <div className="space-y-2">
-              <label className="font-sans text-xs font-bold text-[#1A1817] uppercase tracking-wider">Anything you want to say? (Optional)</label>
+              <label className="font-sans text-xs font-bold text-white uppercase tracking-wider">Anything you want to say? (Optional)</label>
               <textarea name="message" value={formData.message} onChange={handleChange} rows="3" 
-                className="bg-white/70 border border-[#1A1817]/10 rounded-xl px-4 py-3 font-serif text-lg text-[#1A1817] focus:outline-none focus:border-[#ff0064] focus:ring-1 focus:ring-[#ff0064]/30 focus:bg-white transition-all placeholder:text-[#1A1817]/30 resize-none w-full" 
-                placeholder="A thought, a question, or what art means to you..."></textarea>
+                className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 font-serif text-lg text-white focus:outline-none focus:border-[#FF2D78] focus:ring-1 focus:ring-[#FF2D78]/30 focus:bg-white/10 transition-all placeholder:text-white/30 resize-none w-full" 
+                placeholder="A thought, a question, or what pulled you here..."></textarea>
             </div>
 
-            <div className="pt-4 border-t border-[#1A1817]/10">
+            <div className="pt-4 border-t border-white/10">
               <button type="submit" disabled={status === 'loading'}
                 className={`w-full text-white font-sans text-sm uppercase tracking-[0.2em] font-bold py-5 px-8 rounded-xl transition-all flex items-center justify-center 
-                  ${status === 'loading' ? 'bg-[#ff0064]/80 cursor-wait' : 'bg-[#1A1817] hover:bg-[#ff0064] hover:shadow-xl hover:-translate-y-1'}
+                  ${status === 'loading' ? 'bg-[#FF2D78]/80 cursor-wait' : 'bg-[#FF2D78] hover:bg-white hover:text-[#0A0A0B] hover:shadow-xl hover:-translate-y-1'}
                 `}>
                 {status === 'loading' ? (
                   <span className="flex items-center gap-2">
@@ -232,7 +232,7 @@ export default function JoinPage() {
               </button>
               
               {status === 'error' && (
-                <p className="text-center text-red-500 font-sans text-[11px] uppercase tracking-widest mt-4 font-bold">Something went wrong. Try again.</p>
+                <p className="text-center text-red-400 font-sans text-[11px] uppercase tracking-widest mt-4 font-bold">Something went wrong. Try again.</p>
               )}
             </div>
 
@@ -240,21 +240,21 @@ export default function JoinPage() {
         </div>
       </section>
 
-      {/* --- 2. WHAT IS AL-MUSAWWIR (CONTEXT) --- */}
-      <section className="py-24 px-4 md:px-6 relative z-10 border-t border-[#1A1817]/5 bg-transparent">
+      {/* --- 2. WHAT IS 3AM IDEAS (CONTEXT) --- */}
+      <section className="py-24 px-4 md:px-6 relative z-10 border-t border-white/5 bg-transparent">
         <div ref={setRef} className="max-w-3xl mx-auto text-center reveal">
-          <h2 className="font-serif text-4xl md:text-5xl font-light text-[#1A1817] mb-10">What is Al-Musawwir?</h2>
+          <h2 className="font-serif text-4xl md:text-5xl font-light text-white mb-10">What is 3AM Ideas?</h2>
           
-          <div className="space-y-6 font-serif text-xl md:text-2xl text-[#5C5855] font-light leading-relaxed px-2">
-            <p className="font-sans text-[12px] uppercase tracking-[0.4em] text-[#ff0064] font-bold">The Philosophy</p>
-            <p className="text-[#1A1817] font-medium">The Fashioner. The one who gives form to the formless.</p>
+          <div className="space-y-6 font-serif text-xl md:text-2xl text-white/60 font-light leading-relaxed px-2">
+            <p className="font-sans text-[12px] uppercase tracking-[0.4em] text-[#FF2D78] font-bold">The Philosophy</p>
+            <p className="text-white font-medium">Creation. Curation. Connection.</p>
             <p>
-              We believe most people are carrying hidden versions of themselves that never get a chance to exist because daily life becomes repetitive, performative, and emotionally disconnected.
+              Most people are carrying a fuller version of themselves that never gets to exist — because daily life turns repetitive, performative, and quietly disconnected.
             </p>
             <p>
-              Al-Musawwir creates experiences where people can temporarily step outside routine identities and reconnect with curiosity, imagination, storytelling, and human connection.
+              3AM Ideas builds rooms where you get to step out of that routine and reconnect with curiosity, creation, and the kind of people you actually want around.
             </p>
-            <p className="italic text-[#1A1817]">We create, therefore we are.</p>
+            <p className="italic text-white">The formats change. The feeling doesn't.</p>
           </div>
         </div>
       </section>
@@ -262,37 +262,37 @@ export default function JoinPage() {
       {/* --- 3. FORMATS (EXPLANATION FOR THE FORM CHOICES) --- */}
       <section className="py-24 px-4 md:px-6 relative z-10 max-w-5xl mx-auto">
         <div ref={setRef} className="text-center mb-16 reveal">
-          <h2 className="font-serif text-3xl md:text-4xl font-light text-[#1A1817]">Our Experimental Formats</h2>
+          <h2 className="font-serif text-3xl md:text-4xl font-light text-white">Our Experimental Formats</h2>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Strokes and Stories */}
-          <div ref={setRef} className="bg-white/60 border border-white/80 p-8 md:p-10 rounded-[2rem] reveal hover:-translate-y-2 transition-transform duration-500 shadow-xl shadow-[#1A1817]/5">
-            <span className="font-sans text-[10px] uppercase tracking-[0.4em] text-[#ff0064] font-bold block mb-4">Format 01</span>
-            <h3 className="font-serif text-3xl text-[#1A1817] mb-4">Strokes & Stories</h3>
-            <p className="font-serif italic text-xl text-[#1A1817] mb-4">A guided painting gathering built around expression, connection, and shared creativity.</p>
-            <p className="font-sans text-[#5C5855] leading-relaxed mb-6">
+          <div ref={setRef} className="bg-white/[0.04] border border-white/10 p-8 md:p-10 rounded-[2rem] reveal hover:-translate-y-2 transition-transform duration-500 shadow-xl shadow-black/40">
+            <span className="font-sans text-[10px] uppercase tracking-[0.4em] text-[#FF2D78] font-bold block mb-4">Format 01</span>
+            <h3 className="font-serif text-3xl text-white mb-4">Strokes & Stories</h3>
+            <p className="font-serif italic text-xl text-white mb-4">A guided painting gathering built around expression, connection, and shared creativity.</p>
+            <p className="font-sans text-white/60 leading-relaxed mb-6">
               This is not a traditional art class, a networking, or a dating event. It is a calm creative gathering where people come together to slow down, paint freely, and reconnect with expression. Through a guided layered process, you won't recreate the same artwork as everyone else—you will learn how to begin creating freely and intuitively to build something entirely your own.
             </p>
-            <ul className="space-y-3 font-serif text-lg text-[#1A1817]">
-              <li className="flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-[#ff0064] block"></span> No pressure. No perfection. No prior experience.</li>
-              <li className="flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-[#ff0064] block"></span> We provide the canvas, paints, and guidance.</li>
-              <li className="flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-[#ff0064] block"></span> Bring your curiosity and a love for creation.</li>
+            <ul className="space-y-3 font-serif text-lg text-white">
+              <li className="flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-[#FF2D78] block"></span> No pressure. No perfection. No prior experience.</li>
+              <li className="flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-[#FF2D78] block"></span> We provide the canvas, paints, and guidance.</li>
+              <li className="flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-[#FF2D78] block"></span> Bring your curiosity and a love for creation.</li>
             </ul>
           </div>
 
           {/* BCC */}
-          <div ref={setRef} className="bg-white/60 border border-white/80 p-8 md:p-10 rounded-[2rem] reveal hover:-translate-y-2 transition-transform duration-500 shadow-xl shadow-[#1A1817]/5" style={{ transitionDelay: '0.1s' }}>
-            <span className="font-sans text-[10px] uppercase tracking-[0.4em] text-[#ff0064] font-bold block mb-4">Format 02</span>
-            <h3 className="font-serif text-3xl text-[#1A1817] mb-4">Broken Camera Crew</h3>
-            <p className="font-serif italic text-xl text-[#1A1817] mb-4">A one-day cinematic chaos experience across Bangalore.</p>
-            <p className="font-sans text-[#5C5855] leading-relaxed mb-6">
+          <div ref={setRef} className="bg-white/[0.04] border border-white/10 p-8 md:p-10 rounded-[2rem] reveal hover:-translate-y-2 transition-transform duration-500 shadow-xl shadow-black/40" style={{ transitionDelay: '0.1s' }}>
+            <span className="font-sans text-[10px] uppercase tracking-[0.4em] text-[#FF2D78] font-bold block mb-4">Format 02</span>
+            <h3 className="font-serif text-3xl text-white mb-4">Broken Camera Crew</h3>
+            <p className="font-serif italic text-xl text-white mb-4">A one-day cinematic chaos experience across Bangalore.</p>
+            <p className="font-sans text-white/60 leading-relaxed mb-6">
               Strangers come together to collaboratively build a story on the spot, assign random character roles, explore real city locations, improvise scenes, and shoot chaotic footage. The focus is on participation, spontaneity, and shared expression—not professional output. No acting or filmmaking experience required.
             </p>
-            <ul className="space-y-3 font-serif text-lg text-[#1A1817] font-medium italic">
-              <li className="flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-[#ff0064] block not-italic"></span> The city becomes the set.</li>
-              <li className="flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-[#ff0064] block not-italic"></span> The people become the crew.</li>
-              <li className="flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-[#ff0064] block not-italic"></span> The day becomes the film.</li>
+            <ul className="space-y-3 font-serif text-lg text-white font-medium italic">
+              <li className="flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-[#FF2D78] block not-italic"></span> The city becomes the set.</li>
+              <li className="flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-[#FF2D78] block not-italic"></span> The people become the crew.</li>
+              <li className="flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-[#FF2D78] block not-italic"></span> The day becomes the film.</li>
             </ul>
           </div>
         </div>
@@ -300,10 +300,10 @@ export default function JoinPage() {
 
       {/* --- 4. SOCIAL PROOF / GALLERY (Fast Lazy Loading) --- */}
       {galleryImages.length > 0 && (
-        <section className="py-24 relative z-10 overflow-hidden bg-[#ff0064]">
+        <section className="py-24 relative z-10 overflow-hidden bg-[#FF2D78]">
           <div ref={setRef} className="max-w-6xl mx-auto px-4 mb-12 text-center reveal">
-            <h2 className="font-serif text-4xl md:text-5xl font-light text-white">Moments Collected</h2>
-            <span className="font-sans text-[10px] uppercase tracking-[0.3em] text-[#F7F5F0]/80 block mt-4 hidden md:block">Scroll →</span>
+            <h2 className="font-serif text-4xl md:text-5xl font-light text-white">Nights We Remember</h2>
+            <span className="font-sans text-[10px] uppercase tracking-[0.3em] text-white/80 block mt-4 hidden md:block">Scroll →</span>
           </div>
           
           <div className="flex gap-4 overflow-x-auto pb-8 snap-x hide-scrollbar px-4 md:px-8">
@@ -314,7 +314,7 @@ export default function JoinPage() {
               >
                 <Image 
                   src={`/images/home/${filename}`} 
-                  alt={`Al-Musawwir Gathering - ${filename}`} 
+                  alt={`3AM Ideas Gathering - ${filename}`} 
                   fill 
                   quality={75}
                   sizes="(max-width: 768px) 260px, (max-width: 1024px) 350px, 400px"
@@ -328,21 +328,21 @@ export default function JoinPage() {
       )}
 
       {/* --- 5. UNIFIED FOOTER --- */}
-      <footer className="py-20 text-center relative z-10 bg-[#F7F5F0] flex flex-col items-center border-t border-[#1A1817]/10">
+      <footer className="py-20 text-center relative z-10 bg-[#0A0A0B] flex flex-col items-center border-t border-white/10">
         <div className="w-40 h-12 relative mb-6">
-          <Image src="/images/logo_black.png" alt="Al-Musawwir Logo" fill className="object-contain opacity-80" />
+          <Image src="/images/white_logo.png" alt="3AM Ideas Logo" fill className="object-contain opacity-80" />
         </div>
-        <p className="font-serif italic text-[#5C5855] text-2xl mb-8 px-4">We create, therefore we are.</p>
+        <p className="font-serif italic text-white/60 text-2xl mb-8 px-4">Some ideas are too good to sleep on.</p>
         
         <div className="flex flex-wrap justify-center items-center gap-4 sm:gap-6 mb-6 px-4">
-          <Link href="/" className="font-sans text-[10px] text-[#5C5855] tracking-widest uppercase font-bold hover:text-[#ff0064] transition-colors py-2">Home</Link>
-          <span className="w-1 h-1 rounded-full bg-[#1A1817]/20"></span>
-          <Link href="/about" className="font-sans text-[10px] text-[#5C5855] tracking-widest uppercase font-bold hover:text-[#ff0064] transition-colors py-2">About Us</Link>
-          <span className="w-1 h-1 rounded-full bg-[#1A1817]/20"></span>
-          <a href="mailto:wearemusawwir@gmail.com" className="font-sans text-[10px] text-[#5C5855] tracking-widest uppercase font-bold hover:text-[#ff0064] transition-colors py-2">Contact</a>
+          <Link href="/" className="font-sans text-[10px] text-white/50 tracking-widest uppercase font-bold hover:text-[#FF2D78] transition-colors py-2">Home</Link>
+          <span className="w-1 h-1 rounded-full bg-white/20"></span>
+          <Link href="/about" className="font-sans text-[10px] text-white/50 tracking-widest uppercase font-bold hover:text-[#FF2D78] transition-colors py-2">About Us</Link>
+          <span className="w-1 h-1 rounded-full bg-white/20"></span>
+          <a href="mailto:wearemusawwir@gmail.com" className="font-sans text-[10px] text-white/50 tracking-widest uppercase font-bold hover:text-[#FF2D78] transition-colors py-2">Contact</a>
         </div>
         
-        <p className="font-sans text-[9px] text-[#5C5855]/60 uppercase tracking-widest">© {new Date().getFullYear()} Al-Musawwir Gatherings. All rights reserved.</p>
+        <p className="font-sans text-[9px] text-white/30 uppercase tracking-widest">© {new Date().getFullYear()} 3AM Ideas. All rights reserved.</p>
       </footer>
     </div>
   );
