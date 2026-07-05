@@ -219,7 +219,7 @@ export default function App() {
             <Link href="/event" className="inline-block border border-white/30 bg-white/5 backdrop-blur-sm text-white font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-3 px-8 md:py-4 md:px-10 rounded-full hover:bg-white hover:text-[#1A1817] transition-all duration-500 hover:scale-105 w-full sm:w-auto text-center">
             Explore Gatherings
              </Link>
-          <Link href="/join" className="inline-block border border-transparent bg-[#FF6B35] text-white font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-3 px-8 md:py-4 md:px-10 rounded-full hover:bg-white hover:text-[#1A1817] transition-all duration-500 hover:scale-105 w-full sm:w-auto text-center">
+         <Link href="/join" className="inline-block border border-transparent bg-[#FF6B35] text-white font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-3 px-8 md:py-4 md:px-10 rounded-full hover:bg-white hover:text-[#1A1817] transition-all duration-500 hover:scale-105 w-full sm:w-auto text-center">
             Join the Waitlist
            </Link>
 </div>
