@@ -12,7 +12,10 @@ export default function App() {
   const [events, setEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedCards, setExpandedCards] = useState({});
-  
+
+  // Toggle between compact square grid and full detailed view
+  const [showFullView, setShowFullView] = useState(false);
+
   // State to hold your dynamic gallery images
   const [galleryImages, setGalleryImages] = useState([]);
   
@@ -87,7 +90,7 @@ export default function App() {
     
     revealRefs.current.forEach((ref) => { if (ref) observer.observe(ref); });
     return () => observer.disconnect();
-  }, [isLoading, events]);
+  }, [isLoading, events, showFullView]);
 
   // Smart Navigation Scroll Logic
   useEffect(() => {
@@ -147,7 +150,7 @@ export default function App() {
           <a href="#about-section" className="cursor-pointer mr-1 sm:mr-0 shrink-0 flex items-center">
             <Image 
               src="/images/logo_black.png" 
-              alt="Al-Musawwir" 
+              alt="3AM Ideas" 
               width={120} 
               height={30} 
               className="h-5 sm:h-6 w-auto object-contain" 
@@ -192,12 +195,12 @@ export default function App() {
 
         <div className="relative z-10 max-w-4xl mx-auto w-full flex flex-col items-center text-center">
           
-          <h1 className="sr-only">AL MUSAWWIR</h1>
+          <h1 className="sr-only">3AM IDEAS</h1>
           
           <div className="relative w-[85vw] max-w-[700px] h-[120px] sm:h-[180px] md:h-[220px] lg:h-[280px] mb-8 opacity-0 animate-fade-in-up drop-shadow-2xl flex justify-center items-center" style={{ animationDelay: '0.2s' }}>
             <Image
               src="/images/white_logo.png"
-              alt="Al-Musawwir Logo"
+              alt="3AM Ideas Logo"
               fill
               priority
               className="object-contain"
@@ -212,7 +215,7 @@ export default function App() {
             <div className="font-sans font-light text-white/80 text-sm md:text-base leading-relaxed mb-12 space-y-2 max-w-2xl px-2">
               <p>Not everyone calls themselves an artist.</p>
               <p>But everyone imagines, shapes, expresses, remembers, and creates.</p>
-              <p>That is the spirit of Al-Musawwir.</p>
+              <p>That is the spirit of 3AM Ideas.</p>
               <p>A gathering space for people to paint, reflect, connect, and explore creativity without pressure, perfection, or labels.</p>
             </div>
             <div className="flex flex-col sm:flex-row items-center gap-4 mb-4">
@@ -297,7 +300,74 @@ export default function App() {
             <div className="text-center font-serif text-xl animate-pulse text-[#5C5855]">Summoning canvases...</div>
           ) : events.length === 0 ? (
              <div className="text-center font-serif text-xl text-[#5C5855]">No gatherings currently scheduled. Check back soon!</div>
+          ) : !showFullView ? (
+            /* ---------- COMPACT SQUARE PREVIEW (max 4: image + title + location) ---------- */
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+                {events.slice(0, 4).map((event) => {
+                  const isExternalImage = event.image_url && event.image_url.startsWith('http');
+                  return (
+                    <div
+                      key={event.id}
+                      onClick={() => handleCardClick(event.id)}
+                      className="cursor-pointer group relative aspect-square rounded-2xl overflow-hidden shadow-lg shadow-[#1A1817]/10 bg-[#1A1817] hover:-translate-y-1.5 transition-transform duration-500"
+                    >
+                      {event.image_url ? (
+                        isExternalImage ? (
+                          <img
+                            src={event.image_url}
+                            alt={event.title}
+                            className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        ) : (
+                          <Image
+                            src={event.image_url}
+                            alt={event.title}
+                            fill
+                            quality={75}
+                            sizes="(max-width: 768px) 50vw, 25vw"
+                            className="object-cover group-hover:scale-105 transition-transform duration-700"
+                            loading="lazy"
+                          />
+                        )
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center bg-[#004E98]/20">
+                          <span className="font-serif italic text-[#F7F5F0]/50 text-sm">Artwork Pending</span>
+                        </div>
+                      )}
+
+                      {/* Gradient so text stays readable */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#1A1817]/90 via-[#1A1817]/20 to-transparent"></div>
+
+                      {/* Title + Location */}
+                      <div className="absolute bottom-0 left-0 right-0 p-4">
+                        <h3 className="font-serif text-lg md:text-xl text-white leading-tight mb-1 line-clamp-2">{event.title}</h3>
+                        {event.location_main && (
+                          <span className="font-sans text-[9px] md:text-[10px] uppercase tracking-widest text-white/80 flex items-center gap-1">
+                            <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                            <span className="truncate">{event.location_main}</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="text-center mt-12">
+                <button
+                  onClick={() => setShowFullView(true)}
+                  className="inline-flex items-center gap-3 border border-[#1A1817]/20 bg-transparent text-[#1A1817] font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-4 px-10 rounded-full hover:bg-[#1A1817] hover:text-white transition-all duration-500 hover:-translate-y-1 shadow-sm"
+                >
+                  View More
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
+                </button>
+              </div>
+            </>
           ) : (
+            /* ---------- FULL DETAILED VIEW (unchanged) ---------- */
             <>
               <div className="space-y-16">
                 {events.slice(0, 3).map((event) => {
@@ -451,7 +521,7 @@ export default function App() {
               >
                 <Image 
                   src={`/images/home/${filename}`} 
-                  alt={`Al-Musawwir Gathering - ${filename}`} 
+                  alt={`3AM Ideas Gathering - ${filename}`} 
                   fill 
                   quality={85}
                   sizes="(max-width: 768px) 260px, (max-width: 1024px) 350px, 400px"
@@ -463,13 +533,13 @@ export default function App() {
         </section>
       )}
 
-      {/* What is Al-Musawwir Section */}
+      {/* What is 3AM Ideas Section */}
       <section id="about-section" className="py-16 md:py-24 px-4 md:px-6 relative z-10">
         <div className="max-w-3xl mx-auto text-center reveal" ref={setRef}>
-          <h2 className="font-serif text-4xl md:text-5xl font-light text-[#1A1817] mb-10">What is Al-Musawwir?</h2>
+          <h2 className="font-serif text-4xl md:text-5xl font-light text-[#1A1817] mb-10">What is 3AM Ideas?</h2>
           
           <div className="space-y-6 font-serif text-xl md:text-2xl text-[#5C5855] font-light leading-relaxed px-2">
-            <p className="font-sans text-[12px] uppercase tracking-[0.4em] text-[#FF6B35] font-bold">Al-Musawwir</p>
+            <p className="font-sans text-[12px] uppercase tracking-[0.4em] text-[#FF6B35] font-bold">3AM Ideas</p>
             <p className="text-[#1A1817] font-medium">The Fashioner. The one who gives form to the formless.</p>
             <p>
               Across traditions, creation has always been deeply human.<br className="hidden md:block" />
@@ -498,7 +568,7 @@ export default function App() {
         <div className="w-40 h-12 relative mb-6">
           <Image 
             src="/images/logo_black.png" 
-            alt="Al-Musawwir Logo" 
+            alt="3AM Ideas Logo" 
             fill 
             className="object-contain opacity-80" 
           />
@@ -513,7 +583,7 @@ export default function App() {
           <a href="mailto:wearemusawwir@gmail.com" className="font-sans text-[10px] text-[#5C5855] tracking-widest uppercase font-bold hover:text-[#FF6B35] transition-colors py-2">Contact</a>
         </div>
         
-        <p className="font-sans text-[9px] text-[#5C5855]/60 uppercase tracking-widest">© {new Date().getFullYear()} Al-Musawwir Gatherings. All rights reserved.</p>
+        <p className="font-sans text-[9px] text-[#5C5855]/60 uppercase tracking-widest">© {new Date().getFullYear()} 3AM Ideas Gatherings. All rights reserved.</p>
       </footer>
     </div>
   );
