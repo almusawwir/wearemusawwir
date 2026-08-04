@@ -23,23 +23,23 @@ export async function generateMetadata({ params }) {
   const targetId = decodeURIComponent(resolvedParams.id || '').trim().toLowerCase();
   const currentEvent = events.find(e => e.id && e.id.trim().toLowerCase() === targetId);
 
-  if (!currentEvent) return { title: 'Event Not Found | Al-Musawwir' };
+  if (!currentEvent) return { title: 'Event Not Found | 3AM Ideas' };
 
   const rawImage = currentEvent.image_url || '/images/hero-bg.jpg';
   const absoluteImage = rawImage.startsWith('/')
-    ? `https://almusawwir.art${rawImage}`
+    ? `https://3amideas.club${rawImage}`
     : rawImage;
-  const ogImage = `https://almusawwir.art/api/og-image?url=${encodeURIComponent(absoluteImage)}`;
+  const ogImage = `https://3amideas.club/api/og-image?url=${encodeURIComponent(absoluteImage)}`;
 
   return {
-    title: `${currentEvent.title} | Al-Musawwir`,
-    description: currentEvent.tagline || 'Secure your canvas under the trees.',
+    title: `${currentEvent.title} | 3AM Ideas`,
+    description: currentEvent.tagline || 'Some ideas are too good to sleep on.',
     openGraph: {
       title: currentEvent.title,
       description: currentEvent.tagline,
       images: [ogImage],
-      siteName: 'Al-Musawwir Gatherings',
-      url: `https://almusawwir.art/event/${targetId}`,
+      siteName: '3AM Ideas',
+      url: `https://3amideas.club/event/${targetId}`,
     },
     twitter: {
       card: 'summary_large_image',
