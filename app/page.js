@@ -38,7 +38,7 @@ function shortDesc(event) {
   return (event.tagline || event.description || '').trim();
 }
 
-/* Wraps every standalone "3 AM" in the brand pink. Used for the long-form copy blocks. */
+/* Wraps every standalone "3 AM" in the brand pink. */
 function Pink3AM({ text }) {
   const parts = text.split(/(3 AM)/g);
   return parts.map((part, i) =>
@@ -86,8 +86,7 @@ export default function App() {
   const [month, setMonth] = useState('This month');
   const [clock, setClock] = useState(null);
   const [isNavVisible, setIsNavVisible] = useState(true);
-  const [lastScrollY, setLastScrollY] = useState(0);
-  const [nearBottom, setNearBottom] = useState(false);
+  const [showMobileCta, setShowMobileCta] = useState(false);
   const revealRefs = useRef([]);
 
   const setRef = (el) => {
@@ -146,18 +145,48 @@ export default function App() {
     return () => observer.disconnect();
   }, [isLoading, events, galleryImages]);
 
+  /* FIX 6: scroll handler is throttled to one computation per animation frame
+     via requestAnimationFrame, and each piece of state is only set when its
+     value actually flips — not on every pixel of scroll. This is the fix for
+     the "hundreds of re-renders per second" issue. */
   useEffect(() => {
-    const handleScroll = () => {
+    let ticking = false;
+    let prevY = window.scrollY;
+    let navVisibleRef = true;
+    let ctaVisibleRef = false;
+
+    const compute = () => {
       const y = window.scrollY;
-      setIsNavVisible(y <= 50 || y < lastScrollY);
-      setLastScrollY(y);
+
+      const shouldShowNav = y <= 50 || y < prevY;
+      if (shouldShowNav !== navVisibleRef) {
+        navVisibleRef = shouldShowNav;
+        setIsNavVisible(shouldShowNav);
+      }
+
       const distanceFromBottom = document.documentElement.scrollHeight - (y + window.innerHeight);
-      setNearBottom(distanceFromBottom < 420);
+      const nearBottom = distanceFromBottom < 420;
+      const shouldShowCta = y > 900 && !shouldShowNav && !nearBottom;
+      if (shouldShowCta !== ctaVisibleRef) {
+        ctaVisibleRef = shouldShowCta;
+        setShowMobileCta(shouldShowCta);
+      }
+
+      prevY = y;
+      ticking = false;
     };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll();
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [lastScrollY]);
+
+    const onScroll = () => {
+      if (!ticking) {
+        ticking = true;
+        requestAnimationFrame(compute);
+      }
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    compute();
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   const cards = SLOTS.flatMap(slot => {
     const real = events.filter(e => getStyle(e) === slot.style);
@@ -196,11 +225,10 @@ export default function App() {
         .tam .clock{font-size:13px;color:#bdbdbd;margin:0}
         .tam .clock b{color:var(--white);font-weight:600}
 
-        /* Hero */
+        /* Hero — FIX 4: no logo here, nav already has it */
         .tam .hero{padding:40px 0 8px;text-align:left}
         .tam .tagline{font-weight:500;color:var(--pink);font-size:16px;margin:0}
         .tam h1{font-family:var(--display);font-weight:900;font-size:clamp(44px,11vw,150px);line-height:.9;letter-spacing:-.5px;margin:10px 0 18px}
-        .tam .hero-logo{height:34px;width:auto;margin-bottom:18px;display:block}
         .tam .lede{max-width:56ch;font-size:17px;color:#222;margin:0}
 
         /* Event grid */
@@ -210,7 +238,8 @@ export default function App() {
         .tam .format{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px}
         .tam .dot{width:8px;height:8px;border-radius:50%;background:var(--pink);animation:tampulse 1.2s infinite}
         @keyframes tampulse{50%{opacity:.25}}
-        .tam .name{font-family:var(--display);font-weight:900;font-size:36px;line-height:.95;margin:8px 0 8px;word-break:break-word}
+        /* FIX 5: line-height was .95 (too tight for 2-line titles), now 1.15 */
+        .tam .name{font-family:var(--display);font-weight:900;font-size:36px;line-height:1.15;margin:8px 0 8px;word-break:break-word}
         .tam .desc{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font-size:14.5px;opacity:.85;margin-bottom:auto}
         .tam .meta{display:flex;justify-content:space-between;gap:10px;margin:18px 0 14px;font-size:14px}
         .tam .meta div{display:flex;flex-direction:column;gap:2px}
@@ -245,13 +274,15 @@ export default function App() {
         .tam .formats li{display:grid;grid-template-columns:200px 1fr;gap:12px;padding:12px 0;border-bottom:1px solid var(--black);font-size:16px}
         .tam .formats strong{font-weight:600}
 
-        /* Learn more accordion */
+        /* Learn more accordion — FIX 2: the question text + "?" live in one
+           span, the "+" in a second span, so space-between only ever sees
+           two flex children instead of treating loose text as its own item. */
         .tam .learn{border-top:2px solid var(--black);padding:56px 0}
         .tam .acc{border-bottom:1px solid var(--black)}
         .tam .acc:first-of-type{border-top:1px solid var(--black)}
-        .tam .acc summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:20px 4px;font-family:var(--display);font-weight:900;font-size:24px}
+        .tam .acc summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:20px 4px;font-family:var(--display);font-weight:900;font-size:24px}
         .tam .acc summary::-webkit-details-marker{display:none}
-        .tam .acc summary .plus{font-size:28px;font-weight:400;transition:transform .25s ease}
+        .tam .acc summary .plus{flex:0 0 auto;font-size:28px;font-weight:400;transition:transform .25s ease}
         .tam .acc[open] summary .plus{transform:rotate(45deg)}
         .tam .acc-body{padding:0 4px 24px;font-size:16px;max-width:68ch}
         .tam .acc-body p{margin:0 0 14px}
@@ -271,8 +302,9 @@ export default function App() {
         .tam .btn.pink{background:var(--pink);border-color:var(--pink);color:var(--white)}
         .tam .btn.wa{background:var(--black);border-color:var(--black);color:var(--white)}
 
-        /* Footer */
-        .tam footer{background:var(--black);color:var(--white);padding:32px 0 calc(32px + env(safe-area-inset-bottom,0px))}
+        /* Footer — FIX 3: extra bottom padding so the sticky mobile CTA
+           never sits on top of the footer links */
+        .tam footer{background:var(--black);color:var(--white);padding:32px 0 calc(90px + env(safe-area-inset-bottom,0px))}
         .tam footer .bar{flex-wrap:wrap;align-items:flex-start;min-height:auto}
         .tam footer nav{display:flex;gap:20px;flex-wrap:wrap;font-size:15px}
         .tam footer small{display:block;color:#9a9a9a;margin-top:10px;font-size:13px}
@@ -289,11 +321,12 @@ export default function App() {
 
           .tam .hero{padding:28px 0 4px}
           .tam .tagline{font-size:14.5px}
-          .tam .hero-logo{height:26px;margin-bottom:14px}
           .tam .lede{font-size:15.5px;line-height:1.55}
 
           .tam .events{grid-template-columns:repeat(2,1fr);gap:14px;padding:22px 0 52px}
-          .tam .card-body{padding:16px;min-height:200px}
+          /* FIX 1: padding-top clears the absolute "Coming soon"/"Free" badge
+             so it never sits on top of the format label text below it */
+          .tam .card-body{padding:16px;padding-top:40px;min-height:200px}
           .tam .format{font-size:12px}
           .tam .name{font-size:22px;margin:8px 0 6px}
           .tam .desc{font-size:13px;line-height:1.45;-webkit-line-clamp:4}
@@ -331,7 +364,7 @@ export default function App() {
           .tam .wrap{padding:0 14px}
           .tam .events{gap:10px}
           .tam .name{font-size:19px}
-          .tam .card-body{padding:12px}
+          .tam .card-body{padding:12px;padding-top:36px}
         }
 
         @media (prefers-reduced-motion:reduce){
@@ -361,10 +394,10 @@ export default function App() {
       </header>
 
       <main>
+        {/* FIX 4: logo removed from here — it's already in the sticky nav above */}
         <section className="wrap hero">
           <p className="tagline">Some ideas are too good to sleep on.</p>
           <h1>{month} at <span className="brand">3 AM</span></h1>
-          <Image src="/images/white_logo.png" alt="" width={130} height={32} className="hero-logo" style={{ filter: 'invert(1)' }} />
           <p className="lede">A creative community in Bangalore. Strangers make films, run citywide hunts and chase the ideas they'd normally talk themselves out of. Pick one and come along.</p>
         </section>
 
@@ -435,17 +468,29 @@ export default function App() {
           </div>
         </section>
 
+        {/* FIX 2: each summary wraps its question text + "?" in one span,
+            and the "+" in its own span, so space-between has exactly two
+            children instead of splitting on every loose text node */}
         <section className="wrap learn reveal" ref={setRef}>
           <details className="acc">
-            <summary>What is <span className="brand">3 AM</span>?<span className="plus">+</span></summary>
+            <summary>
+              <span>What is <span className="brand">3 AM</span>?</span>
+              <span className="plus">+</span>
+            </summary>
             <div className="acc-body">{ABOUT_COPY.map((p, i) => <p key={i}><Pink3AM text={p} /></p>)}</div>
           </details>
           <details className="acc">
-            <summary>What is Broken Camera Crew?<span className="plus">+</span></summary>
+            <summary>
+              <span>What is Broken Camera Crew?</span>
+              <span className="plus">+</span>
+            </summary>
             <div className="acc-body">{BCC_COPY.map((p, i) => <p key={i}><Pink3AM text={p} /></p>)}</div>
           </details>
           <details className="acc">
-            <summary>What is the <span className="brand">3 AM</span> Community Event?<span className="plus">+</span></summary>
+            <summary>
+              <span>What is the <span className="brand">3 AM</span> Community Event?</span>
+              <span className="plus">+</span>
+            </summary>
             <div className="acc-body">{COMMUNITY_COPY.map((p, i) => <p key={i}><Pink3AM text={p} /></p>)}</div>
           </details>
         </section>
@@ -492,7 +537,7 @@ export default function App() {
         </div>
       </footer>
 
-      <a href="#event" className={`mcta ${(lastScrollY > 900 && !isNavVisible && !nearBottom) ? '' : 'off'}`}>See {month}'s events</a>
+      <a href="#event" className={`mcta ${showMobileCta ? '' : 'off'}`}>See {month}'s events</a>
     </div>
   );
 }
