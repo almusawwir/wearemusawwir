@@ -7,17 +7,43 @@ import Link from 'next/link';
 import Papa from 'papaparse';
 
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSSCmEDqxpPn1OEzXR3geUaynoeGhrswVO5xf8zKETC8xOq1oimP1SiapOAsSPY_nEMTHoDeacTgKC/pub?gid=0&single=true&output=csv";
+const WHATSAPP_URL = "https://chat.whatsapp.com/B68V6Q62HZPHHsGMG0t4jP";
+const TZ = "Asia/Kolkata";
+
+/* Picks a card look from the sheet row.
+   Optional: add a "format" column in the sheet (bcc / odc / community / premium) to control it directly. */
+function getStyle(event) {
+  const f = (event.format || '').toLowerCase().trim();
+  if (['bcc', 'odc', 'community', 'premium'].includes(f)) return f;
+  const text = `${event.id} ${event.title}`.toLowerCase();
+  if (text.includes('bcc') || text.includes('broken camera')) return 'bcc';
+  if (text.includes('odc') || text.includes('one day crew')) return 'odc';
+  if (isFree(event)) return 'community';
+  return 'premium';
+}
+function isFree(event) {
+  const p = (event.price || '').toString().trim().toLowerCase();
+  return p === '0' || p === 'free';
+}
+function formatLabel(style) {
+  return { bcc: 'Broken Camera Crew', odc: 'One Day Crew', community: '3 AM Community', premium: 'Creative experience' }[style];
+}
+function priceText(event) {
+  if (isFree(event)) return 'Free';
+  const p = (event.price || '').toString().trim();
+  return p ? `₹${p}` : 'TBA';
+}
+function shortDesc(event) {
+  const d = (event.tagline || event.description || '').trim();
+  return d.length > 110 ? d.slice(0, 107).trimEnd() + '…' : d;
+}
 
 export default function App() {
   const [events, setEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [expandedCards, setExpandedCards] = useState({});
-
-  // Toggle between compact square grid and full detailed view
-  const [showFullView, setShowFullView] = useState(false);
-
-  // State to hold your dynamic gallery images
   const [galleryImages, setGalleryImages] = useState([]);
+  const [month, setMonth] = useState('This month');
+  const [clock, setClock] = useState(null);
 
   // Navigation scroll state
   const [isNavVisible, setIsNavVisible] = useState(true);
@@ -27,23 +53,15 @@ export default function App() {
   const router = useRouter();
 
   const setRef = (el) => {
-    if (el && !revealRefs.current.includes(el)) {
-      revealRefs.current.push(el);
-    }
-  };
-
-  const toggleExpand = (e, id) => {
-    e.stopPropagation();
-    setExpandedCards(prev => ({ ...prev, [id]: !prev[id] }));
+    if (el && !revealRefs.current.includes(el)) revealRefs.current.push(el);
   };
 
   const handleCardClick = (id) => {
     if (id) router.push(`/event/${id.trim()}`);
   };
 
-  // Fetch Events AND Gallery Images
+  // Fetch events (Google Sheet) + gallery images
   useEffect(() => {
-    // 1. Fetch CSV Events
     fetch(CSV_URL)
       .then(res => res.text())
       .then(text => {
@@ -52,33 +70,42 @@ export default function App() {
           skipEmptyLines: true,
           transformHeader: (h) => h.trim().toLowerCase().replace(/^\uFEFF/, ''),
           complete: (results) => {
-            const validEvents = results.data.filter(event => {
-                const hasId = event.id && event.id.trim() !== '';
-                const hasTitle = event.title && event.title.trim() !== '';
-                return hasId && hasTitle;
-            });
-
+            const validEvents = results.data.filter(e =>
+              e.id && e.id.trim() !== '' && e.title && e.title.trim() !== ''
+            );
             setEvents(validEvents);
             setIsLoading(false);
           }
         });
-      });
+      })
+      .catch(() => setIsLoading(false));
 
-    // 2. Fetch dynamic images from our custom API
     fetch('/api/gallery')
       .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          setGalleryImages(data);
-        }
-      })
+      .then(data => { if (Array.isArray(data)) setGalleryImages(data); })
       .catch(err => console.error("Could not load gallery images:", err));
   }, []);
 
-  // Intersection Observer for scroll animations
+  // Month heading + Bangalore clock (client-only to avoid hydration mismatch)
+  useEffect(() => {
+    setMonth(new Intl.DateTimeFormat('en-IN', { month: 'long', timeZone: TZ }).format(new Date()));
+    const tick = () => {
+      const parts = Object.fromEntries(
+        new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: TZ })
+          .formatToParts(new Date()).map(p => [p.type, p.value])
+      );
+      const left = (180 - (+parts.hour * 60 + +parts.minute) + 1440) % 1440;
+      const now = new Intl.DateTimeFormat('en-IN', { hour: 'numeric', minute: '2-digit', timeZone: TZ }).format(new Date());
+      setClock({ now, h: Math.floor(left / 60), m: left % 60, isThree: left === 0 });
+    };
+    tick();
+    const t = setInterval(tick, 30000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Scroll reveal
   useEffect(() => {
     if (isLoading) return;
-    const observerOptions = { root: null, rootMargin: '0px', threshold: 0.1 };
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
@@ -86,517 +113,299 @@ export default function App() {
           observer.unobserve(entry.target);
         }
       });
-    }, observerOptions);
-
+    }, { threshold: 0.1 });
     revealRefs.current.forEach((ref) => { if (ref) observer.observe(ref); });
     return () => observer.disconnect();
-  }, [isLoading, events, showFullView]);
+  }, [isLoading, events, galleryImages]);
 
-  // Smart Navigation Scroll Logic
+  // Hide header on scroll down, show on scroll up
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const handleScroll = () => {
-        const currentScrollY = window.scrollY;
-
-        if (currentScrollY <= 50) {
-          setIsNavVisible(true);
-        } else if (currentScrollY < lastScrollY) {
-          setIsNavVisible(true);
-        } else {
-          setIsNavVisible(false);
-        }
-
-        setLastScrollY(currentScrollY);
-      };
-
-      window.addEventListener('scroll', handleScroll, { passive: true });
-      return () => window.removeEventListener('scroll', handleScroll);
-    }
+    const handleScroll = () => {
+      const y = window.scrollY;
+      setIsNavVisible(y <= 50 || y < lastScrollY);
+      setLastScrollY(y);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
   }, [lastScrollY]);
 
   return (
-    <div className="relative overflow-x-hidden w-full bg-[#0A0A0B] text-[#F5F3EF] font-sans antialiased selection:bg-[#FF2D78] selection:text-white pb-24">
-      <style dangerouslySetInnerHTML={{__html: `
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Manrope:wght@200;300;400;500;600;700&display=swap');
-
-        :root {
-          --ink: #F5F3EF;
-          --bg: #0A0A0B;
-          --accent: #FF2D78;
-          --accent-soft: rgba(255,45,120,0.14);
-          --line: rgba(245,243,239,0.09);
+    <div className="tam">
+      <style dangerouslySetInnerHTML={{ __html: `
+        @import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Instrument+Sans:wght@400;500;600&display=swap');
+        .tam{
+          --pink:#FF0065; --pink-soft:#FFE3EE; --black:#000; --white:#fff; --grey:#5c5c5c;
+          --display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
+          --body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+          font-family:var(--body); background:var(--white); color:var(--black);
+          line-height:1.55; font-size:17px; overflow-x:hidden; min-height:100vh;
         }
-        html { scroll-behavior: smooth; }
-        .font-serif { font-family: 'Cormorant Garamond', serif; }
-        .font-sans { font-family: 'Manrope', sans-serif; }
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        html{scroll-behavior:smooth}
+        .tam *{box-sizing:border-box}
+        .tam a{color:inherit}
+        .tam :focus-visible{outline:3px solid var(--pink);outline-offset:3px}
+        .tam .wrap{max-width:1180px;margin:0 auto;padding:0 20px}
 
-        .canvas-texture {
-          position: fixed; inset: 0; z-index: 50; pointer-events: none;
-          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
-          mix-blend-mode: screen; opacity: 0.45;
+        .tam .reveal{opacity:0;transform:translateY(24px);transition:opacity .8s cubic-bezier(.16,1,.3,1),transform .8s cubic-bezier(.16,1,.3,1)}
+        .tam .reveal.active{opacity:1;transform:none}
+
+        /* Header */
+        .tam .top{position:sticky;top:0;z-index:60;background:var(--black);color:var(--white);
+          padding-top:env(safe-area-inset-top,0px);transition:transform .35s ease}
+        .tam .top.hidden{transform:translateY(-100%)}
+        .tam .bar{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 0}
+        .tam .navlinks{display:flex;align-items:center;gap:22px;font-size:15px;font-weight:500}
+        .tam .navlinks a{text-decoration:none;opacity:.8}
+        .tam .navlinks a:hover{opacity:1;color:var(--pink)}
+        .tam .clock{font-size:13px;color:#bdbdbd}
+        .tam .clock b{color:var(--white);font-weight:600}
+
+        /* Hero */
+        .tam .hero{padding:44px 0 20px}
+        .tam .tagline{font-weight:500;color:var(--pink);font-size:18px;margin:0}
+        .tam h1{font-family:var(--display);font-weight:900;font-size:clamp(60px,13vw,168px);line-height:.86;letter-spacing:-1px;margin:10px 0 16px}
+        .tam .lede{max-width:56ch;font-size:19px;color:#222;margin:0}
+
+        /* Events */
+        .tam .events{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:20px;padding:24px 0 72px}
+        .tam .card{position:relative;display:flex;flex-direction:column;text-align:left;cursor:pointer;
+          border:2px solid var(--black);background:var(--white);color:var(--black);font:inherit;padding:0;
+          transition:transform .15s ease, box-shadow .15s ease}
+        .tam .card:hover{transform:translate(-3px,-3px);box-shadow:6px 6px 0 var(--black)}
+        .tam .card-img{position:relative;aspect-ratio:16/10;border-bottom:2px solid var(--black);background:#222;overflow:hidden}
+        .tam .card-img img{object-fit:cover;width:100%;height:100%}
+        .tam .card-body{display:flex;flex-direction:column;flex:1;padding:20px 22px 22px}
+        .tam .format{font-size:14px;font-weight:600}
+        .tam .name{font-family:var(--display);font-weight:900;font-size:42px;line-height:.95;margin:10px 0 8px}
+        .tam .desc{margin:6px 0 auto;font-size:15.5px;opacity:.85}
+        .tam .meta{display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;margin:20px 0 16px;font-size:15px}
+        .tam .meta dt{opacity:.65}
+        .tam .meta dd{margin:0;font-weight:600}
+        .tam .meta .old{text-decoration:line-through;opacity:.5;font-weight:400;margin-right:6px}
+        .tam .status{font-size:14px;font-weight:600;margin-bottom:12px}
+        .tam .cta{display:inline-block;align-self:flex-start;padding:11px 18px;font-weight:600;font-size:15px;border:2px solid currentColor}
+
+        .tam .bcc{background:var(--black);color:var(--white)}
+        .tam .bcc .card-img{border-color:var(--white)}
+        .tam .bcc .cta{background:var(--pink);border-color:var(--pink);color:var(--white)}
+        .tam .bcc:hover{box-shadow:6px 6px 0 var(--pink)}
+        .tam .rec{position:absolute;top:12px;left:12px;z-index:2;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--white);background:rgba(0,0,0,.55);padding:3px 8px}
+        .tam .rec i{width:9px;height:9px;border-radius:50%;background:var(--pink);animation:tamblink 1.2s steps(1) infinite}
+        @keyframes tamblink{50%{opacity:0}}
+        .tam .odc{background:var(--pink)}
+        .tam .odc .cta{background:var(--black);color:var(--white);border-color:var(--black)}
+        .tam .premium .cta{background:var(--pink);color:var(--white);border-color:var(--pink)}
+        .tam .community{background:var(--pink-soft);border-style:dashed}
+        .tam .free{position:absolute;top:12px;right:12px;z-index:2;font-family:var(--display);font-weight:900;font-size:26px;color:var(--pink);background:var(--white);transform:rotate(6deg);border:3px solid var(--pink);padding:0 10px}
+        .tam .soldout{opacity:.55}
+        .tam .soldout .cta{background:transparent !important;color:inherit !important;border-color:currentColor !important}
+
+        .tam .state{padding:40px 0 80px;font-size:18px;color:var(--grey)}
+
+        /* About */
+        .tam .about{border-top:2px solid var(--black);padding:64px 0;display:grid;grid-template-columns:1fr 1.3fr;gap:48px}
+        .tam .h2{font-family:var(--display);font-weight:900;font-size:clamp(40px,6vw,72px);line-height:.9;margin:0}
+        .tam .about p{max-width:60ch;margin:0 0 14px}
+        .tam .formats{list-style:none;margin:20px 0 0;padding:0;border-top:1px solid var(--black)}
+        .tam .formats li{display:grid;grid-template-columns:200px 1fr;gap:12px;padding:12px 0;border-bottom:1px solid var(--black);font-size:16px}
+        .tam .formats strong{font-weight:600}
+
+        /* Gallery */
+        .tam .proof{background:var(--black);color:var(--white);padding:64px 0}
+        .tam .proof-head{display:flex;justify-content:space-between;align-items:end;gap:24px;flex-wrap:wrap;margin-bottom:28px}
+        .tam .strip{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:0 20px 8px;scrollbar-width:none}
+        .tam .strip::-webkit-scrollbar{display:none}
+        .tam .shot{position:relative;flex:0 0 auto;width:min(72vw,340px);aspect-ratio:4/5;scroll-snap-align:center;background:#1f1f1f;overflow:hidden}
+
+        /* Join */
+        .tam .join{padding:64px 0;display:flex;justify-content:space-between;align-items:center;gap:24px;flex-wrap:wrap}
+        .tam .join p{margin:8px 0 0;max-width:48ch}
+        .tam .btns{display:flex;gap:12px;flex-wrap:wrap}
+        .tam .btn{display:inline-block;padding:14px 22px;font-weight:600;font-size:16px;text-decoration:none;border:2px solid var(--black)}
+        .tam .btn.pink{background:var(--pink);border-color:var(--pink);color:var(--white)}
+        .tam .btn.wa{background:#25D366;border-color:#25D366;color:var(--black)}
+
+        /* Footer */
+        .tam footer{background:var(--black);color:var(--white);padding:32px 0 calc(32px + env(safe-area-inset-bottom,0px))}
+        .tam footer .bar{flex-wrap:wrap}
+        .tam footer nav{display:flex;gap:20px;flex-wrap:wrap;font-size:15px}
+        .tam footer small{display:block;color:#9a9a9a;margin-top:10px;font-size:13px}
+
+        /* Mobile sticky CTA */
+        .tam .mcta{display:none}
+
+        @media (max-width:820px){
+          .tam .clock{display:none}
+          .tam .hero{padding:32px 0 12px}
+          .tam .lede{font-size:17px}
+          .tam .events{gap:16px;padding-bottom:56px}
+          .tam .name{font-size:38px}
+          .tam .about{grid-template-columns:1fr;gap:20px;padding:48px 0}
+          .tam .formats li{grid-template-columns:1fr;gap:2px}
+          .tam .join{padding:48px 0 110px}
+          .tam .btns{width:100%}
+          .tam .btn{flex:1;text-align:center}
+          .tam .mcta{display:block;position:fixed;left:16px;right:16px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:60;
+            text-align:center;background:var(--pink);color:var(--white);font-weight:600;padding:15px;text-decoration:none;border:2px solid var(--black);
+            box-shadow:4px 4px 0 var(--black);transition:transform .3s ease, opacity .3s ease}
+          .tam .mcta.off{transform:translateY(140%);opacity:0;pointer-events:none}
         }
-
-        .reveal { opacity: 0; transform: translateY(32px); transition: opacity 1.1s cubic-bezier(0.16,1,0.3,1), transform 1.1s cubic-bezier(0.16,1,0.3,1); }
-        .reveal.active { opacity: 1; transform: translateY(0); }
-
-        .glass-card {
-          background: linear-gradient(180deg, rgba(245,243,239,0.045), rgba(245,243,239,0.015));
-          backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
-          border: 1px solid var(--line);
-          box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+        @media (prefers-reduced-motion:reduce){
+          .tam .reveal{opacity:1;transform:none;transition:none}
+          .tam .card,.tam .top,.tam .mcta{transition:none}
+          .tam .card:hover{transform:none}
+          .tam .rec i{animation:none}
         }
-
-        @keyframes fadeInUp { 0% { opacity: 0; transform: translateY(32px); } 100% { opacity: 1; transform: translateY(0); } }
-        .animate-fade-in-up { animation: fadeInUp 1s cubic-bezier(0.16,1,0.3,1) forwards; }
-
-        .safe-b { padding-bottom: env(safe-area-inset-bottom, 0px); }
-        .safe-t { padding-top: env(safe-area-inset-top, 0px); }
-
-        .edge-fade { -webkit-mask-image: linear-gradient(90deg, transparent, black 6%, black 94%, transparent); mask-image: linear-gradient(90deg, transparent, black 6%, black 94%, transparent); }
       `}} />
 
-      <div className="canvas-texture"></div>
-
-      {/* TOP: Smart Floating Navigation */}
-      <nav
-        className={`fixed left-0 right-0 z-[60] flex justify-center px-4 safe-t transition-all duration-500 ease-in-out ${
-          isNavVisible ? 'opacity-100 translate-y-0 top-4' : 'opacity-0 -translate-y-10 pointer-events-none top-4'
-        }`}
-      >
-        <div className="glass-card px-4 sm:px-6 py-2.5 sm:py-3 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.35)] flex items-center justify-between gap-3 sm:gap-6 max-w-max bg-black/70">
-          <a href="#about-section" className="cursor-pointer mr-1 sm:mr-0 shrink-0 flex items-center">
-            <Image
-              src="/images/white_logo.png"
-              alt="3AM Ideas"
-              width={120}
-              height={30}
-              className="h-5 sm:h-6 w-auto object-contain"
-            />
-          </a>
-          <div className="w-1 h-1 rounded-full bg-[#FF2D78] hidden sm:block"></div>
-          <Link href="/about" className="font-sans text-[11px] sm:text-[10px] uppercase tracking-[0.18em] font-bold text-white/55 hover:text-white transition-colors py-2 px-1 sm:p-0">About</Link>
-          <div className="w-1 h-1 rounded-full bg-white/15 hidden sm:block"></div>
-          <Link href="/event" className="font-sans text-[11px] sm:text-[10px] uppercase tracking-[0.18em] font-bold text-[#FF2D78] hover:text-white transition-colors py-2 px-1 sm:p-0">Gatherings</Link>
-        </div>
-      </nav>
-
-      {/* BOTTOM: Inverse Sticky CTA */}
-      <div
-        className={`fixed bottom-6 md:bottom-8 left-0 right-0 z-[60] flex justify-center px-4 safe-b transition-all duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
-          !isNavVisible && lastScrollY > 300 ? 'opacity-100 translate-y-0 delay-100' : 'opacity-0 translate-y-12 pointer-events-none'
-        }`}
-      >
-        <Link href="/event" className="bg-[#FF2D78] text-white shadow-2xl shadow-[#FF2D78]/25 px-7 py-3.5 md:px-8 md:py-4 rounded-full font-sans text-[10px] md:text-xs uppercase tracking-[0.28em] font-bold hover:bg-white hover:text-[#0A0A0B] active:scale-95 transition-all flex items-center gap-3 border border-white/10 group">
-          See Gatherings
-          <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-        </Link>
-      </div>
-
-      {/* Hero Section */}
-      <header className="relative min-h-[100svh] flex flex-col items-center justify-center px-4 md:px-6 overflow-hidden pt-28 pb-14 md:py-20">
-        <div className="absolute inset-0 z-0 bg-[#13100F]">
-          <video
-            autoPlay
-            loop
-            muted
-            playsInline
-            poster="/images/hero-bg.jpg"
-            className="absolute inset-0 w-full h-full object-cover"
-            style={{ opacity: 0.55 }}
-          >
-            <source src="/videos/homepage.mp4" type="video/mp4" />
-          </video>
-          <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0B]/75 via-[#0A0A0B]/55 to-[#0A0A0B]"></div>
-        </div>
-
-        <div className="relative z-10 max-w-4xl mx-auto w-full flex flex-col items-center text-center">
-
-          <h1 className="sr-only">3AM IDEAS</h1>
-
-          <div className="relative w-[78vw] max-w-[640px] h-[110px] sm:h-[170px] md:h-[210px] lg:h-[260px] mb-7 opacity-0 animate-fade-in-up drop-shadow-2xl flex justify-center items-center" style={{ animationDelay: '0.2s' }}>
-            <Image
-              src="/images/white_logo.png"
-              alt="3AM Ideas Logo"
-              fill
-              priority
-              className="object-contain"
-              sizes="(max-width: 768px) 78vw, 640px"
-            />
-          </div>
-
-          <div className="w-full opacity-0 animate-fade-in-up flex flex-col items-center" style={{ animationDelay: '0.4s' }}>
-            <p className="font-serif italic text-white/90 text-xl md:text-3xl tracking-wide mb-7 drop-shadow-md font-light px-4">
-              Some ideas are too good to sleep on.
+      {/* Header */}
+      <header className={`top ${isNavVisible ? '' : 'hidden'}`}>
+        <div className="wrap bar">
+          <Link href="/" aria-label="3AM Ideas home" style={{ display: 'flex', alignItems: 'center' }}>
+            <Image src="/images/white_logo.png" alt="3AM Ideas" width={120} height={30} priority style={{ height: 28, width: 'auto' }} />
+          </Link>
+          {clock && (
+            <p className="clock" style={{ margin: 0 }}>
+              {clock.isThree
+                ? <>It's <b>3 AM</b> in Bangalore. Good time for an idea.</>
+                : <>{clock.now} in Bangalore. <b>{clock.h}h {clock.m}m</b> till 3 AM.</>}
             </p>
-            <div className="font-sans font-light text-white/65 text-[13.5px] md:text-base leading-relaxed mb-11 space-y-1.5 max-w-2xl px-3">
-              <p>You know that 3AM thought — the one you talk yourself out of by morning?</p>
-              <p>This is the place you actually chase it.</p>
-              <p>A third space built on creation, curation, and real connection —</p>
-              <p>where the right people, pure creative chaos, and a room that feels safe turn into the nights you remember.</p>
-            </div>
-            <div className="flex flex-col sm:flex-row items-center gap-3.5 w-full sm:w-auto px-6 sm:px-0">
-              <Link href="/event" className="inline-block border border-white/25 bg-white/[0.04] backdrop-blur-sm text-white font-sans text-[10px] md:text-xs uppercase tracking-[0.28em] font-bold py-3.5 px-8 md:py-4 md:px-10 rounded-full hover:bg-white hover:text-[#0A0A0B] transition-all duration-500 w-full sm:w-auto text-center">
-                Explore Gatherings
-              </Link>
-              <Link href="/join" className="inline-block bg-[#FF2D78] text-white font-sans text-[10px] md:text-xs uppercase tracking-[0.28em] font-bold py-3.5 px-8 md:py-4 md:px-10 rounded-full hover:bg-white hover:text-[#0A0A0B] transition-all duration-500 w-full sm:w-auto text-center shadow-lg shadow-[#FF2D78]/20">
-                Check Availability
-              </Link>
-            </div>
-          </div>
+          )}
+          <nav className="navlinks">
+            <Link href="/about">About</Link>
+            <Link href="/event">All events</Link>
+          </nav>
         </div>
       </header>
 
-      {/* Core Values Section */}
-      <section id="values" className="py-20 md:py-24 px-0 md:px-6 relative z-10">
-        <div className="max-w-6xl mx-auto">
-          <div ref={setRef} className="text-center mb-12 md:mb-16 reveal px-4">
-            <h2 className="font-serif text-3xl md:text-5xl font-light text-white">Creation. Curation. Connection.</h2>
-            <p className="font-sans text-[11px] md:text-sm tracking-[0.25em] text-white/45 uppercase mt-4">What every room is built on</p>
-          </div>
+      <main>
+        {/* Hero: short, events visible right after */}
+        <section className="wrap hero">
+          <p className="tagline">Some ideas are too good to sleep on.</p>
+          <h1>{month} at 3 AM</h1>
+          <p className="lede">A creative community in Bangalore. Strangers make films, run citywide hunts and chase the ideas they'd normally talk themselves out of. Pick one and come along.</p>
+        </section>
 
-          {/* Mobile: snap-scroll row. Desktop: 5-up grid. Same five cards either way. */}
-          <div
-            ref={setRef}
-            className="reveal flex md:grid md:grid-cols-5 gap-4 md:gap-5 overflow-x-auto md:overflow-visible snap-x snap-mandatory hide-scrollbar px-4 md:px-0 edge-fade md:[mask-image:none]"
-          >
-            {/* Value 1 */}
-            <div className="glass-card rounded-[1.75rem] p-6 flex flex-col items-center text-center shrink-0 w-[72vw] sm:w-[280px] md:w-auto snap-center hover:-translate-y-1.5 transition-transform duration-500">
-              <svg className="w-9 h-9 mb-4 text-[#FF2D78]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.4" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"></path>
-              </svg>
-              <h3 className="font-sans text-[11px] md:text-xs uppercase tracking-[0.18em] font-bold text-white mb-2.5">Chase the 3AM Thought</h3>
-              <p className="font-serif text-[15px] leading-snug text-white/55">The idea you'd normally talk yourself out of? Here you get to build it.</p>
-            </div>
-
-            {/* Value 2 */}
-            <div className="glass-card rounded-[1.75rem] p-6 flex flex-col items-center text-center shrink-0 w-[72vw] sm:w-[280px] md:w-auto snap-center hover:-translate-y-1.5 transition-transform duration-500">
-              <svg className="w-9 h-9 mb-4 text-[#FF2D78]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.4" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
-              </svg>
-              <h3 className="font-sans text-[11px] md:text-xs uppercase tracking-[0.18em] font-bold text-white mb-2.5">Vibe-Checked Rooms</h3>
-              <p className="font-serif text-[15px] leading-snug text-white/55">Small, curated groups. Everyone here is here for the right reasons.</p>
-            </div>
-
-            {/* Value 3 */}
-            <div className="glass-card rounded-[1.75rem] p-6 flex flex-col items-center text-center shrink-0 w-[72vw] sm:w-[280px] md:w-auto snap-center hover:-translate-y-1.5 transition-transform duration-500">
-              <svg className="w-9 h-9 mb-4 text-[#FF2D78]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.4" d="M20 8v2a2 2 0 01-2 2h-1M4 8h11M4 8v10a2 2 0 002 2h7a2 2 0 002-2V8M4 8L5.5 4h8L15 8m-5 4v4"></path>
-              </svg>
-              <h3 className="font-sans text-[11px] md:text-xs uppercase tracking-[0.18em] font-bold text-white mb-2.5">Safe Enough to Be Loud</h3>
-              <p className="font-serif text-[15px] leading-snug text-white/55">No creeps, no judgement. Chaos, yes — but the kind that feels safe.</p>
-            </div>
-
-            {/* Value 4 */}
-            <div className="glass-card rounded-[1.75rem] p-6 flex flex-col items-center text-center shrink-0 w-[72vw] sm:w-[280px] md:w-auto snap-center hover:-translate-y-1.5 transition-transform duration-500">
-              <svg className="w-9 h-9 mb-4 text-[#FF2D78]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.4" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
-              </svg>
-              <h3 className="font-sans text-[11px] md:text-xs uppercase tracking-[0.18em] font-bold text-white mb-2.5">Real Connection</h3>
-              <p className="font-serif text-[15px] leading-snug text-white/55">Not networking. Not small talk. The kind of people you actually keep.</p>
-            </div>
-
-            {/* Value 5 */}
-            <div className="glass-card rounded-[1.75rem] p-6 flex flex-col items-center text-center shrink-0 w-[72vw] sm:w-[280px] md:w-auto snap-center hover:-translate-y-1.5 transition-transform duration-500">
-              <svg className="w-9 h-9 mb-4 text-[#FF2D78]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.4" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
-              </svg>
-              <h3 className="font-sans text-[11px] md:text-xs uppercase tracking-[0.18em] font-bold text-white mb-2.5">Your Third Place</h3>
-              <p className="font-serif text-[15px] leading-snug text-white/55">Not home, not work. The place you come alive between the two.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Dynamic Events Section */}
-      <section id="event" className="py-16 md:py-24 px-4 md:px-6 relative z-10">
-        <div className="max-w-4xl mx-auto">
-          <div ref={setRef} className="text-center mb-12 md:mb-16 reveal">
-            <h2 className="font-serif text-4xl md:text-6xl font-light text-white">What's On</h2>
-          </div>
-
-          {isLoading ? (
-            <div className="text-center font-serif text-xl animate-pulse text-white/45">Loading the lineup...</div>
-          ) : events.length === 0 ? (
-             <div className="text-center font-serif text-xl text-white/45">Nothing scheduled right now. Something's always brewing — check back soon.</div>
-          ) : !showFullView ? (
-            /* ---------- COMPACT SQUARE PREVIEW (max 4: image + title + location) ---------- */
-            <>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 md:gap-6">
-                {events.slice(0, 4).map((event) => {
+        {/* Events */}
+        <section id="event" aria-label="Upcoming events">
+          <div className="wrap">
+            {isLoading ? (
+              <p className="state">Loading this month's events…</p>
+            ) : events.length === 0 ? (
+              <p className="state">Nothing scheduled right now. The next calendar drops soon. Join the WhatsApp community to hear first.</p>
+            ) : (
+              <div className="events">
+                {events.map((event) => {
+                  const style = getStyle(event);
+                  const isSoldOut = event.status && /sold|closed/i.test(event.status);
                   const isExternalImage = event.image_url && event.image_url.startsWith('http');
+                  const hasOld = event.original_price && event.original_price.trim() !== '' && !isFree(event);
                   return (
-                    <div
+                    <button
+                      type="button"
                       key={event.id}
                       onClick={() => handleCardClick(event.id)}
-                      className="cursor-pointer group relative aspect-square rounded-2xl overflow-hidden shadow-lg shadow-black/30 bg-[#161412] hover:-translate-y-1 active:scale-[0.98] transition-transform duration-500 border border-white/[0.06]"
+                      className={`card ${style} ${isSoldOut ? 'soldout' : ''}`}
+                      aria-label={`${event.title}, ${event.date || 'date TBA'}, ${priceText(event)}`}
                     >
-                      {event.image_url ? (
-                        isExternalImage ? (
-                          <img
-                            src={event.image_url}
-                            alt={event.title}
-                            className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                            loading="lazy"
-                            decoding="async"
-                          />
-                        ) : (
-                          <Image
-                            src={event.image_url}
-                            alt={event.title}
-                            fill
-                            quality={75}
-                            sizes="(max-width: 768px) 50vw, 25vw"
-                            className="object-cover group-hover:scale-105 transition-transform duration-700"
-                            loading="lazy"
-                          />
-                        )
-                      ) : (
-                        <div className="absolute inset-0 flex items-center justify-center bg-[#1b1b1f]">
-                          <span className="font-serif italic text-white/35 text-sm">Artwork Pending</span>
+                      {style === 'community' && <span className="free">Free</span>}
+                      {event.image_url && (
+                        <div className="card-img">
+                          {style === 'bcc' && <span className="rec"><i></i>REC</span>}
+                          {isExternalImage ? (
+                            <img src={event.image_url} alt="" loading="lazy" decoding="async" />
+                          ) : (
+                            <Image src={event.image_url} alt="" fill quality={75} sizes="(max-width: 768px) 100vw, 33vw" style={{ objectFit: 'cover' }} />
+                          )}
                         </div>
                       )}
-
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/15 to-transparent"></div>
-
-                      <div className="absolute bottom-0 left-0 right-0 p-3.5 md:p-4">
-                        <h3 className="font-serif text-base md:text-xl text-white leading-tight mb-1 line-clamp-2">{event.title}</h3>
-                        {event.location_main && (
-                          <span className="font-sans text-[8.5px] md:text-[10px] uppercase tracking-widest text-white/75 flex items-center gap-1">
-                            <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                            <span className="truncate">{event.location_main}</span>
-                          </span>
-                        )}
+                      <div className="card-body">
+                        <span className="format">{formatLabel(style)}</span>
+                        <span className="name">{event.title}</span>
+                        {shortDesc(event) && <p className="desc">{shortDesc(event)}</p>}
+                        <dl className="meta">
+                          <dt>Date</dt><dt>Price</dt>
+                          <dd>{event.date || 'TBA'}</dd>
+                          <dd>{hasOld && <span className="old">₹{event.original_price}</span>}{priceText(event)}</dd>
+                        </dl>
+                        {event.status && <span className="status">{event.status}</span>}
+                        <span className="cta">{isSoldOut ? 'Sold out' : (event.button_text || 'View event')}</span>
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
-
-              <div className="text-center mt-10 md:mt-12">
-                <button
-                  onClick={() => setShowFullView(true)}
-                  className="inline-flex items-center gap-3 border border-white/15 bg-transparent text-white font-sans text-[10px] md:text-xs uppercase tracking-[0.28em] font-bold py-3.5 px-9 md:py-4 md:px-10 rounded-full hover:bg-white hover:text-[#0A0A0B] active:scale-95 transition-all duration-500"
-                >
-                  View More
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
-                </button>
-              </div>
-            </>
-          ) : (
-            /* ---------- FULL DETAILED VIEW ---------- */
-            <>
-              <div className="space-y-10 md:space-y-16">
-                {events.slice(0, 3).map((event) => {
-                  const isExpanded = expandedCards[event.id];
-                  const desc = event.description || "";
-                  const isLongDesc = desc.length > 120;
-                  const displayDesc = isExpanded ? desc : (isLongDesc ? desc.slice(0, 120) + '...' : desc);
-                  const isSoldOut = event.status && (event.status.toLowerCase().includes('sold') || event.status.toLowerCase().includes('closed'));
-                  const isExternalImage = event.image_url && event.image_url.startsWith('http');
-
-                  return (
-                    <div key={event.id} ref={setRef} onClick={() => handleCardClick(event.id)}
-                      className="cursor-pointer reveal glass-card rounded-[1.75rem] md:rounded-[2rem] overflow-hidden shadow-2xl shadow-black/40 flex flex-col md:flex-row group hover:-translate-y-1.5 transition-all duration-500">
-
-                      {/* Event Card Image */}
-                      <div className="w-full md:w-2/5 relative h-56 md:h-auto min-h-[14rem] overflow-hidden bg-[#161412]">
-                        {event.image_url ? (
-                          isExternalImage ? (
-                            <img
-                              src={event.image_url}
-                              className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000"
-                              alt={event.title}
-                              loading="lazy"
-                              decoding="async"
-                            />
-                          ) : (
-                            <Image
-                              src={event.image_url}
-                              alt={event.title}
-                              fill
-                              quality={75}
-                              sizes="(max-width: 768px) 100vw, 40vw"
-                              className="object-cover group-hover:scale-105 transition-transform duration-1000"
-                              loading="lazy"
-                            />
-                          )
-                        ) : (
-                          <div className="absolute inset-0 flex items-center justify-center bg-[#1b1b1f]">
-                            <span className="font-serif italic text-white/35 text-sm">Artwork Pending</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="w-full md:w-3/5 p-6 md:p-10 flex flex-col">
-                        <span className="font-sans text-[10px] uppercase tracking-[0.35em] text-[#FF2D78] mb-2 font-bold">{event.id}</span>
-                        <h3 className="font-serif text-2xl md:text-4xl text-white mb-2">{event.title}</h3>
-                        <p className="font-serif italic text-base md:text-xl text-white/55 mb-5 md:mb-6">{event.tagline}</p>
-
-                        <div className="mb-6 md:mb-8">
-                          <p className="font-sans text-[13.5px] md:text-base text-white/70 leading-relaxed">
-                            {displayDesc}
-                            {isLongDesc && (
-                              <button onClick={(e) => toggleExpand(e, event.id)} className="ml-2 font-bold text-[#FF2D78] text-[10px] uppercase tracking-widest hover:text-white transition-colors">
-                                {isExpanded ? "See Less" : "See More"}
-                              </button>
-                            )}
-                          </p>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-y-5 gap-x-4 mb-6 md:mb-8">
-                          <div>
-                            <span className="font-sans text-[9px] md:text-[10px] uppercase tracking-[0.18em] text-white/45 mb-1.5 font-semibold flex items-center gap-1.5">
-                              <svg className="w-3.5 h-3.5 text-[#4DA3FF]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                              When
-                            </span>
-                            <span className="font-serif text-base md:text-lg text-white leading-tight block">{event.date}<br/><span className="text-sm italic text-white/45">{event.time}</span></span>
-                          </div>
-                          <div>
-                            <span className="font-sans text-[9px] md:text-[10px] uppercase tracking-[0.18em] text-white/45 mb-1.5 font-semibold flex items-center gap-1.5">
-                              <svg className="w-3.5 h-3.5 text-[#FF2D78]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                              Where
-                            </span>
-                            <span className="font-serif text-base md:text-lg text-white leading-tight block">{event.location_main}<br/><span className="text-sm italic text-white/45">{event.location_sub}</span></span>
-                          </div>
-                          <div>
-                            <span className="font-sans text-[9px] md:text-[10px] uppercase tracking-[0.18em] text-white/45 mb-1.5 font-semibold flex items-center gap-1.5">
-                              <svg className="w-3.5 h-3.5 text-[#FF2D78]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path></svg>
-                              Provided
-                            </span>
-                            <span className="font-serif text-sm md:text-base text-white leading-tight block line-clamp-2">{event.provided}</span>
-                          </div>
-                          <div>
-                            <span className="font-sans text-[9px] md:text-[10px] uppercase tracking-[0.18em] text-white/45 mb-1.5 font-semibold flex items-center gap-1.5">
-                              <svg className="w-3.5 h-3.5 text-[#FFB84D]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
-                              To Bring
-                            </span>
-                            <span className="font-serif text-sm md:text-base text-white leading-tight block line-clamp-2">{event.bring}</span>
-                          </div>
-                        </div>
-
-                        <div className="mt-auto pt-5 md:pt-6 border-t border-white/[0.08] flex items-center justify-between gap-3">
-                          <div className="flex flex-col gap-1">
-                            <span className={`font-sans text-[9.5px] md:text-[11px] uppercase tracking-widest font-bold flex items-center gap-2 ${isSoldOut ? 'text-white/40' : 'text-[#FF2D78]'}`}>
-                              <span className={`w-1.5 h-1.5 rounded-full ${isSoldOut ? 'bg-white/40' : 'bg-[#FF2D78] animate-pulse'}`}></span>
-                              {event.status || 'Check Availability'}
-                            </span>
-                            <div className="font-serif text-lg md:text-xl text-white flex items-center gap-2">
-                              {event.original_price && event.original_price.trim() !== '' && (
-                                <span className="text-white/40 line-through text-sm md:text-base">₹{event.original_price}</span>
-                              )}
-                              <span>₹{event.price || '999'}</span>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-3">
-                            <span className="hidden sm:block font-sans text-[10px] uppercase tracking-widest text-white font-bold group-hover:text-[#FF2D78] transition-colors">
-                              {event.button_text || 'View Details'}
-                            </span>
-                            <div className="w-10 h-10 rounded-full bg-white text-[#0A0A0B] flex items-center justify-center group-hover:bg-[#FF2D78] group-hover:text-white transition-colors shadow-md shrink-0">
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {events.length > 3 && (
-                <div className="text-center mt-14 md:mt-16 reveal animate-fade-in-up" ref={setRef}>
-                  <Link href="/event" className="inline-block border border-white/15 bg-transparent text-white font-sans text-[10px] md:text-xs uppercase tracking-[0.28em] font-bold py-3.5 px-9 md:py-4 md:px-10 rounded-full hover:bg-white hover:text-[#0A0A0B] transition-all duration-500">
-                    View All Gatherings
-                  </Link>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </section>
-
-      {/* Picture Gallery Section */}
-      {galleryImages.length > 0 && (
-        <section className="py-16 md:py-24 relative z-10 overflow-hidden">
-          <div ref={setRef} className="max-w-6xl mx-auto px-4 mb-7 md:mb-12 text-center reveal">
-            <h2 className="font-serif text-3xl md:text-5xl font-light text-white">Nights We Remember</h2>
-            <span className="font-sans text-[10px] uppercase tracking-[0.3em] text-white/35 block mt-3 hidden md:block">Scroll →</span>
-          </div>
-
-          <div className="flex gap-3.5 md:gap-4 overflow-x-auto pb-8 snap-x snap-mandatory hide-scrollbar px-4 md:px-8">
-            {galleryImages.map((filename, index) => (
-              <div
-                key={index}
-                className="snap-center shrink-0 w-[230px] md:w-[350px] lg:w-[400px] h-[290px] md:h-[450px] relative rounded-3xl overflow-hidden shadow-xl border border-white/[0.08] group bg-white/[0.03]"
-              >
-                <Image
-                  src={`/images/home/${filename}`}
-                  alt={`3AM Ideas Gathering - ${filename}`}
-                  fill
-                  quality={85}
-                  sizes="(max-width: 768px) 230px, (max-width: 1024px) 350px, 400px"
-                  className="object-cover group-hover:scale-105 transition-transform duration-1000"
-                />
-              </div>
-            ))}
+            )}
           </div>
         </section>
-      )}
 
-      {/* What is 3AM Ideas Section */}
-      <section id="about-section" className="py-16 md:py-24 px-4 md:px-6 relative z-10">
-        <div className="max-w-3xl mx-auto text-center reveal" ref={setRef}>
-          <h2 className="font-serif text-3xl md:text-5xl font-light text-white mb-8 md:mb-10">What is 3AM Ideas?</h2>
-
-          <div className="space-y-5 md:space-y-6 font-serif text-lg md:text-2xl text-white/60 font-light leading-relaxed px-2">
-            <p className="font-sans text-[11px] md:text-[12px] uppercase tracking-[0.35em] text-[#FF2D78] font-bold">Creation · Curation · Connection</p>
-            <p className="text-white font-medium">A third place for people who'd rather live it than watch it.</p>
-            <p>
-              We build small, curated rooms where creative chaos is welcome<br className="hidden md:block" />
-              and the vibe is checked at the door — so it stays safe to be loud,<br className="hidden md:block" />
-              weird, and fully yourself.
-            </p>
-            <p className="italic text-white">The formats change. The feeling doesn't.</p>
-
-            <div className="pt-8 md:pt-10 flex flex-col sm:flex-row items-center justify-center gap-3.5 sm:gap-6">
-              <Link href="/event" className="w-full sm:w-auto inline-block bg-[#FF2D78] text-white font-sans text-[10px] md:text-xs uppercase tracking-[0.28em] font-bold py-3.5 px-8 md:py-4 md:px-10 rounded-full hover:bg-white hover:text-[#0A0A0B] transition-all duration-500 shadow-lg shadow-[#FF2D78]/20">
-                Check Availability
-              </Link>
-              <a href="https://chat.whatsapp.com/B68V6Q62HZPHHsGMG0t4jP" target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 border border-[#25D366]/35 bg-[#25D366]/[0.08] text-[#25D366] font-sans text-[10px] md:text-xs uppercase tracking-[0.28em] font-bold py-3.5 px-8 md:py-4 md:px-10 rounded-full hover:bg-[#25D366] hover:text-white transition-all duration-500">
-                <svg className="w-4 h-4 md:w-5 md:h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12.031 0C5.385 0 0 5.385 0 12.031c0 2.115.552 4.148 1.597 5.952L.15 23.473l5.65-1.48c1.745.962 3.712 1.472 5.755 1.472h.004c6.645 0 12.03-5.384 12.03-12.03S18.676 0 12.031 0zm0 21.492c-1.782 0-3.535-.48-5.076-1.385l-.364-.216-3.766.988.997-3.67-.238-.376A9.972 9.972 0 012.052 12.03c0-5.503 4.478-9.98 9.983-9.98 2.668 0 5.176 1.04 7.062 2.927a9.92 9.92 0 012.924 7.054c0 5.503-4.478 9.98-9.98 9.98zm5.474-7.48c-.3-.15-1.776-.877-2.05-.978-.276-.1-.476-.15-.677.15-.2.3-.775.978-.95 1.178-.175.2-.35.225-.65.075-.3-.15-1.267-.468-2.414-1.488-.89-.79-1.49-1.767-1.665-2.067-.175-.3-.018-.462.132-.612.135-.135.3-.35.45-.525.15-.175.2-.3.3-.5.1-.2.05-.375-.025-.525-.075-.15-.676-1.626-.926-2.226-.244-.585-.49-.505-.677-.515-.175-.01-.375-.01-.575-.01-.2 0-.525.075-.8.375-.275.3-1.05 1.025-1.05 2.5s1.075 2.9 1.225 3.1c.15.2 2.112 3.226 5.112 4.526.715.31 1.272.494 1.706.632.716.228 1.368.196 1.884.118.577-.087 1.775-.726 2.025-1.426.25-.7.25-1.3.175-1.426-.075-.125-.275-.2-.575-.35z"></path>
-                </svg>
-                Join Community
-              </a>
-            </div>
+        {/* About + values */}
+        <section id="about-section" className="wrap about reveal" ref={setRef}>
+          <h2 className="h2">What is 3 AM?</h2>
+          <div id="values">
+            <p>Every event starts as an idea that sounds ridiculous at 3am. Instead of dropping it, we make it happen. Small, vibe-checked rooms where it's safe to be loud, weird and fully yourself.</p>
+            <p>Not networking. Not workshops. You come for the activity and leave with people you actually keep.</p>
+            <ul className="formats">
+              <li><strong>3 AM Community</strong><span>Free meetups. The easiest way in.</span></li>
+              <li><strong>One Day Crew</strong><span>Teams, a challenge, a deadline. You run it.</span></li>
+              <li><strong>Broken Camera Crew</strong><span>Our signature one-day filmmaking chaos.</span></li>
+              <li><strong>Creative experiences</strong><span>Deeper, hands-on sessions.</span></li>
+            </ul>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Unified Footer */}
-      <footer className="py-16 md:py-20 text-center relative z-10 border-t border-white/[0.08] flex flex-col items-center px-4">
-        <div className="w-36 h-11 relative mb-6">
-          <Image
-            src="/images/white_logo.png"
-            alt="3AM Ideas Logo"
-            fill
-            className="object-contain opacity-75"
-          />
-        </div>
-        <p className="font-serif italic text-white/55 text-xl md:text-2xl mb-7 px-4">Some ideas are too good to sleep on.</p>
+        {/* Gallery */}
+        {galleryImages.length > 0 && (
+          <section className="proof">
+            <div className="wrap proof-head reveal" ref={setRef}>
+              <h2 className="h2">Nights we remember</h2>
+            </div>
+            <div className="strip">
+              {galleryImages.map((filename, index) => (
+                <div key={index} className="shot">
+                  <Image
+                    src={`/images/home/${filename}`}
+                    alt={`3AM Ideas event photo ${index + 1}`}
+                    fill
+                    quality={80}
+                    sizes="(max-width: 768px) 72vw, 340px"
+                    style={{ objectFit: 'cover' }}
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
-        <div className="flex flex-wrap justify-center items-center gap-3.5 sm:gap-6 mb-6">
-          <Link href="/about" className="font-sans text-[10px] text-white/45 tracking-widest uppercase font-bold hover:text-[#FF2D78] transition-colors py-2">About Us</Link>
-          <span className="w-1 h-1 rounded-full bg-white/15"></span>
-          <Link href="/terms" className="font-sans text-[10px] text-white/45 tracking-widest uppercase font-bold hover:text-[#FF2D78] transition-colors py-2">Terms & Conditions</Link>
-          <span className="w-1 h-1 rounded-full bg-white/15"></span>
-          <a href="mailto:wearemusawwir@gmail.com" className="font-sans text-[10px] text-white/45 tracking-widest uppercase font-bold hover:text-[#FF2D78] transition-colors py-2">Contact</a>
-        </div>
+        {/* Join */}
+        <section className="wrap join reveal" ref={setRef}>
+          <div>
+            <h2 className="h2">Hear about the next one first</h2>
+            <p>The full calendar drops on the 1st of every month. The WhatsApp community gets it before anyone else.</p>
+          </div>
+          <div className="btns">
+            <a className="btn wa" href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer">Join on WhatsApp</a>
+            <Link className="btn pink" href="/event">See all events</Link>
+          </div>
+        </section>
+      </main>
 
-        <p className="font-sans text-[9px] text-white/25 uppercase tracking-widest">© {new Date().getFullYear()} 3AM Ideas. All rights reserved.</p>
+      <footer>
+        <div className="wrap bar">
+          <div>
+            <Image src="/images/white_logo.png" alt="3AM Ideas" width={120} height={30} style={{ height: 26, width: 'auto' }} />
+            <small>© {new Date().getFullYear()} 3AM Ideas, Bangalore</small>
+          </div>
+          <nav>
+            <Link href="/about">About</Link>
+            <Link href="/terms">Terms & Conditions</Link>
+            <a href="mailto:wearemusawwir@gmail.com">Contact</a>
+          </nav>
+        </div>
       </footer>
+
+      {/* Mobile: sticky CTA once the user scrolls past the events */}
+      <a href="#event" className={`mcta ${lastScrollY > 900 && !isNavVisible ? '' : 'off'}`}>See {month}'s events</a>
     </div>
   );
 }
