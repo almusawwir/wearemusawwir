@@ -395,4 +395,58 @@ export default function App() {
             <ul className="formats">
               <li><strong>3 AM Community</strong><span>Free meetups. The easiest way in.</span></li>
               <li><strong>One Day Crew</strong><span>Teams, a challenge, a deadline. You run it.</span></li>
-              <li><strong>Broken Camera
+              <li><strong>Broken Camera Crew</strong><span>Our signature one-day filmmaking chaos.</span></li>
+              <li><strong>Creative experiences</strong><span>Deeper, hands-on sessions.</span></li>
+            </ul>
+          </div>
+        </section>
+
+        {/* Gallery */}
+        {galleryImages.length > 0 && (
+          <section className="proof">
+            <div className="wrap proof-head reveal" ref={setRef}>
+              <h2 className="h2">Nights we remember</h2>
+            </div>
+            <div className="strip">
+              {galleryImages.map((filename, index) => (
+                <div key={index} className="shot">
+                  <Image src={`/images/home/${filename}`} alt={`3AM Ideas event photo ${index + 1}`} fill quality={80}
+                         sizes="(max-width: 820px) 70vw, 340px" style={{ objectFit: 'cover' }} />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Join */}
+        <section className="wrap join reveal" ref={setRef}>
+          <div>
+            <h2 className="h2">Hear about the next one first</h2>
+            <p>The full calendar drops on the 1st of every month. The WhatsApp community gets it before anyone else.</p>
+          </div>
+          <div className="btns">
+            <a className="btn wa" href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer">Join on WhatsApp</a>
+            <Link className="btn pink" href="/event">See all events</Link>
+          </div>
+        </section>
+      </main>
+
+      <footer>
+        <div className="wrap bar">
+          <div>
+            <Image src="/images/white_logo.png" alt="3AM Ideas" width={120} height={30} style={{ height: 24, width: 'auto' }} />
+            <small>© {new Date().getFullYear()} 3AM Ideas, Bangalore</small>
+          </div>
+          <nav>
+            <Link href="/about">About</Link>
+            <Link href="/terms">Terms & Conditions</Link>
+            <a href="mailto:wearemusawwir@gmail.com">Contact</a>
+          </nav>
+        </div>
+      </footer>
+
+      {/* Mobile sticky CTA */}
+      <a href="#event" className={`mcta ${lastScrollY > 900 && !isNavVisible ? '' : 'off'}`}>See {month}'s events</a>
+    </div>
+  );
+}
