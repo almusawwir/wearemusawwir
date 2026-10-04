@@ -145,10 +145,6 @@ export default function App() {
     return () => observer.disconnect();
   }, [isLoading, events, galleryImages]);
 
-  /* FIX 6: scroll handler is throttled to one computation per animation frame
-     via requestAnimationFrame, and each piece of state is only set when its
-     value actually flips — not on every pixel of scroll. This is the fix for
-     the "hundreds of re-renders per second" issue. */
   useEffect(() => {
     let ticking = false;
     let prevY = window.scrollY;
@@ -199,37 +195,39 @@ export default function App() {
     <div className="tam">
       <style dangerouslySetInnerHTML={{ __html: `
         @import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Instrument+Sans:wght@400;500;600&display=swap');
+
+        html,body{margin:0;padding:0;width:100%;max-width:100%}
         .tam{
           --pink:#FF0065; --pink-soft:#FFE3EE; --black:#000; --white:#fff; --grey:#5c5c5c;
           --display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
           --body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
           font-family:var(--body); background:var(--white); color:var(--black);
-          line-height:1.55; font-size:17px; overflow-x:hidden; min-height:100vh;
+          line-height:1.55; font-size:17px; width:100%; max-width:100vw; overflow-x:hidden; min-height:100vh;
         }
         html{scroll-behavior:smooth}
         .tam *{box-sizing:border-box}
         .tam a{color:inherit}
         .tam .brand{color:var(--pink)}
         .tam :focus-visible{outline:3px solid var(--pink);outline-offset:3px}
-        .tam .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+        .tam .wrap{max-width:1180px;margin:0 auto;padding:0 24px;width:100%}
         .tam .reveal{opacity:0;transform:translateY(24px);transition:opacity .8s cubic-bezier(.16,1,.3,1),transform .8s cubic-bezier(.16,1,.3,1)}
         .tam .reveal.active{opacity:1;transform:none}
 
         /* Header */
         .tam .top{position:sticky;top:0;z-index:60;background:var(--black);color:var(--white);padding-top:env(safe-area-inset-top,0px);transition:transform .35s ease}
         .tam .top.hidden{transform:translateY(-100%)}
-        .tam .bar{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px 0;min-height:64px}
-        .tam .navlinks{display:flex;align-items:center;gap:22px;font-size:16px;font-weight:500}
-        .tam .navlinks a{text-decoration:none;opacity:.85;padding:8px 2px;display:inline-block}
+        .tam .bar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 0;min-height:64px}
+        .tam .navlinks{display:flex;align-items:center;gap:20px;font-size:16px;font-weight:500;flex:0 0 auto}
+        .tam .navlinks a{text-decoration:none;opacity:.85;padding:8px 2px;display:inline-block;white-space:nowrap}
         .tam .navlinks a:hover{opacity:1;color:var(--pink)}
         .tam .clock{font-size:13px;color:#bdbdbd;margin:0}
         .tam .clock b{color:var(--white);font-weight:600}
 
-        /* Hero — FIX 4: no logo here, nav already has it */
-        .tam .hero{padding:40px 0 8px;text-align:left}
+        /* Hero — centered */
+        .tam .hero{padding:44px 0 8px;text-align:center;display:flex;flex-direction:column;align-items:center}
         .tam .tagline{font-weight:500;color:var(--pink);font-size:16px;margin:0}
-        .tam h1{font-family:var(--display);font-weight:900;font-size:clamp(44px,11vw,150px);line-height:.9;letter-spacing:-.5px;margin:10px 0 18px}
-        .tam .lede{max-width:56ch;font-size:17px;color:#222;margin:0}
+        .tam h1{font-family:var(--display);font-weight:900;font-size:clamp(40px,11vw,150px);line-height:.92;letter-spacing:-.5px;margin:10px 0 18px}
+        .tam .lede{max-width:56ch;font-size:17px;color:#222;margin:0 auto}
 
         /* Event grid */
         .tam .events{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;padding:28px 0 72px}
@@ -238,7 +236,6 @@ export default function App() {
         .tam .format{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px}
         .tam .dot{width:8px;height:8px;border-radius:50%;background:var(--pink);animation:tampulse 1.2s infinite}
         @keyframes tampulse{50%{opacity:.25}}
-        /* FIX 5: line-height was .95 (too tight for 2-line titles), now 1.15 */
         .tam .name{font-family:var(--display);font-weight:900;font-size:36px;line-height:1.15;margin:8px 0 8px;word-break:break-word}
         .tam .desc{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font-size:14.5px;opacity:.85;margin-bottom:auto}
         .tam .meta{display:flex;justify-content:space-between;gap:10px;margin:18px 0 14px;font-size:14px}
@@ -259,40 +256,35 @@ export default function App() {
         .tam .free{position:absolute;top:12px;right:12px;font-family:var(--display);font-weight:900;font-size:24px;line-height:1.2;color:var(--pink);background:var(--white);transform:rotate(6deg);border:3px solid var(--pink);padding:0 8px}
         .tam .soldout{opacity:.55}
         .tam .soldout .cta{background:transparent !important;color:inherit !important;border-color:currentColor !important}
-        .tam .state{padding:40px 0 80px;font-size:17px;color:var(--grey)}
+        .tam .state{padding:40px 0 80px;font-size:17px;color:var(--grey);text-align:center}
 
         @media (hover:hover){
           .tam .card:hover{transform:translate(-3px,-3px);box-shadow:6px 6px 0 var(--black)}
           .tam .bcc:hover{box-shadow:6px 6px 0 var(--pink)}
         }
 
-        /* About */
+        /* About + formats (now holds the longer copy, tap-to-expand) */
         .tam .about{border-top:2px solid var(--black);padding:60px 0;display:grid;grid-template-columns:1fr 1.3fr;gap:48px}
         .tam .h2{font-family:var(--display);font-weight:900;font-size:clamp(34px,6vw,72px);line-height:.92;margin:0}
         .tam .about p{max-width:60ch;margin:0 0 14px;font-size:16px}
-        .tam .formats{list-style:none;margin:20px 0 0;padding:0;border-top:1px solid var(--black)}
-        .tam .formats li{display:grid;grid-template-columns:200px 1fr;gap:12px;padding:12px 0;border-bottom:1px solid var(--black);font-size:16px}
-        .tam .formats strong{font-weight:600}
+        .tam .formats{margin:24px 0 0;border-top:1px solid var(--black)}
+        .tam .fmt{border-bottom:1px solid var(--black)}
+        .tam .fmt.plain{display:grid;grid-template-columns:200px 1fr;gap:12px;padding:16px 4px;font-size:16px}
+        .tam .fmt.plain strong{font-weight:600}
+        .tam .fmt > summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px 4px;font-size:16px}
+        .tam .fmt > summary::-webkit-details-marker{display:none}
+        .tam .fmt > summary strong{font-weight:600;margin-right:6px}
+        .tam .fmt .plus{flex:0 0 auto;font-size:22px;font-weight:400;line-height:1;transition:transform .25s ease}
+        .tam .fmt[open] .plus{transform:rotate(45deg)}
+        .tam .fmt-body{padding:0 4px 20px;font-size:15.5px;max-width:64ch}
+        .tam .fmt-body p{margin:0 0 12px}
 
-        /* Learn more accordion — FIX 2: the question text + "?" live in one
-           span, the "+" in a second span, so space-between only ever sees
-           two flex children instead of treating loose text as its own item. */
-        .tam .learn{border-top:2px solid var(--black);padding:56px 0}
-        .tam .acc{border-bottom:1px solid var(--black)}
-        .tam .acc:first-of-type{border-top:1px solid var(--black)}
-        .tam .acc summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:20px 4px;font-family:var(--display);font-weight:900;font-size:24px}
-        .tam .acc summary::-webkit-details-marker{display:none}
-        .tam .acc summary .plus{flex:0 0 auto;font-size:28px;font-weight:400;transition:transform .25s ease}
-        .tam .acc[open] summary .plus{transform:rotate(45deg)}
-        .tam .acc-body{padding:0 4px 24px;font-size:16px;max-width:68ch}
-        .tam .acc-body p{margin:0 0 14px}
-
-        /* Gallery */
-        .tam .proof{background:var(--black);color:var(--white);padding:56px 0}
+        /* Gallery — now white, not black */
+        .tam .proof{background:var(--white);color:var(--black);border-top:2px solid var(--black);padding:56px 0}
         .tam .proof-head{margin-bottom:24px}
         .tam .strip{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:0 24px 8px;scrollbar-width:none}
         .tam .strip::-webkit-scrollbar{display:none}
-        .tam .shot{position:relative;flex:0 0 auto;width:min(70vw,340px);aspect-ratio:4/5;scroll-snap-align:center;background:#1f1f1f;overflow:hidden}
+        .tam .shot{position:relative;flex:0 0 auto;width:min(70vw,340px);aspect-ratio:4/5;scroll-snap-align:center;background:#eee;overflow:hidden;border:2px solid var(--black)}
 
         /* Join */
         .tam .join{padding:56px 0;display:flex;justify-content:space-between;align-items:center;gap:24px;flex-wrap:wrap}
@@ -302,8 +294,7 @@ export default function App() {
         .tam .btn.pink{background:var(--pink);border-color:var(--pink);color:var(--white)}
         .tam .btn.wa{background:var(--black);border-color:var(--black);color:var(--white)}
 
-        /* Footer — FIX 3: extra bottom padding so the sticky mobile CTA
-           never sits on top of the footer links */
+        /* Footer */
         .tam footer{background:var(--black);color:var(--white);padding:32px 0 calc(90px + env(safe-area-inset-bottom,0px))}
         .tam footer .bar{flex-wrap:wrap;align-items:flex-start;min-height:auto}
         .tam footer nav{display:flex;gap:20px;flex-wrap:wrap;font-size:15px}
@@ -314,18 +305,16 @@ export default function App() {
 
         /* Mobile */
         @media (max-width:820px){
-          .tam .wrap{padding:0 18px}
+          .tam .wrap{padding:0 20px}
           .tam .clock{display:none}
-          .tam .bar{padding:14px 0;min-height:60px}
-          .tam .navlinks{gap:18px;font-size:15px}
+          .tam .bar{padding:14px 0;min-height:60px;gap:10px}
+          .tam .navlinks{gap:16px;font-size:14.5px}
 
-          .tam .hero{padding:28px 0 4px}
+          .tam .hero{padding:32px 0 6px}
           .tam .tagline{font-size:14.5px}
           .tam .lede{font-size:15.5px;line-height:1.55}
 
           .tam .events{grid-template-columns:repeat(2,1fr);gap:14px;padding:22px 0 52px}
-          /* FIX 1: padding-top clears the absolute "Coming soon"/"Free" badge
-             so it never sits on top of the format label text below it */
           .tam .card-body{padding:16px;padding-top:40px;min-height:200px}
           .tam .format{font-size:12px}
           .tam .name{font-size:22px;margin:8px 0 6px}
@@ -339,14 +328,12 @@ export default function App() {
 
           .tam .about{grid-template-columns:1fr;gap:20px;padding:44px 0}
           .tam .about p{font-size:15.5px}
-          .tam .formats li{grid-template-columns:1fr;gap:3px;font-size:15px;padding:14px 0}
-
-          .tam .learn{padding:44px 0}
-          .tam .acc summary{font-size:19px;padding:18px 2px}
-          .tam .acc-body{font-size:15px;padding:0 2px 20px}
+          .tam .fmt.plain{grid-template-columns:1fr;gap:3px;font-size:15px;padding:14px 4px}
+          .tam .fmt > summary{font-size:15px;padding:14px 4px}
+          .tam .fmt-body{font-size:15px;padding:0 4px 18px}
 
           .tam .proof{padding:44px 0}
-          .tam .strip{padding:0 18px 8px}
+          .tam .strip{padding:0 20px 8px}
 
           .tam .join{padding:44px 0 112px;flex-direction:column;align-items:flex-start}
           .tam .btns{width:100%}
@@ -354,14 +341,18 @@ export default function App() {
 
           .tam footer nav{gap:16px;margin-top:16px}
 
-          .tam .mcta{display:block;position:fixed;left:18px;right:18px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:60;
+          .tam .mcta{display:block;position:fixed;left:20px;right:20px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:60;
             text-align:center;background:var(--pink);color:var(--white);font-weight:600;font-size:15px;padding:15px;text-decoration:none;border:2px solid var(--black);
             box-shadow:4px 4px 0 var(--black);transition:transform .3s ease, opacity .3s ease}
           .tam .mcta.off{transform:translateY(140%);opacity:0;pointer-events:none}
         }
 
+        @media (max-width:380px){
+          .tam .navlinks{gap:12px;font-size:13.5px}
+        }
+
         @media (max-width:360px){
-          .tam .wrap{padding:0 14px}
+          .tam .wrap{padding:0 16px}
           .tam .events{gap:10px}
           .tam .name{font-size:19px}
           .tam .card-body{padding:12px;padding-top:36px}
@@ -377,7 +368,7 @@ export default function App() {
       <header className={`top ${isNavVisible ? '' : 'hidden'}`}>
         <div className="wrap bar">
           <Link href="/" aria-label="3 AM Ideas home" style={{ display: 'flex', alignItems: 'center' }}>
-            <Image src="/images/white_logo.png" alt="3 AM Ideas" width={130} height={32} priority style={{ height: 30, width: 'auto' }} />
+            <Image src="/images/white_logo.png" alt="3 AM Ideas" width={130} height={32} priority style={{ height: 28, width: 'auto' }} />
           </Link>
           {clock && (
             <p className="clock">
@@ -394,7 +385,6 @@ export default function App() {
       </header>
 
       <main>
-        {/* FIX 4: logo removed from here — it's already in the sticky nav above */}
         <section className="wrap hero">
           <p className="tagline">Some ideas are too good to sleep on.</p>
           <h1>{month} at <span className="brand">3 AM</span></h1>
@@ -454,51 +444,40 @@ export default function App() {
           </div>
         </section>
 
+        {/* What is 3 AM — full copy, plus tap-to-expand rows for BCC and Community */}
         <section id="about-section" className="wrap about reveal" ref={setRef}>
           <h2 className="h2">What is <span className="brand">3 AM</span>?</h2>
           <div id="values">
-            <p>Every event starts as an idea that sounds ridiculous at 3am. Instead of dropping it, we make it happen. Small, vibe-checked rooms where it's safe to be loud, weird and fully yourself.</p>
-            <p>Not networking. Not workshops. You come for the activity and leave with people you actually keep.</p>
-            <ul className="formats">
-              <li><strong>3 AM Community</strong><span>Free meetups. The easiest way in.</span></li>
-              <li><strong>One Day Crew</strong><span>Teams, a challenge, a deadline. You run it.</span></li>
-              <li><strong>Broken Camera Crew</strong><span>Our signature one-day filmmaking chaos.</span></li>
-              <li><strong>Creative experiences</strong><span>Deeper, hands-on sessions.</span></li>
-            </ul>
-          </div>
-        </section>
+            {ABOUT_COPY.map((p, i) => <p key={i}><Pink3AM text={p} /></p>)}
 
-        {/* FIX 2: each summary wraps its question text + "?" in one span,
-            and the "+" in its own span, so space-between has exactly two
-            children instead of splitting on every loose text node */}
-        <section className="wrap learn reveal" ref={setRef}>
-          <details className="acc">
-            <summary>
-              <span>What is <span className="brand">3 AM</span>?</span>
-              <span className="plus">+</span>
-            </summary>
-            <div className="acc-body">{ABOUT_COPY.map((p, i) => <p key={i}><Pink3AM text={p} /></p>)}</div>
-          </details>
-          <details className="acc">
-            <summary>
-              <span>What is Broken Camera Crew?</span>
-              <span className="plus">+</span>
-            </summary>
-            <div className="acc-body">{BCC_COPY.map((p, i) => <p key={i}><Pink3AM text={p} /></p>)}</div>
-          </details>
-          <details className="acc">
-            <summary>
-              <span>What is the <span className="brand">3 AM</span> Community Event?</span>
-              <span className="plus">+</span>
-            </summary>
-            <div className="acc-body">{COMMUNITY_COPY.map((p, i) => <p key={i}><Pink3AM text={p} /></p>)}</div>
-          </details>
+            <div className="formats">
+              <details className="fmt">
+                <summary>
+                  <span><strong>3 AM Community</strong> — Free meetups. The easiest way in.</span>
+                  <span className="plus">+</span>
+                </summary>
+                <div className="fmt-body">{COMMUNITY_COPY.map((p, i) => <p key={i}><Pink3AM text={p} /></p>)}</div>
+              </details>
+
+              <div className="fmt plain"><strong>One Day Crew</strong><span>Teams, a challenge, a deadline. You run it.</span></div>
+
+              <details className="fmt">
+                <summary>
+                  <span><strong>Broken Camera Crew</strong> — Our signature one-day filmmaking chaos.</span>
+                  <span className="plus">+</span>
+                </summary>
+                <div className="fmt-body">{BCC_COPY.map((p, i) => <p key={i}><Pink3AM text={p} /></p>)}</div>
+              </details>
+
+              <div className="fmt plain"><strong>Creative experiences</strong><span>Deeper, hands-on sessions.</span></div>
+            </div>
+          </div>
         </section>
 
         {galleryImages.length > 0 && (
           <section className="proof">
             <div className="wrap proof-head reveal" ref={setRef}>
-              <h2 className="h2">Nights we remember</h2>
+              <h2 className="h2">A glimpse of the events</h2>
             </div>
             <div className="strip">
               {galleryImages.map((filename, index) => (
