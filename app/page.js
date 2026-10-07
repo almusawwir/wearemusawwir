@@ -9,11 +9,13 @@ const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSSCmEDqxpPn1O
 const WHATSAPP_URL = "https://chat.whatsapp.com/B68V6Q62HZPHHsGMG0t4jP";
 const TZ = "Asia/Kolkata";
 
+/* shortLabel = small line on the card. fullName = bold title for dummy cards
+   (real cards use the event's own title as the bold line instead). */
 const SLOTS = [
-  { style: 'bcc',       label: 'Broken Camera Crew',  dummyName: 'BCC',              dummyDesc: 'One-day filmmaking chaos. Next edition drops soon.' },
-  { style: 'odc',       label: 'One Day Crew',        dummyName: 'ODC',              dummyDesc: 'Teams, a challenge, a deadline. Next one drops soon.' },
-  { style: 'premium',   label: 'Creative experience', dummyName: 'Something new',    dummyDesc: 'A deeper, hands-on session. Details drop soon.' },
-  { style: 'community', label: '3 AM Community',      dummyName: 'Community meetup', dummyDesc: 'Free. Meet people, make something, grab lunch.' },
+  { style: 'bcc',       shortLabel: 'BCC',     fullName: 'Broken Camera Crew',   dummyDesc: 'One-day filmmaking chaos. Next edition drops soon.' },
+  { style: 'odc',       shortLabel: 'ODC',     fullName: 'One Day Crew',         dummyDesc: 'Teams, a challenge, a deadline. Next one drops soon.' },
+  { style: 'premium',   shortLabel: 'Premium', fullName: 'Creative experience',  dummyDesc: 'A deeper, hands-on session. Details drop soon.' },
+  { style: 'community', shortLabel: 'Free',    fullName: '3 AM Community',      dummyDesc: 'Free. Meet people, make something, grab lunch.' },
 ];
 
 function getStyle(event) {
@@ -29,10 +31,18 @@ function isFree(event) {
   const p = (event.price || '').toString().trim().toLowerCase();
   return p === '0' || p === 'free';
 }
+/* Always one short line: Free / From ₹price / TBA. No strikethrough — keeps card height predictable. */
 function priceText(event) {
   if (isFree(event)) return 'Free';
   const p = (event.price || '').toString().trim();
-  return p ? `₹${p}` : 'TBA';
+  return p ? `From ₹${p}` : 'TBA';
+}
+/* Day, date, month only — no year. Falls back to the raw sheet value if it can't be parsed. */
+function formatDate(raw) {
+  if (!raw || !raw.toString().trim()) return 'TBA';
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return raw.toString().trim();
+  return new Intl.DateTimeFormat('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: TZ }).format(d);
 }
 function shortDesc(event) {
   return (event.tagline || event.description || '').trim();
@@ -198,6 +208,7 @@ export default function App() {
 
         html,body{margin:0;padding:0;width:100%;max-width:100%}
         .tam{
+          min-width:0;
           --pink:#FF0065; --pink-soft:#FFE3EE; --black:#000; --white:#fff; --grey:#5c5c5c;
           --display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
           --body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -213,25 +224,25 @@ export default function App() {
         .tam .reveal{opacity:0;transform:translateY(24px);transition:opacity .8s cubic-bezier(.16,1,.3,1),transform .8s cubic-bezier(.16,1,.3,1)}
         .tam .reveal.active{opacity:1;transform:none}
 
-        /* Header */
+        /* Header — padding-top/bottom only, never touches .wrap's left/right padding */
         .tam .top{position:sticky;top:0;z-index:60;background:var(--black);color:var(--white);padding-top:env(safe-area-inset-top,0px);transition:transform .35s ease}
         .tam .top.hidden{transform:translateY(-100%)}
-        .tam .bar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 0;min-height:64px}
+        .tam .bar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-top:16px;padding-bottom:16px;min-height:64px}
         .tam .navlinks{display:flex;align-items:center;gap:20px;font-size:16px;font-weight:500;flex:0 0 auto}
         .tam .navlinks a{text-decoration:none;opacity:.85;padding:8px 2px;display:inline-block;white-space:nowrap}
         .tam .navlinks a:hover{opacity:1;color:var(--pink)}
         .tam .clock{font-size:13px;color:#bdbdbd;margin:0}
         .tam .clock b{color:var(--white);font-weight:600}
 
-        /* Hero — centered */
-        .tam .hero{padding:44px 0 8px;text-align:center;display:flex;flex-direction:column;align-items:center}
+        /* Hero — centered, padding-top/bottom only */
+        .tam .hero{padding-top:44px;padding-bottom:8px;text-align:center;display:flex;flex-direction:column;align-items:center}
         .tam .tagline{font-weight:500;color:var(--pink);font-size:16px;margin:0}
         .tam h1{font-family:var(--display);font-weight:900;font-size:clamp(40px,11vw,150px);line-height:.92;letter-spacing:-.5px;margin:10px 0 18px}
         .tam .lede{max-width:56ch;font-size:17px;color:#222;margin:0 auto}
 
         /* Event grid */
-        .tam .events{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;padding:28px 0 72px}
-        .tam .card{position:relative;display:flex;flex-direction:column;text-decoration:none;border:2px solid var(--black);background:var(--white);color:var(--black);transition:transform .15s ease, box-shadow .15s ease}
+        .tam .events{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;padding:28px 0 72px;align-items:stretch}
+        .tam .card{position:relative;display:flex;flex-direction:column;height:100%;text-decoration:none;border:2px solid var(--black);background:var(--white);color:var(--black);transition:transform .15s ease, box-shadow .15s ease}
         .tam .card-body{display:flex;flex-direction:column;flex:1;padding:20px;min-height:220px}
         .tam .format{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px}
         .tam .dot{width:8px;height:8px;border-radius:50%;background:var(--pink);animation:tampulse 1.2s infinite}
@@ -242,7 +253,6 @@ export default function App() {
         .tam .meta div{display:flex;flex-direction:column;gap:2px}
         .tam .meta span{opacity:.65;font-size:12.5px}
         .tam .meta b{font-weight:600}
-        .tam .meta .old{display:inline;text-decoration:line-through;opacity:.5;font-weight:400;margin-right:4px}
         .tam .status{font-size:13px;font-weight:600;margin-bottom:10px}
         .tam .cta{display:block;text-align:center;padding:12px;font-weight:600;font-size:14.5px;border:2px solid currentColor;min-height:44px}
         .tam .soon{position:absolute;top:12px;left:12px;font-size:12px;font-weight:600;padding:3px 9px;background:var(--white);color:var(--black);border:2px solid var(--black)}
@@ -263,8 +273,8 @@ export default function App() {
           .tam .bcc:hover{box-shadow:6px 6px 0 var(--pink)}
         }
 
-        /* About + formats (now holds the longer copy, tap-to-expand) */
-        .tam .about{border-top:2px solid var(--black);padding:60px 0;display:grid;grid-template-columns:1fr 1.3fr;gap:48px}
+        /* About + formats — padding-top/bottom only */
+        .tam .about{border-top:2px solid var(--black);padding-top:60px;padding-bottom:60px;display:grid;grid-template-columns:1fr 1.3fr;gap:48px}
         .tam .h2{font-family:var(--display);font-weight:900;font-size:clamp(34px,6vw,72px);line-height:.92;margin:0}
         .tam .about p{max-width:60ch;margin:0 0 14px;font-size:16px}
         .tam .formats{margin:24px 0 0;border-top:1px solid var(--black)}
@@ -279,22 +289,22 @@ export default function App() {
         .tam .fmt-body{padding:0 4px 20px;font-size:15.5px;max-width:64ch}
         .tam .fmt-body p{margin:0 0 12px}
 
-        /* Gallery — now white, not black */
+        /* Gallery — white background */
         .tam .proof{background:var(--white);color:var(--black);border-top:2px solid var(--black);padding:56px 0}
         .tam .proof-head{margin-bottom:24px}
         .tam .strip{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:0 24px 8px;scrollbar-width:none}
         .tam .strip::-webkit-scrollbar{display:none}
         .tam .shot{position:relative;flex:0 0 auto;width:min(70vw,340px);aspect-ratio:4/5;scroll-snap-align:center;background:#eee;overflow:hidden;border:2px solid var(--black)}
 
-        /* Join */
-        .tam .join{padding:56px 0;display:flex;justify-content:space-between;align-items:center;gap:24px;flex-wrap:wrap}
+        /* Join — padding-top/bottom only */
+        .tam .join{padding-top:56px;padding-bottom:56px;display:flex;justify-content:space-between;align-items:center;gap:24px;flex-wrap:wrap}
         .tam .join p{margin:10px 0 0;max-width:48ch}
         .tam .btns{display:flex;gap:12px;flex-wrap:nowrap}
         .tam .btn{flex:1 1 0;display:inline-block;padding:14px 16px;font-weight:600;font-size:15px;text-decoration:none;border:2px solid var(--black);text-align:center;white-space:nowrap}
         .tam .btn.pink{background:var(--pink);border-color:var(--pink);color:var(--white)}
         .tam .btn.wa{background:var(--black);border-color:var(--black);color:var(--white)}
 
-        /* Footer */
+        /* Footer — not combined with .wrap, safe as shorthand */
         .tam footer{background:var(--black);color:var(--white);padding:32px 0 calc(90px + env(safe-area-inset-bottom,0px))}
         .tam footer .bar{flex-wrap:wrap;align-items:flex-start;min-height:auto}
         .tam footer nav{display:flex;gap:20px;flex-wrap:wrap;font-size:15px}
@@ -307,10 +317,10 @@ export default function App() {
         @media (max-width:820px){
           .tam .wrap{padding:0 20px}
           .tam .clock{display:none}
-          .tam .bar{padding:14px 0;min-height:60px;gap:10px}
+          .tam .bar{padding-top:14px;padding-bottom:14px;min-height:60px;gap:10px}
           .tam .navlinks{gap:16px;font-size:14.5px}
 
-          .tam .hero{padding:32px 0 6px}
+          .tam .hero{padding-top:32px;padding-bottom:6px}
           .tam .tagline{font-size:14.5px}
           .tam .lede{font-size:15.5px;line-height:1.55}
 
@@ -326,7 +336,7 @@ export default function App() {
           .tam .free{font-size:16px;top:10px;right:10px;padding:0 6px}
           .tam .soon{top:10px;left:10px;font-size:11px;padding:2px 8px}
 
-          .tam .about{grid-template-columns:1fr;gap:20px;padding:44px 0}
+          .tam .about{grid-template-columns:1fr;gap:20px;padding-top:44px;padding-bottom:44px}
           .tam .about p{font-size:15.5px}
           .tam .fmt.plain{grid-template-columns:1fr;gap:3px;font-size:15px;padding:14px 4px}
           .tam .fmt > summary{font-size:15px;padding:14px 4px}
@@ -335,7 +345,7 @@ export default function App() {
           .tam .proof{padding:44px 0}
           .tam .strip{padding:0 20px 8px}
 
-          .tam .join{padding:44px 0 112px;flex-direction:column;align-items:flex-start}
+          .tam .join{padding-top:44px;padding-bottom:112px;flex-direction:column;align-items:flex-start}
           .tam .btns{width:100%}
           .tam .btn{padding:14px 10px;font-size:14px}
 
@@ -406,8 +416,8 @@ export default function App() {
                          className={`card ${slot.style}`}>
                         {slot.style === 'community' ? <span className="free">Free</span> : <span className="soon">Coming soon</span>}
                         <div className="card-body">
-                          <span className="format">{slot.style === 'bcc' && <span className="dot"></span>}{slot.label}</span>
-                          <span className="name">{slot.dummyName}</span>
+                          <span className="format">{slot.style === 'bcc' && <span className="dot"></span>}{slot.shortLabel}</span>
+                          <span className="name">{slot.fullName}</span>
                           <span className="desc">{slot.dummyDesc}</span>
                           <div className="meta">
                             <div><span>Date</span><b>Soon</b></div>
@@ -421,17 +431,16 @@ export default function App() {
 
                   const event = c.event;
                   const isSoldOut = event.status && /sold|closed/i.test(event.status);
-                  const hasOld = event.original_price && event.original_price.trim() !== '' && !isFree(event);
                   return (
                     <Link key={event.id || i} href={`/event/${event.id.trim()}`} className={`card ${slot.style} ${isSoldOut ? 'soldout' : ''}`}>
                       {slot.style === 'community' && <span className="free">Free</span>}
                       <div className="card-body">
-                        <span className="format">{slot.style === 'bcc' && <span className="dot"></span>}{slot.label}</span>
+                        <span className="format">{slot.style === 'bcc' && <span className="dot"></span>}{slot.shortLabel}</span>
                         <span className="name">{event.title}</span>
                         {shortDesc(event) && <span className="desc">{shortDesc(event)}</span>}
                         <div className="meta">
-                          <div><span>Date</span><b>{event.date || 'TBA'}</b></div>
-                          <div><span>Price</span><b>{hasOld && <span className="old">₹{event.original_price}</span>}{priceText(event)}</b></div>
+                          <div><span>Date</span><b>{formatDate(event.date)}</b></div>
+                          <div><span>Price</span><b>{priceText(event)}</b></div>
                         </div>
                         {event.status && <span className="status">{event.status}</span>}
                         <span className="cta">{isSoldOut ? 'Sold out' : (event.button_text || 'View event')}</span>
@@ -444,7 +453,6 @@ export default function App() {
           </div>
         </section>
 
-        {/* What is 3 AM — full copy, plus tap-to-expand rows for BCC and Community */}
         <section id="about-section" className="wrap about reveal" ref={setRef}>
           <h2 className="h2">What is <span className="brand">3 AM</span>?</h2>
           <div id="values">
