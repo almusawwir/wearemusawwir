@@ -6,6 +6,9 @@ import { useSearchParams } from 'next/navigation';
 import Papa from 'papaparse';
 
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSSCmEDqxpPn1OEzXR3geUaynoeGhrswVO5xf8zKETC8xOq1oimP1SiapOAsSPY_nEMTHoDeacTgKC/pub?gid=0&single=true&output=csv";
+const TZ = "Asia/Kolkata";
+
+const REASONS = ['To learn something', 'To meet people', 'To make something', 'To try something new'];
 
 // ── CSV fetched once, cached globally — never causes re-renders ──
 let cachedEvents = null;
@@ -40,6 +43,13 @@ function loadRazorpay() {
     script.onerror = () => reject(new Error('Failed to load Razorpay script'));
     document.body.appendChild(script);
   });
+}
+
+function formatDate(raw) {
+  if (!raw || !raw.toString().trim()) return 'TBA';
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return raw.toString().trim();
+  return new Intl.DateTimeFormat('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: TZ }).format(d);
 }
 
 function RegisterContent() {
@@ -83,8 +93,8 @@ function RegisterContent() {
           location: foundEvent.location_main,
           price: foundEvent.price || '999',
           groupPrice: foundEvent.group_price || foundEvent.price || '999',
-          bring: foundEvent.bring || 'An open heart.',
-          provided: foundEvent.provided || 'Canvas and paints.',
+          bring: foundEvent.bring || 'Just yourself.',
+          provided: foundEvent.provided || 'Everything you need.',
         });
       }
       setIsLoadingEvent(false);
@@ -107,7 +117,6 @@ function RegisterContent() {
     setIsProcessing(true);
 
     try {
-      // ── Ensure Razorpay is loaded before touching window.Razorpay ──
       await loadRazorpay();
 
       const response = await fetch('/api/create-order', {
@@ -127,8 +136,8 @@ function RegisterContent() {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
         amount: data.order.amount,
         currency: data.order.currency,
-        name: '3AM Ideas',
-        description: `${ticketCount}x Ticket(s) for ${eventDetails ? eventDetails.title : '3AM Ideas Gathering'}`,
+        name: '3 AM Ideas',
+        description: `${ticketCount}x Ticket(s) for ${eventDetails ? eventDetails.title : '3 AM Ideas event'}`,
         order_id: data.order.id,
 
         handler: async function (razorpayResponse) {
@@ -146,12 +155,12 @@ function RegisterContent() {
                 reason: formData.reason,
                 reflection: formData.reflection,
                 paymentId: razorpayResponse.razorpay_payment_id,
-                eventTitle: eventDetails?.title || '3AM Ideas',
+                eventTitle: eventDetails?.title || '3 AM Ideas',
                 eventDate: eventDetails?.date || 'TBD',
                 eventTime: eventDetails?.time || 'TBD',
                 eventLocation: eventDetails?.location || 'TBD',
-                eventBring: eventDetails?.bring || 'An open heart',
-                eventProvided: eventDetails?.provided || 'Art supplies',
+                eventBring: eventDetails?.bring || 'Just yourself',
+                eventProvided: eventDetails?.provided || 'Everything you need',
                 ticketCount,
                 totalPaid: totalAmount,
               }),
@@ -165,7 +174,7 @@ function RegisterContent() {
         },
 
         prefill: { name: formData.name, contact: formData.whatsapp, email: formData.email },
-        theme: { color: '#1A1817' },
+        theme: { color: '#FF0065' },
       };
 
       const paymentObject = new window.Razorpay(options);
@@ -183,242 +192,257 @@ function RegisterContent() {
   };
 
   return (
-    <div className="relative min-h-screen w-full bg-[#0A0A0B] text-[#F5F3EF] font-sans antialiased selection:bg-[#FF2D78] selection:text-white flex justify-center py-12 px-4 md:px-6">
+    <div className="tam">
+      <style dangerouslySetInnerHTML={{ __html: `
+        @import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Instrument+Sans:wght@400;500;600&display=swap');
 
-      {/* ── Success overlay ── */}
+        html,body{margin:0;padding:0;width:100%;max-width:100%}
+        .tam{
+          min-width:0;
+          --pink:#FF0065; --pink-soft:#FFE3EE; --black:#000; --white:#fff; --grey:#5c5c5c;
+          --display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
+          --body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+          font-family:var(--body); background:var(--white); color:var(--black);
+          line-height:1.55; font-size:17px; width:100%; max-width:100vw; overflow-x:hidden; min-height:100vh;
+        }
+        .tam *{box-sizing:border-box}
+        .tam a{color:inherit}
+        .tam .brand{color:var(--pink)}
+        .tam :focus-visible{outline:3px solid var(--pink);outline-offset:3px}
+        .tam .wrap{max-width:760px;margin:0 auto;padding:0 24px;width:100%}
+
+        /* Header */
+        .tam .top{background:var(--black);color:var(--white);padding-top:env(safe-area-inset-top,0px)}
+        .tam .bar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-top:16px;padding-bottom:16px;min-height:64px;
+          max-width:760px;margin:0 auto;padding-left:24px;padding-right:24px}
+        .tam .back{font-size:15px;font-weight:500;text-decoration:none;opacity:.85}
+        .tam .back:hover{opacity:1;color:var(--pink)}
+        .tam .wordmark{font-family:var(--display);font-weight:900;font-size:22px;letter-spacing:.5px}
+
+        /* Event summary */
+        .tam .summary{border-bottom:2px solid var(--black);padding-top:28px;padding-bottom:24px}
+        .tam .eyebrow{font-weight:500;color:var(--pink);font-size:14px;margin:0;letter-spacing:.04em;text-transform:uppercase}
+        .tam .summary h1{font-family:var(--display);font-weight:900;font-size:clamp(34px,8vw,64px);line-height:1.02;margin:8px 0 14px;word-break:break-word}
+        .tam .facts{display:flex;flex-wrap:wrap;gap:6px 26px;font-size:15px;margin:0}
+        .tam .facts b{font-weight:600}
+        .tam .facts span{opacity:.65}
+        .tam .skel{height:18px;background:#eee;margin:8px 0;max-width:60%}
+        .tam .skel.big{height:40px;max-width:80%}
+
+        /* Low stock */
+        .tam .lowstock{background:var(--pink);color:var(--white);padding:12px 16px;font-size:14px;font-weight:600;
+          display:flex;align-items:center;gap:10px;margin-top:18px;border:2px solid var(--black)}
+        .tam .lowstock i{width:9px;height:9px;border-radius:50%;background:var(--white);animation:tamblink 1.2s steps(1) infinite;flex:0 0 auto}
+        @keyframes tamblink{50%{opacity:.25}}
+
+        /* Form */
+        .tam form{padding-top:32px;padding-bottom:40px;display:flex;flex-direction:column;gap:34px}
+        .tam .step{display:flex;flex-direction:column;gap:18px}
+        .tam .steptitle{font-family:var(--display);font-weight:900;font-size:26px;line-height:1;margin:0;border-bottom:1px solid var(--black);padding-bottom:10px}
+        .tam .steptitle em{font-style:normal;color:var(--pink);margin-right:8px}
+        .tam .row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+        .tam .field{display:flex;flex-direction:column;gap:8px}
+        .tam .field.full{grid-column:1 / -1}
+        .tam .field label{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+        .tam .field .hint{font-size:13px;color:var(--grey);font-weight:400;text-transform:none;letter-spacing:0}
+        .tam input[type=text],.tam input[type=tel],.tam input[type=email],.tam textarea{
+          font:inherit;font-size:16px;padding:13px 14px;border:2px solid var(--black);background:var(--white);color:var(--black);width:100%;border-radius:0}
+        .tam textarea{resize:vertical;min-height:92px}
+        .tam input::placeholder,.tam textarea::placeholder{color:#9a9a9a}
+        .tam input:focus,.tam textarea:focus{outline:none;border-color:var(--pink);box-shadow:3px 3px 0 var(--pink)}
+
+        .tam .choices{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+        .tam .choice{position:relative;display:block;padding:14px;border:2px solid var(--black);cursor:pointer;background:var(--white);font-size:15.5px;font-weight:500}
+        .tam .choice input{position:absolute;opacity:0;pointer-events:none}
+        .tam .choice.on{background:var(--pink);border-color:var(--pink);color:var(--white)}
+
+        /* Consent */
+        .tam .consent{display:flex;align-items:flex-start;gap:12px;cursor:pointer;font-size:15px}
+        .tam .consent input{width:22px;height:22px;flex:0 0 auto;margin:2px 0 0;accent-color:var(--pink)}
+        .tam .consent a{font-weight:600;text-decoration:underline}
+
+        /* Quantity + pay */
+        .tam .checkout{border-top:2px solid var(--black);padding-top:24px;display:flex;flex-direction:column;gap:16px}
+        .tam .qty{display:flex;justify-content:space-between;align-items:center;gap:16px;border:2px solid var(--black);padding:16px}
+        .tam .qty .lbl{font-size:12.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--grey);display:block;margin-bottom:4px}
+        .tam .qty .per{font-weight:600;font-size:16px}
+        .tam .stepper{display:flex;align-items:center;gap:0;flex:0 0 auto}
+        .tam .stepper button{width:44px;height:44px;font:inherit;font-size:22px;line-height:1;background:var(--white);color:var(--black);
+          border:2px solid var(--black);cursor:pointer}
+        .tam .stepper button:disabled{opacity:.3;cursor:not-allowed}
+        .tam .stepper .n{width:52px;text-align:center;font-weight:600;font-size:18px;border-top:2px solid var(--black);border-bottom:2px solid var(--black);
+          height:44px;line-height:40px}
+
+        .tam .pay{font:inherit;font-weight:600;font-size:16px;padding:18px 20px;border:2px solid var(--pink);background:var(--pink);color:var(--white);
+          cursor:pointer;width:100%;border-radius:0;display:flex;justify-content:space-between;align-items:center;gap:12px}
+        .tam .pay:disabled{opacity:.5;cursor:not-allowed}
+        .tam .pay .total{font-family:var(--display);font-weight:900;font-size:24px;line-height:1}
+        .tam .secure{font-size:13px;color:var(--grey);text-align:center;margin:0}
+
+        /* Success overlay */
+        .tam .overlay{position:fixed;inset:0;z-index:100;background:var(--white);display:flex;flex-direction:column;
+          align-items:center;justify-content:center;text-align:center;padding:24px}
+        .tam .overlay h2{font-family:var(--display);font-weight:900;font-size:clamp(34px,8vw,64px);line-height:1;margin:0 0 12px}
+        .tam .overlay p{margin:0;font-size:15px;color:var(--grey)}
+        .tam .spinner{width:54px;height:54px;border:5px solid var(--pink-soft);border-top-color:var(--pink);border-radius:50%;
+          animation:tamspin .8s linear infinite;margin-bottom:26px}
+        @keyframes tamspin{to{transform:rotate(360deg)}}
+
+        /* Mobile */
+        @media (max-width:820px){
+          .tam .wrap,.tam .bar{padding-left:20px;padding-right:20px}
+          .tam .bar{padding-top:14px;padding-bottom:14px;min-height:60px}
+          .tam .summary{padding-top:22px;padding-bottom:20px}
+          .tam .facts{font-size:14.5px;gap:4px 20px}
+          .tam form{padding-top:26px;padding-bottom:36px;gap:28px}
+          .tam .steptitle{font-size:22px}
+          .tam .row{grid-template-columns:1fr;gap:16px}
+          .tam .choices{grid-template-columns:1fr}
+          .tam .qty{flex-direction:column;align-items:stretch;gap:14px}
+          .tam .stepper{justify-content:space-between}
+          .tam .stepper .n{flex:1}
+          .tam .pay{font-size:15px;padding:16px}
+          .tam .pay .total{font-size:21px}
+        }
+        @media (max-width:360px){ .tam .wrap,.tam .bar{padding-left:16px;padding-right:16px} }
+
+        @media (prefers-reduced-motion:reduce){
+          .tam .spinner,.tam .lowstock i{animation:none}
+        }
+      `}} />
+
       {isSuccessLoading && (
-        <div className="fixed inset-0 z-[100] bg-[#0A0A0B]/90 backdrop-blur-md flex flex-col items-center justify-center">
-          <div className="relative w-20 h-20 mb-8">
-            <div className="absolute inset-0 border-4 border-white/10 rounded-full"></div>
-            <div className="absolute inset-0 border-4 border-[#FF2D78] rounded-full border-t-transparent animate-spin"></div>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <svg className="w-8 h-8 text-white animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path>
-              </svg>
-            </div>
-          </div>
-          <h2 className="font-serif italic text-3xl md:text-4xl text-white mb-2">Locking in your spot...</h2>
-          <p className="font-sans text-xs text-white/50 tracking-[0.2em] uppercase font-bold animate-pulse">Please do not close this window</p>
+        <div className="overlay">
+          <div className="spinner"></div>
+          <h2>Locking in your spot</h2>
+          <p>Please don&apos;t close this window.</p>
         </div>
       )}
 
-      <style dangerouslySetInnerHTML={{__html: `
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Manrope:wght@200;300;400;500;600;700&display=swap');
-        .font-serif { font-family: 'Cormorant Garamond', serif; }
-        .font-sans { font-family: 'Manrope', sans-serif; }
-        .canvas-texture {
-          position: fixed; inset: 0; z-index: 0; pointer-events: none;
-          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.06'/%3E%3C/svg%3E");
-          mix-blend-mode: screen; opacity: 0.5;
-        }
-        .glass-card {
-          background: rgba(255, 255, 255, 0.04);
-          backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-          border: 1px solid rgba(255, 255, 255, 0.09);
-        }
-        @keyframes pulse-fast { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
-        .animate-pulse-fast { animation: pulse-fast 1.2s ease-in-out infinite; }
-      `}} />
-
-      <div className="canvas-texture"></div>
-
-      {/* Static background blobs — no state, no jitter */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0" aria-hidden="true">
-        <div className="absolute top-[-10%] right-[-10%] w-[50vw] h-[50vw] bg-[#4DA3FF]/10 rounded-full mix-blend-screen filter blur-[100px]"></div>
-        <div className="absolute bottom-[-10%] left-[-10%] w-[60vw] h-[60vw] bg-[#FF2D78]/15 rounded-full mix-blend-screen filter blur-[120px]"></div>
-      </div>
-
-      <div className="w-full max-w-2xl relative z-10 flex flex-col gap-8">
-
-        {/* Nav */}
-        <div className="flex items-center justify-between">
-          <Link href={`/event/${eventId}`} className="group flex items-center gap-2 text-white/60 hover:text-[#FF2D78] transition-colors font-sans text-xs uppercase tracking-widest font-bold">
-            <svg className="w-4 h-4 transform group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
-            </svg>
-            Back to Event
-          </Link>
-          <span className="font-serif italic text-lg text-white">3AM Ideas</span>
+      <header className="top">
+        <div className="bar">
+          <Link className="back" href={`/event/${eventId}`}>← Back to event</Link>
+          <span className="wordmark">3<span className="brand">AM</span></span>
         </div>
+      </header>
 
-        {/* ── Urgency banner — only when <=4 tickets left ── */}
-        {showCountdown && (
-          <div className="bg-[#DC2626] text-white rounded-2xl px-5 py-3 flex items-center gap-3">
-            <span className="animate-pulse-fast w-2 h-2 bg-white rounded-full shrink-0"></span>
-            <p className="font-sans text-xs font-bold uppercase tracking-wider">
-              Only {ticketsLeftParam} spot{ticketsLeftParam === 1 ? '' : 's'} left — you're almost there
-            </p>
-          </div>
-        )}
-
-        <div className="glass-card rounded-[2rem] md:rounded-[2.5rem] shadow-2xl shadow-black/40 overflow-hidden">
-
-          {/* Header */}
-          <div className="bg-black/40 text-white p-8 md:p-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative overflow-hidden min-h-[160px] border-b border-white/10">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-[#FF2D78] rounded-full filter blur-[50px] opacity-30" aria-hidden="true"></div>
-            {isLoadingEvent ? (
-              <div className="animate-pulse flex flex-col gap-3 w-full">
-                <div className="h-8 bg-white/20 rounded w-3/4"></div>
-                <div className="h-4 bg-white/20 rounded w-1/2"></div>
-              </div>
-            ) : (
-              <>
-                <div>
-                  <h1 className="font-serif text-3xl md:text-4xl mb-2 text-white line-clamp-1">
-                    {eventDetails?.title || 'Secure Your Spot'}
-                  </h1>
-                  <p className="font-sans text-sm tracking-wide text-white/70 flex items-center gap-2">
-                    <svg className="w-4 h-4 text-[#FF2D78] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                    </svg>
-                    {eventDetails ? `${eventDetails.date} • ${eventDetails.time}` : 'Event specifics unavailable'}
-                  </p>
-                </div>
-                <div className="text-left md:text-right shrink-0">
-                  <span className="font-sans text-[10px] uppercase tracking-[0.2em] text-white/50 block mb-1">Registration Fee</span>
-                  <span className="font-serif text-3xl text-white">₹{eventDetails?.price || '999'}</span>
-                </div>
-              </>
-            )}
-          </div>
-
-          <form onSubmit={handleSubmit} className="p-8 md:p-10 flex flex-col gap-8">
-
-            {/* 1. Basics */}
-            <div className="space-y-6">
-              <h2 className="font-sans text-[11px] uppercase tracking-[0.3em] font-bold text-[#FF2D78] border-b border-white/10 pb-2">1. The Basics</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="flex flex-col gap-2">
-                  <label className="font-sans text-xs font-bold text-white uppercase tracking-wider">Full Name *</label>
-                  <input type="text" name="name" required value={formData.name} onChange={handleChange}
-                    className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 font-serif text-lg text-white focus:outline-none focus:border-[#4DA3FF] focus:bg-white/10 transition-all placeholder:text-white/30"
-                    placeholder="Your name" />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <label className="font-sans text-xs font-bold text-white uppercase tracking-wider">WhatsApp Number *</label>
-                  <input type="tel" name="whatsapp" required value={formData.whatsapp} onChange={handleChange}
-                    className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 font-sans text-base text-white focus:outline-none focus:border-[#4DA3FF] focus:bg-white/10 transition-all placeholder:text-white/30"
-                    placeholder="+91 00000 00000" />
-                </div>
-                <div className="flex flex-col gap-2 md:col-span-2">
-                  <label className="font-sans text-xs font-bold text-white uppercase tracking-wider">Email Address *</label>
-                  <input type="email" name="email" required value={formData.email} onChange={handleChange}
-                    className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 font-sans text-base text-white focus:outline-none focus:border-[#4DA3FF] focus:bg-white/10 transition-all placeholder:text-white/30"
-                    placeholder="you@example.com" />
-                </div>
-              </div>
-            </div>
-
-            {/* 2. Your World — required, plain text, no restrictions */}
-            <div className="space-y-6">
-              <h2 className="font-sans text-[11px] uppercase tracking-[0.3em] font-bold text-[#4DA3FF] border-b border-white/10 pb-2">2. Your World</h2>
-              <div className="flex flex-col gap-2">
-                <label className="font-sans text-xs font-bold text-white uppercase tracking-wider">Instagram / LinkedIn / Portfolio *</label>
-                <input type="text" name="creativeLink" required value={formData.creativeLink} onChange={handleChange}
-                  className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 font-sans text-base text-white focus:outline-none focus:border-[#4DA3FF] focus:bg-white/10 transition-all placeholder:text-white/30"
-                  placeholder="username, handle, or link" />
-                <p className="font-sans text-[10px] text-white/50 tracking-wide">Any format works — a handle, a username, or a full link.</p>
-              </div>
-            </div>
-
-            {/* 3. Intentions */}
-            <div className="space-y-6">
-              <h2 className="font-sans text-[11px] uppercase tracking-[0.3em] font-bold text-[#FF2D78] border-b border-white/10 pb-2">3. Intentions</h2>
-              <label className="font-sans text-xs font-bold text-white uppercase tracking-wider">Why are you joining us? *</label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
-                {['To learn', 'To meet people', 'To paint with like-minded people', 'To explore creativity'].map((option) => (
-                  <label key={option} className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${formData.reason === option ? 'border-[#FF2D78] bg-[#FF2D78]/10' : 'border-white/10 bg-white/[0.03] hover:bg-white/[0.06]'}`}>
-                    <input type="radio" name="reason" value={option} required onChange={handleChange} className="w-4 h-4 text-[#FF2D78] focus:ring-[#FF2D78] accent-[#FF2D78]" />
-                    <span className="font-serif text-[1.1rem] text-white">{option}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* 4. Reflection — optional */}
-            <div className="space-y-6">
-              <h2 className="font-sans text-[11px] uppercase tracking-[0.3em] font-bold text-[#FFB84D] border-b border-white/10 pb-2">4. Reflection (Optional)</h2>
-              <div className="flex flex-col gap-2">
-                <label className="font-sans text-xs font-bold text-white uppercase tracking-wider">What does creation mean to you?</label>
-                <textarea name="reflection" rows="3" value={formData.reflection} onChange={handleChange}
-                  className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 font-serif text-lg text-white focus:outline-none focus:border-[#FFB84D] focus:bg-white/10 transition-all placeholder:text-white/30 resize-none"
-                  placeholder="A few words on how you feel..."></textarea>
-              </div>
-            </div>
-
-            {/* Consent */}
-            <div className="pt-4">
-              <label className="flex items-start gap-3 cursor-pointer group">
-                <div className="relative flex items-center justify-center mt-1">
-                  <input type="checkbox" name="consent" required checked={formData.consent} onChange={handleChange}
-                    className="peer appearance-none w-5 h-5 border-2 border-white/30 rounded-[4px] checked:bg-[#FF2D78] checked:border-[#FF2D78] transition-all cursor-pointer" />
-                  <svg className="absolute w-3 h-3 text-white opacity-0 peer-checked:opacity-100 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                </div>
-                <span className="font-sans text-sm text-white/60 group-hover:text-white transition-colors">
-                  I understand that this is a curated space, and I agree to the{' '}
-                  <Link href="/terms" target="_blank" className="font-bold text-white underline hover:text-[#FF2D78]">Terms & Guidelines</Link>.
-                </span>
-              </label>
-            </div>
-
-            {/* Ticket counter + pay */}
-            <div className="pt-6 border-t border-white/10">
-              <div className="flex items-center justify-between bg-white/[0.04] p-4 rounded-2xl border border-white/10 mb-4 shadow-sm">
-                <div>
-                  <span className="font-sans text-[10px] uppercase tracking-widest text-white/50 font-bold block mb-1">Select Quantity</span>
-                  <span className="font-serif text-lg text-white leading-none">
-                    {ticketCount === 1 ? `₹${eventDetails?.price || '999'} per person` : `Group Rate: ₹${eventDetails?.groupPrice || '899'} per person`}
-                  </span>
-                </div>
-                <div className="flex items-center bg-white/10 rounded-full p-1 gap-4 text-white">
-                  <button onClick={decrement} disabled={ticketCount <= 1 || isProcessing}
-                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors disabled:opacity-30">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 12H4"></path></svg>
-                  </button>
-                  <span className="font-sans font-bold w-4 text-center">{ticketCount}</span>
-                  <button onClick={increment} disabled={ticketCount >= maxTickets || isProcessing}
-                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors disabled:opacity-30">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
-                  </button>
-                </div>
-              </div>
-
-              {/* Only X left warning under counter */}
-              {showCountdown && (
-                <div className="flex items-center gap-2 mb-4 px-1">
-                  <span className="animate-pulse-fast w-1.5 h-1.5 bg-[#DC2626] rounded-full shrink-0"></span>
-                  <p className="font-sans text-[11px] font-bold uppercase tracking-wider text-[#F87171]">
-                    Only {ticketsLeftParam} ticket{ticketsLeftParam === 1 ? '' : 's'} remaining for this event
-                  </p>
-                </div>
-              )}
-
-              <button disabled={isProcessing || isLoadingEvent} type="submit"
-                className="w-full bg-[#FF2D78] disabled:bg-white/20 disabled:cursor-not-allowed text-white font-sans text-sm uppercase tracking-[0.2em] font-bold py-5 px-8 rounded-xl hover:bg-white hover:text-[#0A0A0B] transition-all hover:shadow-xl hover:-translate-y-1 flex items-center justify-between group">
-                <span>{isProcessing ? 'Processing...' : `Secure ${ticketCount} Ticket${ticketCount > 1 ? 's' : ''}`}</span>
-                {!isProcessing && (
-                  <span className="flex items-center gap-3">
-                    Pay ₹{totalAmount}
-                    <svg className="w-5 h-5 transform group-hover:translate-x-2 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
-                    </svg>
-                  </span>
-                )}
-              </button>
-
-              <p className="font-sans text-[10px] text-center text-white/50 uppercase tracking-widest mt-4 flex items-center justify-center gap-2">
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
-                </svg>
-                Secure Checkout by Razorpay
+      <main className="wrap">
+        <section className="summary">
+          <p className="eyebrow">Book your spot</p>
+          {isLoadingEvent ? (
+            <>
+              <div className="skel big"></div>
+              <div className="skel"></div>
+            </>
+          ) : (
+            <>
+              <h1>{eventDetails?.title || 'Book your spot'}</h1>
+              <p className="facts">
+                <span>Date</span> <b>{formatDate(eventDetails?.date)}</b>
+                {eventDetails?.time && <><span>Time</span> <b>{eventDetails.time}</b></>}
+                {eventDetails?.location && <><span>Where</span> <b>{eventDetails.location}</b></>}
+                <span>Price</span> <b>₹{eventDetails?.price || '999'}</b>
               </p>
+            </>
+          )}
+
+          {showCountdown && (
+            <div className="lowstock">
+              <i></i>
+              Only {ticketsLeftParam} spot{ticketsLeftParam === 1 ? '' : 's'} left
+            </div>
+          )}
+        </section>
+
+        <form onSubmit={handleSubmit}>
+          <div className="step">
+            <h2 className="steptitle"><em>01</em>The basics</h2>
+            <div className="row">
+              <div className="field">
+                <label htmlFor="name">Full name</label>
+                <input id="name" type="text" name="name" required value={formData.name} onChange={handleChange}
+                       autoComplete="name" placeholder="Your name" />
+              </div>
+              <div className="field">
+                <label htmlFor="whatsapp">WhatsApp number</label>
+                <input id="whatsapp" type="tel" name="whatsapp" required value={formData.whatsapp} onChange={handleChange}
+                       autoComplete="tel" inputMode="tel" placeholder="+91 00000 00000" />
+              </div>
+              <div className="field full">
+                <label htmlFor="email">Email address</label>
+                <input id="email" type="email" name="email" required value={formData.email} onChange={handleChange}
+                       autoComplete="email" inputMode="email" placeholder="you@example.com" />
+                <span className="hint">Your ticket goes here.</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="step">
+            <h2 className="steptitle"><em>02</em>Your world</h2>
+            <div className="field">
+              <label htmlFor="creativeLink">Instagram, LinkedIn or portfolio</label>
+              <input id="creativeLink" type="text" name="creativeLink" required value={formData.creativeLink} onChange={handleChange}
+                     placeholder="username, handle, or link" />
+              <span className="hint">Any format works. A handle, a username, or a full link.</span>
+            </div>
+          </div>
+
+          <div className="step">
+            <h2 className="steptitle"><em>03</em>Why you&apos;re coming</h2>
+            <div className="choices">
+              {REASONS.map((option) => (
+                <label key={option} className={`choice ${formData.reason === option ? 'on' : ''}`}>
+                  <input type="radio" name="reason" value={option} required
+                         checked={formData.reason === option} onChange={handleChange} />
+                  {option}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="step">
+            <h2 className="steptitle"><em>04</em>Anything else</h2>
+            <div className="field">
+              <label htmlFor="reflection">Want to tell us something? <span className="hint">(optional)</span></label>
+              <textarea id="reflection" name="reflection" rows="3" value={formData.reflection} onChange={handleChange}
+                        placeholder="A thought, a question, or what brought you here…"></textarea>
+            </div>
+          </div>
+
+          <label className="consent">
+            <input type="checkbox" name="consent" required checked={formData.consent} onChange={handleChange} />
+            <span>
+              I&apos;ve read and agree to the{' '}
+              <Link href="/terms" target="_blank">terms and guidelines</Link>.
+            </span>
+          </label>
+
+          <div className="checkout">
+            <div className="qty">
+              <div>
+                <span className="lbl">How many spots?</span>
+                <span className="per">
+                  {ticketCount === 1
+                    ? `₹${eventDetails?.price || '999'} per person`
+                    : `₹${eventDetails?.groupPrice || '999'} per person (group rate)`}
+                </span>
+              </div>
+              <div className="stepper">
+                <button type="button" onClick={decrement} disabled={ticketCount <= 1 || isProcessing} aria-label="One less">−</button>
+                <span className="n" aria-live="polite">{ticketCount}</span>
+                <button type="button" onClick={increment} disabled={ticketCount >= maxTickets || isProcessing} aria-label="One more">+</button>
+              </div>
             </div>
 
-          </form>
-        </div>
-      </div>
+            <button className="pay" type="submit" disabled={isProcessing || isLoadingEvent}>
+              <span>{isProcessing ? 'Processing…' : `Book ${ticketCount} spot${ticketCount > 1 ? 's' : ''}`}</span>
+              {!isProcessing && <span className="total">₹{totalAmount}</span>}
+            </button>
+
+            <p className="secure">Secure checkout by Razorpay.</p>
+          </div>
+        </form>
+      </main>
     </div>
   );
 }
@@ -426,8 +450,8 @@ function RegisterContent() {
 export default function RegisterPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-[#0A0A0B] text-white font-serif text-2xl">
-        Setting up your spot...
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui, sans-serif' }}>
+        Setting up your spot…
       </div>
     }>
       <RegisterContent />

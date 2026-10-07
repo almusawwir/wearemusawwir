@@ -1,50 +1,70 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import Papa from 'papaparse';
 
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSSCmEDqxpPn1OEzXR3geUaynoeGhrswVO5xf8zKETC8xOq1oimP1SiapOAsSPY_nEMTHoDeacTgKC/pub?gid=0&single=true&output=csv";
+const WHATSAPP_URL = "https://chat.whatsapp.com/B68V6Q62HZPHHsGMG0t4jP";
+const TZ = "Asia/Kolkata";
+const DESC_MAX = 30;
+
+const LABELS = {
+  bcc:       { shortLabel: 'BCC',     fullName: 'Broken Camera Crew' },
+  odc:       { shortLabel: 'ODC',     fullName: 'One Day Crew' },
+  premium:   { shortLabel: 'Premium', fullName: 'Creative experience' },
+  community: { shortLabel: 'Free',    fullName: '3 AM Community' },
+};
+
+function getStyle(event) {
+  const f = (event.format || '').toLowerCase().trim();
+  if (['bcc', 'odc', 'premium', 'community'].includes(f)) return f;
+  const text = `${event.id} ${event.title}`.toLowerCase();
+  if (text.includes('bcc') || text.includes('broken camera')) return 'bcc';
+  if (text.includes('odc') || text.includes('one day crew')) return 'odc';
+  if (isFree(event)) return 'community';
+  return 'premium';
+}
+function isFree(event) {
+  const p = (event.price || '').toString().trim().toLowerCase();
+  return p === '0' || p === 'free';
+}
+function priceText(event) {
+  if (isFree(event)) return 'Free';
+  const p = (event.price || '').toString().trim();
+  return p ? `From ₹${p}` : 'TBA';
+}
+function formatDate(raw) {
+  if (!raw || !raw.toString().trim()) return 'TBA';
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return raw.toString().trim();
+  return new Intl.DateTimeFormat('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: TZ }).format(d);
+}
+function truncate(text, max = DESC_MAX) {
+  const t = (text || '').trim();
+  if (!t) return '';
+  return t.length > max ? t.slice(0, max).trimEnd() + '...' : t;
+}
+function isPast(event) {
+  return event.status && /sold|closed|past/i.test(event.status);
+}
 
 export default function EventsPage() {
   const [events, setEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [expandedCards, setExpandedCards] = useState({});
-  const router = useRouter();
-
-  // Navigation scroll state
-  const [isNavVisible, setIsNavVisible] = useState(true);
-  const [lastScrollY, setLastScrollY] = useState(0);
-
-  // Gallery State
   const [galleryImages, setGalleryImages] = useState([]);
   const [visibleGalleryCount, setVisibleGalleryCount] = useState(6);
+  const [isNavVisible, setIsNavVisible] = useState(true);
   const revealRefs = useRef([]);
 
   const setRef = (el) => {
-    if (el && !revealRefs.current.includes(el)) {
-      revealRefs.current.push(el);
-    }
+    if (el && !revealRefs.current.includes(el)) revealRefs.current.push(el);
   };
 
-  const toggleExpand = (e, id) => {
-    e.stopPropagation();
-    setExpandedCards(prev => ({ ...prev, [id]: !prev[id] }));
-  };
+  const loadMoreImages = () => setVisibleGalleryCount(prev => prev + 6);
 
-  const handleCardClick = (id) => {
-    if (id) router.push(`/event/${id.trim()}`);
-  };
-
-  const loadMoreImages = () => {
-    setVisibleGalleryCount(prev => prev + 6);
-  };
-
-  // Fetch Events and Gallery Images
   useEffect(() => {
-    // 1. Fetch CSV Events
     fetch(CSV_URL)
       .then(res => res.text())
       .then(text => {
@@ -53,33 +73,21 @@ export default function EventsPage() {
           skipEmptyLines: true,
           transformHeader: (h) => h.trim().toLowerCase().replace(/^\uFEFF/, ''),
           complete: (results) => {
-            const validEvents = results.data.filter(event => {
-                const hasId = event.id && event.id.trim() !== '';
-                const hasTitle = event.title && event.title.trim() !== '';
-                return hasId && hasTitle;
-            });
-            
-            setEvents(validEvents);
+            setEvents(results.data.filter(e => e.id && e.id.trim() !== '' && e.title && e.title.trim() !== ''));
             setIsLoading(false);
           }
         });
-      });
+      })
+      .catch(() => setIsLoading(false));
 
-    // 2. Fetch dynamic images from our custom API
     fetch('/api/gallery')
       .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          setGalleryImages(data);
-        }
-      })
+      .then(data => { if (Array.isArray(data)) setGalleryImages(data); })
       .catch(err => console.error("Could not load gallery images:", err));
   }, []);
 
-  // Intersection Observer for scroll animations
   useEffect(() => {
     if (isLoading) return;
-    const observerOptions = { root: null, rootMargin: '0px', threshold: 0.1 };
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
@@ -87,236 +95,313 @@ export default function EventsPage() {
           observer.unobserve(entry.target);
         }
       });
-    }, observerOptions);
-    
+    }, { threshold: 0.1 });
     revealRefs.current.forEach((ref) => { if (ref) observer.observe(ref); });
     return () => observer.disconnect();
   }, [isLoading, events, visibleGalleryCount]);
 
-  // Smart Navigation Scroll Logic
+  /* Throttled via requestAnimationFrame; only sets state when the value flips. */
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const handleScroll = () => {
-        const currentScrollY = window.scrollY;
-        if (currentScrollY <= 50) setIsNavVisible(true);
-        else if (currentScrollY < lastScrollY) setIsNavVisible(true);
-        else setIsNavVisible(false);
-        setLastScrollY(currentScrollY);
-      };
+    let ticking = false;
+    let prevY = window.scrollY;
+    let navVisibleRef = true;
 
-      window.addEventListener('scroll', handleScroll, { passive: true });
-      return () => window.removeEventListener('scroll', handleScroll);
-    }
-  }, [lastScrollY]);
+    const compute = () => {
+      const y = window.scrollY;
+      const shouldShowNav = y <= 50 || y < prevY;
+      if (shouldShowNav !== navVisibleRef) {
+        navVisibleRef = shouldShowNav;
+        setIsNavVisible(shouldShowNav);
+      }
+      prevY = y;
+      ticking = false;
+    };
+
+    const onScroll = () => {
+      if (!ticking) { ticking = true; requestAnimationFrame(compute); }
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  const upcoming = events.filter(e => !isPast(e));
+  const past = events.filter(e => isPast(e));
+
+  const renderCard = (event, i) => {
+    const style = getStyle(event);
+    const labels = LABELS[style];
+    const soldOut = isPast(event);
+    const desc = truncate(event.tagline || event.description || '');
+    return (
+      <Link key={event.id || i} href={`/event/${event.id.trim()}`} className={`card ${style} ${soldOut ? 'soldout' : ''}`}>
+        {style === 'community' && <span className="free">Free</span>}
+        <div className="card-body">
+          <span className="format">{style === 'bcc' && !soldOut && <span className="dot"></span>}{labels.shortLabel}</span>
+          <span className="name">{event.title}</span>
+          {desc && <span className="desc">{desc}</span>}
+          <div className="meta">
+            <div><span>Date</span><b>{formatDate(event.date)}</b></div>
+            <div><span>Price</span><b>{priceText(event)}</b></div>
+          </div>
+          {event.status && <span className="status">{event.status}</span>}
+          <span className="cta">{soldOut ? 'View event' : (event.button_text || 'View event')}</span>
+        </div>
+      </Link>
+    );
+  };
 
   return (
-    <div className="relative min-h-screen w-full bg-[#0A0A0B] text-[#F5F3EF] font-sans antialiased selection:bg-[#FF2D78] selection:text-white pb-24">
-      <style dangerouslySetInnerHTML={{__html: `
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Manrope:wght@200;300;400;500;600;700&display=swap');
-        .font-serif { font-family: 'Cormorant Garamond', serif; }
-        .font-sans { font-family: 'Manrope', sans-serif; }
-        .canvas-texture {
-          position: fixed; inset: 0; z-index: 50; pointer-events: none;
-          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.06'/%3E%3C/svg%3E");
-          mix-blend-mode: screen; opacity: 0.5;
+    <div className="tam">
+      <style dangerouslySetInnerHTML={{ __html: `
+        @import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Instrument+Sans:wght@400;500;600&display=swap');
+
+        html,body{margin:0;padding:0;width:100%;max-width:100%}
+        .tam{
+          min-width:0;
+          --pink:#FF0065; --pink-soft:#FFE3EE; --black:#000; --white:#fff; --grey:#5c5c5c;
+          --display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
+          --body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+          font-family:var(--body); background:var(--white); color:var(--black);
+          line-height:1.55; font-size:17px; width:100%; max-width:100vw; overflow-x:hidden; min-height:100vh;
         }
-        .reveal { opacity: 0; transform: translateY(40px); transition: all 1.2s cubic-bezier(0.16, 1, 0.3, 1); }
-        .reveal.active { opacity: 1; transform: translateY(0); }
-        .glass-card {
-          background: rgba(255, 255, 255, 0.04); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-          border: 1px solid rgba(255, 255, 255, 0.09);
+        html{scroll-behavior:smooth}
+        .tam *{box-sizing:border-box}
+        .tam a{color:inherit}
+        .tam .brand{color:var(--pink)}
+        .tam :focus-visible{outline:3px solid var(--pink);outline-offset:3px}
+        .tam .wrap{max-width:1180px;margin:0 auto;padding:0 24px;width:100%}
+        .tam .reveal{opacity:0;transform:translateY(24px);transition:opacity .8s cubic-bezier(.16,1,.3,1),transform .8s cubic-bezier(.16,1,.3,1)}
+        .tam .reveal.active{opacity:1;transform:none}
+
+        /* Header */
+        .tam .top{position:sticky;top:0;z-index:60;background:var(--black);color:var(--white);padding-top:env(safe-area-inset-top,0px);transition:transform .35s ease}
+        .tam .top.hidden{transform:translateY(-100%)}
+        .tam .bar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-top:16px;padding-bottom:16px;min-height:64px}
+        .tam .navlinks{display:flex;align-items:center;gap:20px;font-size:16px;font-weight:500;flex:0 0 auto}
+        .tam .navlinks a{text-decoration:none;opacity:.85;padding:8px 2px;display:inline-block;white-space:nowrap}
+        .tam .navlinks a:hover{opacity:1;color:var(--pink)}
+        .tam .navlinks a.on{opacity:1;color:var(--pink)}
+
+        /* Hero */
+        .tam .hero{padding-top:44px;padding-bottom:10px;text-align:center;display:flex;flex-direction:column;align-items:center}
+        .tam .eyebrow{font-weight:500;color:var(--pink);font-size:15px;margin:0;letter-spacing:.04em;text-transform:uppercase}
+        .tam h1{font-family:var(--display);font-weight:900;font-size:clamp(46px,12vw,150px);line-height:.92;letter-spacing:-.5px;margin:12px 0 14px}
+        .tam .lede{max-width:54ch;font-size:17px;color:#222;margin:0 auto}
+
+        /* Section heads */
+        .tam .sechead{display:flex;align-items:baseline;gap:12px;border-top:2px solid var(--black);padding-top:22px;margin-top:34px}
+        .tam .h2{font-family:var(--display);font-weight:900;font-size:clamp(30px,5.5vw,56px);line-height:.95;margin:0}
+        .tam .count{font-size:14px;color:var(--grey);font-weight:500}
+
+        /* Cards (same system as the homepage) */
+        .tam .events{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;padding:22px 0 10px;align-items:stretch}
+        .tam .card{position:relative;display:flex;flex-direction:column;height:100%;text-decoration:none;border:2px solid var(--black);background:var(--white);color:var(--black);transition:transform .15s ease, box-shadow .15s ease}
+        .tam .card-body{display:flex;flex-direction:column;flex:1;padding:20px;min-height:220px}
+        .tam .format{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px}
+        .tam .dot{width:8px;height:8px;border-radius:50%;background:var(--pink);animation:tampulse 1.2s infinite}
+        @keyframes tampulse{50%{opacity:.25}}
+        .tam .name{font-family:var(--display);font-weight:900;font-size:36px;line-height:1.15;margin:8px 0 8px;word-break:break-word}
+        .tam .desc{font-size:14.5px;opacity:.85;margin-bottom:auto}
+        .tam .meta{display:flex;justify-content:space-between;gap:10px;margin:18px 0 14px;font-size:14px}
+        .tam .meta div{display:flex;flex-direction:column;gap:2px}
+        .tam .meta span{opacity:.65;font-size:12.5px}
+        .tam .meta b{font-weight:600}
+        .tam .status{font-size:13px;font-weight:600;margin-bottom:10px}
+        .tam .cta{display:block;text-align:center;padding:12px;font-weight:600;font-size:14.5px;border:2px solid currentColor;min-height:44px}
+
+        .tam .bcc{background:var(--black);color:var(--white)}
+        .tam .bcc .cta{background:var(--pink);border-color:var(--pink);color:var(--white)}
+        .tam .odc{background:var(--pink)}
+        .tam .odc .cta{background:var(--black);color:var(--white);border-color:var(--black)}
+        .tam .premium .cta{background:var(--pink);color:var(--white);border-color:var(--pink)}
+        .tam .community{background:var(--pink-soft);border-style:dashed}
+        .tam .free{position:absolute;top:12px;right:12px;font-family:var(--display);font-weight:900;font-size:24px;line-height:1.2;color:var(--pink);background:var(--white);transform:rotate(6deg);border:3px solid var(--pink);padding:0 8px}
+        .tam .soldout{opacity:.55}
+        .tam .soldout .cta{background:transparent !important;color:inherit !important;border-color:currentColor !important}
+
+        @media (hover:hover){
+          .tam .card:hover{transform:translate(-3px,-3px);box-shadow:6px 6px 0 var(--black)}
+          .tam .bcc:hover{box-shadow:6px 6px 0 var(--pink)}
         }
-        @keyframes fadeInUp { 0% { opacity: 0; transform: translateY(40px); } 100% { opacity: 1; transform: translateY(0); } }
-        .animate-fade-in-up { animation: fadeInUp 1s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+        /* Empty / loading states */
+        .tam .state{padding:40px 0 48px;font-size:17px;color:var(--grey);text-align:center}
+        .tam .empty{border:2px dashed var(--black);padding:40px 24px;text-align:center;margin:22px 0 10px}
+        .tam .empty h3{font-family:var(--display);font-weight:900;font-size:clamp(28px,5vw,44px);line-height:.98;margin:0 0 10px}
+        .tam .empty p{margin:0 auto 20px;max-width:44ch;font-size:16px;color:var(--grey)}
+
+        /* Archive grid */
+        .tam .archive{border-top:2px solid var(--black);padding-top:44px;padding-bottom:44px;margin-top:40px}
+        .tam .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:22px}
+        .tam .shot{position:relative;aspect-ratio:1;overflow:hidden;border:2px solid var(--black);background:#eee}
+        .tam .shot img{transition:transform .8s ease}
+        @media (hover:hover){ .tam .shot:hover img{transform:scale(1.06)} }
+        .tam .more{text-align:center;margin-top:24px}
+
+        /* CTA */
+        .tam .join{border-top:2px solid var(--black);padding-top:44px;padding-bottom:48px;display:flex;justify-content:space-between;align-items:center;gap:24px;flex-wrap:wrap}
+        .tam .join p{margin:10px 0 0;max-width:48ch}
+        .tam .btns{display:flex;gap:12px;flex-wrap:nowrap}
+        .tam .btn{flex:1 1 0;display:inline-block;padding:14px 20px;font-weight:600;font-size:15px;text-decoration:none;border:2px solid var(--black);text-align:center;white-space:nowrap;background:var(--white);cursor:pointer;font-family:inherit}
+        .tam .btn.pink{background:var(--pink);border-color:var(--pink);color:var(--white)}
+        .tam .btn.dark{background:var(--black);border-color:var(--black);color:var(--white)}
+
+        /* Footer */
+        .tam footer{background:var(--black);color:var(--white);padding:32px 0 calc(40px + env(safe-area-inset-bottom,0px))}
+        .tam footer .bar{flex-wrap:wrap;align-items:flex-start;min-height:auto}
+        .tam footer nav{display:flex;gap:20px;flex-wrap:wrap;font-size:15px}
+        .tam footer small{display:block;color:#9a9a9a;margin-top:10px;font-size:13px}
+
+        @media (max-width:1024px){ .tam .name{font-size:30px} }
+
+        /* Mobile */
+        @media (max-width:820px){
+          .tam .wrap{padding:0 20px}
+          .tam .bar{padding-top:14px;padding-bottom:14px;min-height:60px;gap:10px}
+          .tam .navlinks{gap:16px;font-size:14.5px}
+          .tam .hero{padding-top:32px;padding-bottom:6px}
+          .tam .eyebrow{font-size:13.5px}
+          .tam .lede{font-size:15.5px}
+          .tam .sechead{margin-top:28px;padding-top:18px}
+          .tam .events{grid-template-columns:repeat(2,1fr);gap:14px;padding:18px 0 6px}
+          .tam .card-body{padding:16px;padding-top:40px;min-height:200px}
+          .tam .format{font-size:12px}
+          .tam .name{font-size:22px;margin:8px 0 6px}
+          .tam .desc{font-size:13px;line-height:1.45}
+          .tam .meta{margin:16px 0 12px;font-size:12.5px}
+          .tam .meta span{font-size:11px}
+          .tam .status{font-size:12px;margin-bottom:10px}
+          .tam .cta{padding:11px;font-size:13.5px}
+          .tam .free{font-size:16px;top:10px;right:10px;padding:0 6px}
+          .tam .empty{padding:32px 18px}
+          .tam .archive{padding-top:36px;padding-bottom:36px;margin-top:32px}
+          .tam .grid{grid-template-columns:repeat(2,1fr);gap:10px}
+          .tam .join{padding-top:36px;padding-bottom:44px;flex-direction:column;align-items:flex-start}
+          .tam .btns{width:100%}
+          .tam .btn{padding:14px 10px;font-size:14px}
+          .tam footer nav{gap:16px;margin-top:16px}
+        }
+
+        @media (max-width:380px){ .tam .navlinks{gap:12px;font-size:13.5px} }
+        @media (max-width:360px){
+          .tam .wrap{padding:0 16px}
+          .tam .events{gap:10px}
+          .tam .name{font-size:19px}
+          .tam .card-body{padding:12px;padding-top:36px}
+        }
+
+        @media (prefers-reduced-motion:reduce){
+          .tam .reveal{opacity:1;transform:none;transition:none}
+          .tam .card,.tam .top{transition:none}
+          .tam .dot{animation:none}
+        }
       `}} />
 
-      <div className="canvas-texture"></div>
-
-      {/* Floating Navigation */}
-      <nav 
-        className={`fixed top-4 left-0 right-0 z-[60] flex justify-center px-4 transition-all duration-500 ease-in-out ${
-          isNavVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10 pointer-events-none'
-        }`}
-      >
-        <div className="glass-card px-4 sm:px-6 py-2 sm:py-3 rounded-full shadow-lg flex items-center justify-between gap-3 sm:gap-6 max-w-max bg-black/60 border border-white/10">
-          <Link href="/" className="cursor-pointer mr-1 sm:mr-0 shrink-0 flex items-center hover:opacity-70 transition-opacity">
-            <Image src="/images/white_logo.png" alt="3AM Ideas" width={120} height={30} className="h-5 sm:h-6 w-auto object-contain" />
+      <header className={`top ${isNavVisible ? '' : 'hidden'}`}>
+        <div className="wrap bar">
+          <Link href="/" aria-label="3 AM Ideas home" style={{ display: 'flex', alignItems: 'center' }}>
+            <Image src="/images/white_logo.png" alt="3 AM Ideas" width={130} height={32} priority style={{ height: 28, width: 'auto' }} />
           </Link>
-          <div className="w-1 h-1 rounded-full bg-[#FF2D78] hidden sm:block"></div>
-          <Link href="/about" className="font-sans text-[11px] sm:text-[10px] uppercase tracking-widest font-bold text-white/60 hover:text-white transition-colors py-2 px-1 sm:p-0">About</Link>
-          <div className="w-1 h-1 rounded-full bg-white/20 hidden sm:block"></div>
-          <Link href="/event" className="font-sans text-[11px] sm:text-[10px] uppercase tracking-widest font-bold text-[#FF2D78] transition-colors py-2 px-1 sm:p-0">Gatherings</Link>
+          <nav className="navlinks">
+            <Link href="/about">About</Link>
+            <Link href="/event" className="on">All events</Link>
+          </nav>
         </div>
-      </nav>
-
-      {/* Events Hero Section */}
-      <header className="relative pt-32 pb-16 md:pt-40 md:pb-20 px-4 md:px-6 flex flex-col items-center text-center z-10 border-b border-white/5">
-        <h1 className="font-serif text-5xl md:text-7xl font-light text-white mb-6 animate-fade-in-up">The Lineup</h1>
-        <p className="font-serif italic text-xl md:text-2xl text-white/60 max-w-2xl animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-          Every night has a story. See what's coming up — and look back at the rooms we've built together.
-        </p>
       </header>
 
-      {/* Events List */}
-      <section className="py-16 px-4 md:px-6 relative z-10 min-h-[40vh]">
-        <div className="max-w-4xl mx-auto">
+      <main>
+        <section className="wrap hero">
+          <p className="eyebrow">The lineup</p>
+          <h1>Every <span className="brand">3 AM</span> event</h1>
+          <p className="lede">What&apos;s open right now, and everything we&apos;ve run before. Pick one and come along.</p>
+        </section>
+
+        <section className="wrap">
           {isLoading ? (
-            <div className="text-center font-serif text-xl animate-pulse text-white/50 mt-12">Loading the lineup...</div>
-          ) : events.length === 0 ? (
-            <div className="text-center mt-20 flex flex-col items-center animate-fade-in-up">
-               <svg className="w-16 h-16 text-white/20 mb-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-               <h3 className="font-serif text-3xl text-white mb-2">Nothing scheduled right now.</h3>
-               <p className="font-sans text-sm text-white/50 uppercase tracking-widest">Something's always brewing. Check back soon.</p>
-            </div>
+            <p className="state">Loading the lineup…</p>
           ) : (
-            <div className="space-y-16">
-              {events.map((event, index) => {
-                const isExpanded = expandedCards[event.id];
-                const desc = event.description || "";
-                const isLongDesc = desc.length > 120;
-                const displayDesc = isExpanded ? desc : (isLongDesc ? desc.slice(0, 120) + '...' : desc);
-                const isSoldOut = event.status && (event.status.toLowerCase().includes('sold') || event.status.toLowerCase().includes('closed'));
-                const isExternalImage = event.image_url && event.image_url.startsWith('http');
+            <>
+              <div className="sechead">
+                <h2 className="h2">Open now</h2>
+                {upcoming.length > 0 && <span className="count">{upcoming.length} {upcoming.length === 1 ? 'event' : 'events'}</span>}
+              </div>
 
-                return (
-                  <div key={event.id} onClick={() => handleCardClick(event.id)}
-                    className="cursor-pointer animate-fade-in-up glass-card rounded-[2rem] overflow-hidden shadow-2xl shadow-black/40 flex flex-col md:flex-row group hover:-translate-y-2 transition-all duration-500 bg-white/[0.04]"
-                    style={{ animationDelay: `${index * 0.1}s` }}>
-                    
-                    {/* Event Card Image */}
-                    <div className="w-full md:w-2/5 relative h-64 md:h-auto min-h-[16rem] overflow-hidden bg-[#1A1817]">
-                      {event.image_url ? (
-                        isExternalImage ? (
-                          <img src={event.image_url} className={`absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000 ${isSoldOut ? 'grayscale opacity-80' : ''}`} alt={event.title} loading="lazy" />
-                        ) : (
-                          <Image src={event.image_url} alt={event.title} fill quality={75} sizes="(max-width: 768px) 100vw, 40vw" className={`object-cover group-hover:scale-105 transition-transform duration-1000 ${isSoldOut ? 'grayscale opacity-80' : ''}`} loading="lazy" />
-                        )
-                      ) : (
-                        <div className="absolute inset-0 flex items-center justify-center bg-[#004E98]/20">
-                          <span className="font-serif italic text-[#F7F5F0]/50 text-sm">Artwork Pending</span>
-                        </div>
-                      )}
-                      
-                      {/* Sold Out Overlay Tag */}
-                      {isSoldOut && (
-                        <div className="absolute top-4 left-4 bg-black/80 text-white font-sans text-[9px] uppercase tracking-widest font-bold py-1.5 px-3 rounded-full">
-                          Past Night
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="w-full md:w-3/5 p-8 md:p-10 flex flex-col">
-                      <span className={`font-sans text-[10px] uppercase tracking-[0.4em] mb-2 font-bold ${isSoldOut ? 'text-white/40' : 'text-[#FF2D78]'}`}>{event.id}</span>
-                      <h3 className="font-serif text-3xl md:text-4xl text-white mb-2">{event.title}</h3>
-                      <p className="font-serif italic text-lg md:text-xl text-white/60 mb-6">{event.tagline}</p>
-
-                      <div className="mb-8">
-                        <p className="font-sans text-sm md:text-base text-white/75 leading-relaxed transition-all duration-300">
-                          {displayDesc}
-                          {isLongDesc && (
-                            <button onClick={(e) => toggleExpand(e, event.id)} className="ml-2 font-bold text-[#FF2D78] text-[10px] uppercase tracking-widest hover:text-white transition-colors">
-                              {isExpanded ? "See Less" : "See More"}
-                            </button>
-                          )}
-                        </p>
-                      </div>
-
-                      <div className="mt-auto pt-6 border-t border-white/10 flex items-center justify-between">
-                        <div className="flex flex-col gap-1">
-                          <span className={`font-sans text-[10px] md:text-[11px] uppercase tracking-widest font-bold flex items-center gap-2 ${isSoldOut ? 'text-white/40' : 'text-[#FF2D78]'}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${isSoldOut ? 'bg-white/40' : 'bg-[#FF2D78] animate-pulse'}`}></span>
-                            {event.status || 'Check Availability'}
-                          </span>
-                          <div className="font-serif text-xl text-white flex items-center gap-2">
-                            <span>₹{event.price || '999'}</span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                          <span className="hidden sm:block font-sans text-[10px] uppercase tracking-widest text-white font-bold group-hover:text-[#FF2D78] transition-colors">
-                            {isSoldOut ? 'View Gallery' : (event.button_text || 'View Details')}
-                          </span>
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors shadow-md ${isSoldOut ? 'bg-white/20 text-white group-hover:bg-white/30' : 'bg-white text-[#0A0A0B] group-hover:bg-[#FF2D78] group-hover:text-white'}`}>
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+              {upcoming.length === 0 ? (
+                <div className="empty">
+                  <h3>Nothing open right now</h3>
+                  <p>The next calendar drops on the 1st of the month. The WhatsApp community hears first.</p>
+                  <div className="btns" style={{ justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <a className="btn dark" href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" style={{ flex: '0 1 auto' }}>Join WhatsApp</a>
                   </div>
-                );
-              })}
-            </div>
+                </div>
+              ) : (
+                <div className="events">{upcoming.map(renderCard)}</div>
+              )}
+
+              {past.length > 0 && (
+                <>
+                  <div className="sechead">
+                    <h2 className="h2">Already happened</h2>
+                    <span className="count">{past.length} {past.length === 1 ? 'event' : 'events'}</span>
+                  </div>
+                  <div className="events">{past.map(renderCard)}</div>
+                </>
+              )}
+            </>
           )}
-        </div>
-      </section>
+        </section>
 
-      {/* DEDICATED ARCHIVE GALLERY GRID */}
-      {galleryImages.length > 0 && (
-        <section className="py-20 px-4 md:px-6 relative z-10 border-t border-white/5">
-          <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-16 reveal" ref={setRef}>
-              <h2 className="font-serif text-4xl md:text-5xl font-light text-white">Nights We Remember</h2>
-              <p className="font-sans text-sm tracking-widest text-white/50 uppercase mt-4">Glimpses from past gatherings</p>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+        {galleryImages.length > 0 && (
+          <section className="wrap archive">
+            <h2 className="h2">A glimpse of the events</h2>
+            <div className="grid">
               {galleryImages.slice(0, visibleGalleryCount).map((filename, index) => (
-                <div 
-                  key={index} 
-                  className="relative aspect-square rounded-[2rem] overflow-hidden shadow-lg border border-white/10 group reveal"
-                  ref={setRef}
-                >
-                  <Image 
-                    src={`/images/home/${filename}`} 
-                    alt={`3AM Ideas Archive - ${filename}`} 
-                    fill 
+                <div key={index} className="shot reveal" ref={setRef}>
+                  <Image
+                    src={`/images/home/${filename}`}
+                    alt={`3 AM Ideas event photo ${index + 1}`}
+                    fill
                     quality={80}
-                    sizes="(max-width: 768px) 50vw, 33vw"
-                    className="object-cover group-hover:scale-110 transition-all duration-1000 md:grayscale group-hover:grayscale-0" 
+                    sizes="(max-width: 820px) 50vw, 33vw"
+                    style={{ objectFit: 'cover' }}
                   />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-500"></div>
                 </div>
               ))}
             </div>
-
-            {/* Load More Button */}
             {visibleGalleryCount < galleryImages.length && (
-              <div className="text-center mt-16 reveal" ref={setRef}>
-                <button 
-                  onClick={loadMoreImages}
-                  className="inline-block border border-white/20 bg-transparent text-white font-sans text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold py-4 px-10 rounded-full hover:bg-white hover:text-[#0A0A0B] transition-all duration-500 hover:-translate-y-1"
-                >
-                  Load More Memories
-                </button>
+              <div className="more">
+                <button className="btn" onClick={loadMoreImages} style={{ flex: '0 1 auto' }}>Load more photos</button>
               </div>
             )}
+          </section>
+        )}
+
+        <section className="wrap join">
+          <div>
+            <h2 className="h2">Hear about the next one first</h2>
+            <p>The full calendar drops on the 1st of every month. The WhatsApp community gets it before anyone else.</p>
+          </div>
+          <div className="btns">
+            <a className="btn dark" href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer">Join WhatsApp</a>
+            <Link className="btn pink" href="/join">Get on the list</Link>
           </div>
         </section>
-      )}
+      </main>
 
-      {/* Newsletter / WhatsApp CTA */}
-      <section className="py-24 px-4 md:px-6 relative z-10">
-        <div className="max-w-2xl mx-auto glass-card rounded-[2rem] p-10 md:p-14 text-center shadow-xl">
-          <svg className="w-10 h-10 mx-auto text-[#25D366] mb-6" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12.031 0C5.385 0 0 5.385 0 12.031c0 2.115.552 4.148 1.597 5.952L.15 23.473l5.65-1.48c1.745.962 3.712 1.472 5.755 1.472h.004c6.645 0 12.03-5.384 12.03-12.03S18.676 0 12.031 0zm0 21.492c-1.782 0-3.535-.48-5.076-1.385l-.364-.216-3.766.988.997-3.67-.238-.376A9.972 9.972 0 012.052 12.03c0-5.503 4.478-9.98 9.983-9.98 2.668 0 5.176 1.04 7.062 2.927a9.92 9.92 0 012.924 7.054c0 5.503-4.478 9.98-9.98 9.98zm5.474-7.48c-.3-.15-1.776-.877-2.05-.978-.276-.1-.476-.15-.677.15-.2.3-.775.978-.95 1.178-.175.2-.35.225-.65.075-.3-.15-1.267-.468-2.414-1.488-.89-.79-1.49-1.767-1.665-2.067-.175-.3-.018-.462.132-.612.135-.135.3-.35.45-.525.15-.175.2-.3.3-.5.1-.2.05-.375-.025-.525-.075-.15-.676-1.626-.926-2.226-.244-.585-.49-.505-.677-.515-.175-.01-.375-.01-.575-.01-.2 0-.525.075-.8.375-.275.3-1.05 1.025-1.05 2.5s1.075 2.9 1.225 3.1c.15.2 2.112 3.226 5.112 4.526.715.31 1.272.494 1.706.632.716.228 1.368.196 1.884.118.577-.087 1.775-.726 2.025-1.426.25-.7.25-1.3.175-1.426-.075-.125-.275-.2-.575-.35z"></path>
-          </svg>
-          <h2 className="font-serif text-3xl md:text-4xl text-white mb-4">Don't miss the next one.</h2>
-          <p className="font-sans text-sm text-white/60 leading-relaxed mb-8">
-            Spots go fast, and everything here is curated. Join the community to be first to know when we announce the next gathering.
-          </p>
-          <a href="https://chat.whatsapp.com/B68V6Q62HZPHHsGMG0t4jP" target="_blank" rel="noopener noreferrer" className="inline-block bg-[#25D366] text-white font-sans text-xs uppercase tracking-[0.2em] font-bold py-4 px-10 rounded-full hover:scale-105 transition-transform duration-300 shadow-lg shadow-[#25D366]/30">
-            Join the Community
-          </a>
+      <footer>
+        <div className="wrap bar">
+          <div>
+            <Image src="/images/white_logo.png" alt="3 AM Ideas" width={120} height={30} style={{ height: 24, width: 'auto' }} />
+            <small>© {new Date().getFullYear()} 3 AM Ideas, Bangalore</small>
+          </div>
+          <nav>
+            <Link href="/">Home</Link>
+            <Link href="/about">About</Link>
+            <Link href="/terms">Terms &amp; Conditions</Link>
+            <a href="mailto:wearemusawwir@gmail.com">Contact</a>
+          </nav>
         </div>
-      </section>
-
-      {/* Unified Footer */}
-      <footer className="py-20 text-center relative z-10 border-t border-white/10 flex flex-col items-center">
-        <div className="w-40 h-12 relative mb-6">
-          <Image src="/images/white_logo.png" alt="3AM Ideas Logo" fill className="object-contain opacity-80" />
-        </div>
-        <p className="font-serif italic text-white/60 text-2xl mb-8 px-4">Some ideas are too good to sleep on.</p>
-        <p className="font-sans text-[9px] text-white/30 uppercase tracking-widest">© {new Date().getFullYear()} 3AM Ideas. All rights reserved.</p>
       </footer>
     </div>
   );

@@ -1,60 +1,30 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 
+const WHATSAPP_URL = "https://chat.whatsapp.com/B68V6Q62HZPHHsGMG0t4jP";
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzvmQy_HZOGPq1KrNg3hE8DF1NCwrwv00aFSgb8naf4Wm0FX-sV7PeeI7ijrwN2QBeT/exec';
+
+const INTERESTS = [
+  { value: 'Broken Camera Crew', label: 'Broken Camera Crew', note: 'One-day filmmaking chaos' },
+  { value: 'One Day Crew',       label: 'One Day Crew',       note: 'Teams, a challenge, a deadline' },
+  { value: '3 AM Community',     label: '3 AM Community',     note: 'Free meetups. The easiest way in' },
+  { value: 'Anything',           label: 'Surprise me',        note: 'Tell me whatever is next' },
+];
+
 export default function JoinPage() {
-  const [formData, setFormData] = useState({
-    name: '',
-    whatsapp: '',
-    interest: '',
-    message: ''
-  });
-  
-  const [status, setStatus] = useState('idle'); // idle, loading, success, error
-  const [galleryImages, setGalleryImages] = useState([]);
-  const revealRefs = useRef([]);
+  const [formData, setFormData] = useState({ name: '', whatsapp: '', interest: '', message: '' });
+  const [status, setStatus] = useState('idle'); // idle | loading | success | error
 
-  // Fetch dynamic gallery images
-  useEffect(() => {
-    fetch('/api/gallery')
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) setGalleryImages(data);
-      })
-      .catch(err => console.error("Could not load gallery images:", err));
-  }, []);
-
-  // Scroll Reveal Animation Observer
-  const setRef = (el) => {
-    if (el && !revealRefs.current.includes(el)) {
-      revealRefs.current.push(el);
-    }
-  };
-
-  useEffect(() => {
-    const observerOptions = { root: null, rootMargin: '0px', threshold: 0.1 };
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('active');
-          observer.unobserve(entry.target);
-        }
-      });
-    }, observerOptions);
-    
-    revealRefs.current.forEach((ref) => { if (ref) observer.observe(ref); });
-    return () => observer.disconnect();
-  }, [galleryImages]);
-
-  // Accidental Exit Prevention
+  // Warn before leaving with an unsent form
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       const isDirty = formData.name || formData.whatsapp || formData.interest || formData.message;
       if (isDirty && status !== 'success') {
         e.preventDefault();
-        e.returnValue = ''; 
+        e.returnValue = '';
       }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -76,10 +46,8 @@ export default function JoinPage() {
     data.append('interest', formData.interest);
     data.append('message', formData.message);
 
-    const scriptURL = 'https://script.google.com/macros/s/AKfycbzvmQy_HZOGPq1KrNg3hE8DF1NCwrwv00aFSgb8naf4Wm0FX-sV7PeeI7ijrwN2QBeT/exec';
-
     try {
-      await fetch(scriptURL, { method: 'POST', body: data, mode: 'no-cors' });
+      await fetch(SCRIPT_URL, { method: 'POST', body: data, mode: 'no-cors' });
       setStatus('success');
       setFormData({ name: '', whatsapp: '', interest: '', message: '' });
     } catch (error) {
@@ -89,260 +57,213 @@ export default function JoinPage() {
   };
 
   return (
-    <div className="bg-[#0A0A0B] text-[#F5F3EF] font-sans antialiased selection:bg-[#FF2D78] selection:text-white min-h-screen relative overflow-x-hidden">
-      
-      <style dangerouslySetInnerHTML={{__html: `
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Manrope:wght@200;300;400;500;600;700&display=swap');
-        html { scroll-behavior: smooth; }
-        .font-serif { font-family: 'Cormorant Garamond', serif; }
-        .font-sans { font-family: 'Manrope', sans-serif; }
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        
-        /* Fast CSS Texture */
-        .canvas-texture {
-            position: fixed; inset: 0; z-index: 0; pointer-events: none;
-            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.06'/%3E%3C/svg%3E");
-            mix-blend-mode: screen; opacity: 0.5;
+    <div className="tam">
+      <style dangerouslySetInnerHTML={{ __html: `
+        @import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Instrument+Sans:wght@400;500;600&display=swap');
+
+        html,body{margin:0;padding:0;width:100%;max-width:100%}
+        .tam{
+          min-width:0;
+          --pink:#FF0065; --pink-soft:#FFE3EE; --black:#000; --white:#fff; --grey:#5c5c5c;
+          --display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
+          --body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+          font-family:var(--body); background:var(--white); color:var(--black);
+          line-height:1.55; font-size:17px; width:100%; max-width:100vw; overflow-x:hidden; min-height:100vh;
         }
-        
-        /* Animations */
-        .reveal { opacity: 0; transform: translateY(30px); transition: all 1s cubic-bezier(0.16, 1, 0.3, 1); }
-        .reveal.active { opacity: 1; transform: translateY(0); }
-        
-        @keyframes fadeInUp { 0% { opacity: 0; transform: translateY(20px); } 100% { opacity: 1; transform: translateY(0); } }
-        .animate-fade-in-up { animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-        
-        @keyframes fadeIn { 0% { opacity: 0; backdrop-filter: blur(0px); } 100% { opacity: 1; backdrop-filter: blur(12px); } }
-        .animate-fade-in-blur { animation: fadeIn 0.4s ease-out forwards; }
+        html{scroll-behavior:smooth}
+        .tam *{box-sizing:border-box}
+        .tam a{color:inherit}
+        .tam .brand{color:var(--pink)}
+        .tam :focus-visible{outline:3px solid var(--pink);outline-offset:3px}
+        .tam .wrap{max-width:1180px;margin:0 auto;padding:0 24px;width:100%}
+
+        /* Header */
+        .tam .top{position:sticky;top:0;z-index:60;background:var(--black);color:var(--white);padding-top:env(safe-area-inset-top,0px)}
+        .tam .bar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-top:16px;padding-bottom:16px;min-height:64px}
+        .tam .navlinks{display:flex;align-items:center;gap:20px;font-size:16px;font-weight:500;flex:0 0 auto}
+        .tam .navlinks a{text-decoration:none;opacity:.85;padding:8px 2px;display:inline-block;white-space:nowrap}
+        .tam .navlinks a:hover{opacity:1;color:var(--pink)}
+
+        /* Hero */
+        .tam .hero{padding-top:48px;padding-bottom:24px;text-align:center;display:flex;flex-direction:column;align-items:center}
+        .tam .eyebrow{font-weight:500;color:var(--pink);font-size:15px;margin:0;letter-spacing:.04em;text-transform:uppercase}
+        .tam h1{font-family:var(--display);font-weight:900;font-size:clamp(46px,12vw,140px);line-height:.92;letter-spacing:-.5px;margin:12px 0 14px}
+        .tam .lede{max-width:54ch;font-size:17px;color:#222;margin:0 auto}
+
+        /* Form */
+        .tam .formwrap{border-top:2px solid var(--black);padding-top:40px;padding-bottom:56px;max-width:680px;margin-left:auto;margin-right:auto}
+        .tam form{display:flex;flex-direction:column;gap:28px}
+        .tam .field{display:flex;flex-direction:column;gap:8px}
+        .tam .field label{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+        .tam .field .hint{font-size:13px;color:var(--grey);font-weight:400;text-transform:none;letter-spacing:0}
+        .tam input[type=text],.tam input[type=tel],.tam textarea{
+          font:inherit;font-size:16px;padding:13px 14px;border:2px solid var(--black);background:var(--white);color:var(--black);width:100%;border-radius:0}
+        .tam textarea{resize:vertical;min-height:96px}
+        .tam input::placeholder,.tam textarea::placeholder{color:#9a9a9a}
+        .tam input:focus,.tam textarea:focus{outline:none;border-color:var(--pink);box-shadow:3px 3px 0 var(--pink)}
+
+        .tam .choices{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+        .tam .choice{position:relative;display:flex;flex-direction:column;gap:2px;padding:14px;border:2px solid var(--black);cursor:pointer;background:var(--white)}
+        .tam .choice input{position:absolute;opacity:0;pointer-events:none}
+        .tam .choice .ttl{font-weight:600;font-size:15.5px}
+        .tam .choice .note{font-size:13px;color:var(--grey)}
+        .tam .choice.on{background:var(--pink);border-color:var(--pink);color:var(--white)}
+        .tam .choice.on .note{color:rgba(255,255,255,.85)}
+        .tam .choice input:focus-visible + .ttl{outline:3px solid var(--pink);outline-offset:3px}
+
+        .tam .submit{font:inherit;font-weight:600;font-size:16px;padding:16px;border:2px solid var(--pink);background:var(--pink);color:var(--white);
+          cursor:pointer;width:100%;border-radius:0}
+        .tam .submit:disabled{opacity:.6;cursor:wait}
+        .tam .err{color:var(--pink);font-weight:600;font-size:14px;margin:12px 0 0;text-align:center}
+        .tam .small{font-size:13.5px;color:var(--grey);margin:0}
+
+        /* Success panel (replaces the form, no modal) */
+        .tam .done{border:2px solid var(--black);padding:36px 28px;text-align:center;box-shadow:6px 6px 0 var(--pink)}
+        .tam .done h2{font-family:var(--display);font-weight:900;font-size:clamp(34px,7vw,58px);line-height:.95;margin:0 0 12px}
+        .tam .done p{margin:0 auto 22px;max-width:46ch;font-size:16px}
+        .tam .done .btns{display:flex;gap:12px;flex-wrap:nowrap;justify-content:center}
+
+        /* What happens next */
+        .tam .next{border-top:2px solid var(--black);padding-top:44px;padding-bottom:48px}
+        .tam .h2{font-family:var(--display);font-weight:900;font-size:clamp(32px,6vw,60px);line-height:.95;margin:0 0 20px}
+        .tam .steps{list-style:none;margin:0;padding:0;border-top:1px solid var(--black)}
+        .tam .steps li{display:grid;grid-template-columns:44px 1fr;gap:14px;padding:16px 4px;border-bottom:1px solid var(--black);font-size:16px}
+        .tam .steps b{font-family:var(--display);font-weight:900;font-size:30px;line-height:.9;color:var(--pink)}
+
+        .tam .btn{flex:1 1 0;display:inline-block;padding:14px 20px;font-weight:600;font-size:15px;text-decoration:none;
+          border:2px solid var(--black);text-align:center;white-space:nowrap}
+        .tam .btn.pink{background:var(--pink);border-color:var(--pink);color:var(--white)}
+        .tam .btn.dark{background:var(--black);border-color:var(--black);color:var(--white)}
+
+        /* Footer */
+        .tam footer{background:var(--black);color:var(--white);padding:32px 0 calc(40px + env(safe-area-inset-bottom,0px))}
+        .tam footer .bar{flex-wrap:wrap;align-items:flex-start;min-height:auto}
+        .tam footer nav{display:flex;gap:20px;flex-wrap:wrap;font-size:15px}
+        .tam footer small{display:block;color:#9a9a9a;margin-top:10px;font-size:13px}
+
+        /* Mobile */
+        @media (max-width:820px){
+          .tam .wrap{padding:0 20px}
+          .tam .bar{padding-top:14px;padding-bottom:14px;min-height:60px;gap:10px}
+          .tam .navlinks{gap:16px;font-size:14.5px}
+          .tam .hero{padding-top:34px;padding-bottom:18px}
+          .tam .eyebrow{font-size:13.5px}
+          .tam .lede{font-size:15.5px}
+          .tam .formwrap{padding-top:32px;padding-bottom:44px}
+          .tam form{gap:24px}
+          .tam .choices{grid-template-columns:1fr;gap:9px}
+          .tam .choice{padding:13px}
+          .tam .done{padding:28px 20px}
+          .tam .done .btns{flex-direction:column}
+          .tam .next{padding-top:36px;padding-bottom:40px}
+          .tam .steps li{grid-template-columns:36px 1fr;gap:12px;font-size:15px}
+          .tam .steps b{font-size:26px}
+          .tam footer nav{gap:16px;margin-top:16px}
+        }
+
+        @media (max-width:380px){ .tam .navlinks{gap:12px;font-size:13.5px} }
+        @media (max-width:360px){ .tam .wrap{padding:0 16px} }
       `}} />
 
-      <div className="canvas-texture"></div>
-
-      {/* --- SUCCESS MODAL OVERLAY --- */}
-      {status === 'success' && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0A0A0B]/90 animate-fade-in-blur px-4">
-          <div className="bg-white/[0.05] border border-white/10 p-10 md:p-14 rounded-[2rem] shadow-2xl text-center max-w-lg w-full flex flex-col items-center animate-fade-in-up relative overflow-hidden backdrop-blur-xl">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-[#FF2D78] rounded-full filter blur-[60px] opacity-20"></div>
-            <div className="w-16 h-16 bg-[#25D366]/15 text-[#25D366] rounded-full flex items-center justify-center mb-6">
-              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path>
-              </svg>
-            </div>
-            <h2 className="font-serif italic text-4xl text-white mb-4">You're on the list.</h2>
-            <p className="font-sans text-sm md:text-base text-white/60 leading-relaxed mb-8">
-              We've got your details. We'll reach out on WhatsApp when the next gathering opens up.
-            </p>
-            <Link href="/" className="bg-white text-[#0A0A0B] font-sans text-xs uppercase tracking-[0.2em] font-bold py-4 px-8 rounded-xl hover:bg-[#FF2D78] hover:text-white transition-all hover:shadow-xl hover:-translate-y-1">
-              Return Home
-            </Link>
-          </div>
+      <header className="top">
+        <div className="wrap bar">
+          <Link href="/" aria-label="3 AM Ideas home" style={{ display: 'flex', alignItems: 'center' }}>
+            <Image src="/images/white_logo.png" alt="3 AM Ideas" width={130} height={32} priority style={{ height: 28, width: 'auto' }} />
+          </Link>
+          <nav className="navlinks">
+            <Link href="/about">About</Link>
+            <Link href="/event">All events</Link>
+          </nav>
         </div>
-      )}
+      </header>
 
-      {/* --- 1. HERO & FORM SECTION --- */}
-      <section className="relative pt-16 pb-20 px-4 flex flex-col items-center min-h-screen justify-center z-10">
-        
-        {/* Logo Fast Load */}
-        <div className="w-48 h-16 relative mb-8 animate-fade-in-up">
-          <Image src="/images/white_logo.png" alt="3AM Ideas Logo" fill priority className="object-contain" />
-        </div>
-
-        {/* Simplified Header */}
-        <div className="text-center mb-10 max-w-xl animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
-          <h1 className="font-serif italic text-4xl md:text-5xl text-white mb-4">Join the Community</h1>
-          <p className="font-sans text-sm md:text-base text-white/60 leading-relaxed font-medium">
-            Curated rooms built on creation, curation, and real connection.
-          </p>
-        </div>
-
-        {/* Clean, Fast Form Card */}
-        <div className="w-full max-w-xl bg-white/[0.04] backdrop-blur-xl border border-white/10 rounded-[2rem] shadow-2xl shadow-black/40 overflow-hidden animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-          
-          <div className="bg-[#FF2D78] text-white p-8 md:p-10 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-40 h-40 bg-white rounded-full filter blur-[60px] opacity-20"></div>
-            <h2 className="font-serif text-3xl text-white relative z-10">Stay in the loop</h2>
-            <p className="font-sans text-[10px] tracking-widest uppercase text-white/90 relative z-10 mt-2 font-bold">Leave your details and we'll keep you posted</p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="p-8 md:p-10 flex flex-col gap-8 bg-white/[0.02]">
-            
-            <div className="space-y-6">
-              <div className="flex flex-col gap-2">
-                <label className="font-sans text-xs font-bold text-white uppercase tracking-wider">Full Name *</label>
-                <input type="text" name="name" value={formData.name} onChange={handleChange} required 
-                  className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 font-serif text-lg text-white focus:outline-none focus:border-[#FF2D78] focus:ring-1 focus:ring-[#FF2D78]/30 focus:bg-white/10 transition-all placeholder:text-white/30" 
-                  placeholder="Your name" />
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <label className="font-sans text-xs font-bold text-white uppercase tracking-wider">WhatsApp Number *</label>
-                <input type="tel" name="whatsapp" value={formData.whatsapp} onChange={handleChange} required 
-                  className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 font-sans text-base text-white focus:outline-none focus:border-[#FF2D78] focus:ring-1 focus:ring-[#FF2D78]/30 focus:bg-white/10 transition-all placeholder:text-white/30" 
-                  placeholder="+91 00000 00000" />
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <label className="font-sans text-xs font-bold text-white uppercase tracking-wider">What are you drawn to? *</label>
-              <div className="grid grid-cols-1 gap-3">
-                
-                <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${formData.interest === 'Strokes and Stories' ? 'border-[#FF2D78] bg-[#FF2D78]/10 shadow-sm' : 'border-white/10 bg-white/[0.03] hover:bg-white/[0.06]'}`}>
-                  <input type="radio" name="interest" value="Strokes and Stories" checked={formData.interest === 'Strokes and Stories'} onChange={handleChange} required className="w-4 h-4 text-[#FF2D78] focus:ring-[#FF2D78] accent-[#FF2D78]" />
-                  <div>
-                    <span className="font-serif text-[1.1rem] text-white block leading-tight">Strokes & Stories</span>
-                    <span className="font-sans text-[10px] text-white/50 uppercase tracking-widest">Guided painting & connection</span>
-                  </div>
-                </label>
-
-                <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${formData.interest === 'Broken Camera Crew' ? 'border-[#FF2D78] bg-[#FF2D78]/10 shadow-sm' : 'border-white/10 bg-white/[0.03] hover:bg-white/[0.06]'}`}>
-                  <input type="radio" name="interest" value="Broken Camera Crew" checked={formData.interest === 'Broken Camera Crew'} onChange={handleChange} required className="w-4 h-4 text-[#FF2D78] focus:ring-[#FF2D78] accent-[#FF2D78]" />
-                  <div>
-                    <span className="font-serif text-[1.1rem] text-white block leading-tight">Broken Camera Crew (BCC)</span>
-                    <span className="font-sans text-[10px] text-white/50 uppercase tracking-widest">Cinematic chaos experiment</span>
-                  </div>
-                </label>
-
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="font-sans text-xs font-bold text-white uppercase tracking-wider">Anything you want to say? (Optional)</label>
-              <textarea name="message" value={formData.message} onChange={handleChange} rows="3" 
-                className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 font-serif text-lg text-white focus:outline-none focus:border-[#FF2D78] focus:ring-1 focus:ring-[#FF2D78]/30 focus:bg-white/10 transition-all placeholder:text-white/30 resize-none w-full" 
-                placeholder="A thought, a question, or what pulled you here..."></textarea>
-            </div>
-
-            <div className="pt-4 border-t border-white/10">
-              <button type="submit" disabled={status === 'loading'}
-                className={`w-full text-white font-sans text-sm uppercase tracking-[0.2em] font-bold py-5 px-8 rounded-xl transition-all flex items-center justify-center 
-                  ${status === 'loading' ? 'bg-[#FF2D78]/80 cursor-wait' : 'bg-[#FF2D78] hover:bg-white hover:text-[#0A0A0B] hover:shadow-xl hover:-translate-y-1'}
-                `}>
-                {status === 'loading' ? (
-                  <span className="flex items-center gap-2">
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Sending Details...
-                  </span>
-                ) : (
-                  <span>Send Details</span>
-                )}
-              </button>
-              
-              {status === 'error' && (
-                <p className="text-center text-red-400 font-sans text-[11px] uppercase tracking-widest mt-4 font-bold">Something went wrong. Try again.</p>
-              )}
-            </div>
-
-          </form>
-        </div>
-      </section>
-
-      {/* --- 2. WHAT IS 3AM IDEAS (CONTEXT) --- */}
-      <section className="py-24 px-4 md:px-6 relative z-10 border-t border-white/5 bg-transparent">
-        <div ref={setRef} className="max-w-3xl mx-auto text-center reveal">
-          <h2 className="font-serif text-4xl md:text-5xl font-light text-white mb-10">What is 3AM Ideas?</h2>
-          
-          <div className="space-y-6 font-serif text-xl md:text-2xl text-white/60 font-light leading-relaxed px-2">
-            <p className="font-sans text-[12px] uppercase tracking-[0.4em] text-[#FF2D78] font-bold">The Philosophy</p>
-            <p className="text-white font-medium">Creation. Curation. Connection.</p>
-            <p>
-              Most people are carrying a fuller version of themselves that never gets to exist — because daily life turns repetitive, performative, and quietly disconnected.
-            </p>
-            <p>
-              3AM Ideas builds rooms where you get to step out of that routine and reconnect with curiosity, creation, and the kind of people you actually want around.
-            </p>
-            <p className="italic text-white">The formats change. The feeling doesn't.</p>
-          </div>
-        </div>
-      </section>
-
-      {/* --- 3. FORMATS (EXPLANATION FOR THE FORM CHOICES) --- */}
-      <section className="py-24 px-4 md:px-6 relative z-10 max-w-5xl mx-auto">
-        <div ref={setRef} className="text-center mb-16 reveal">
-          <h2 className="font-serif text-3xl md:text-4xl font-light text-white">Our Experimental Formats</h2>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Strokes and Stories */}
-          <div ref={setRef} className="bg-white/[0.04] border border-white/10 p-8 md:p-10 rounded-[2rem] reveal hover:-translate-y-2 transition-transform duration-500 shadow-xl shadow-black/40">
-            <span className="font-sans text-[10px] uppercase tracking-[0.4em] text-[#FF2D78] font-bold block mb-4">Format 01</span>
-            <h3 className="font-serif text-3xl text-white mb-4">Strokes & Stories</h3>
-            <p className="font-serif italic text-xl text-white mb-4">A guided painting gathering built around expression, connection, and shared creativity.</p>
-            <p className="font-sans text-white/60 leading-relaxed mb-6">
-              This is not a traditional art class, a networking, or a dating event. It is a calm creative gathering where people come together to slow down, paint freely, and reconnect with expression. Through a guided layered process, you won't recreate the same artwork as everyone else—you will learn how to begin creating freely and intuitively to build something entirely your own.
-            </p>
-            <ul className="space-y-3 font-serif text-lg text-white">
-              <li className="flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-[#FF2D78] block"></span> No pressure. No perfection. No prior experience.</li>
-              <li className="flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-[#FF2D78] block"></span> We provide the canvas, paints, and guidance.</li>
-              <li className="flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-[#FF2D78] block"></span> Bring your curiosity and a love for creation.</li>
-            </ul>
-          </div>
-
-          {/* BCC */}
-          <div ref={setRef} className="bg-white/[0.04] border border-white/10 p-8 md:p-10 rounded-[2rem] reveal hover:-translate-y-2 transition-transform duration-500 shadow-xl shadow-black/40" style={{ transitionDelay: '0.1s' }}>
-            <span className="font-sans text-[10px] uppercase tracking-[0.4em] text-[#FF2D78] font-bold block mb-4">Format 02</span>
-            <h3 className="font-serif text-3xl text-white mb-4">Broken Camera Crew</h3>
-            <p className="font-serif italic text-xl text-white mb-4">A one-day cinematic chaos experience across Bangalore.</p>
-            <p className="font-sans text-white/60 leading-relaxed mb-6">
-              Strangers come together to collaboratively build a story on the spot, assign random character roles, explore real city locations, improvise scenes, and shoot chaotic footage. The focus is on participation, spontaneity, and shared expression—not professional output. No acting or filmmaking experience required.
-            </p>
-            <ul className="space-y-3 font-serif text-lg text-white font-medium italic">
-              <li className="flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-[#FF2D78] block not-italic"></span> The city becomes the set.</li>
-              <li className="flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-[#FF2D78] block not-italic"></span> The people become the crew.</li>
-              <li className="flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-[#FF2D78] block not-italic"></span> The day becomes the film.</li>
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      {/* --- 4. SOCIAL PROOF / GALLERY (Fast Lazy Loading) --- */}
-      {galleryImages.length > 0 && (
-        <section className="py-24 relative z-10 overflow-hidden bg-[#FF2D78]">
-          <div ref={setRef} className="max-w-6xl mx-auto px-4 mb-12 text-center reveal">
-            <h2 className="font-serif text-4xl md:text-5xl font-light text-white">Nights We Remember</h2>
-            <span className="font-sans text-[10px] uppercase tracking-[0.3em] text-white/80 block mt-4 hidden md:block">Scroll →</span>
-          </div>
-          
-          <div className="flex gap-4 overflow-x-auto pb-8 snap-x hide-scrollbar px-4 md:px-8">
-            {galleryImages.map((filename, index) => (
-              <div 
-                key={index} 
-                className="snap-center shrink-0 w-[260px] md:w-[350px] lg:w-[400px] h-[320px] md:h-[450px] relative rounded-3xl overflow-hidden shadow-2xl border border-white/20 group bg-black/10"
-              >
-                <Image 
-                  src={`/images/home/${filename}`} 
-                  alt={`3AM Ideas Gathering - ${filename}`} 
-                  fill 
-                  quality={75}
-                  sizes="(max-width: 768px) 260px, (max-width: 1024px) 350px, 400px"
-                  className="object-cover group-hover:scale-105 transition-transform duration-1000" 
-                  loading="lazy"
-                />
-              </div>
-            ))}
-          </div>
+      <main>
+        <section className="wrap hero">
+          <p className="eyebrow">Join the community</p>
+          <h1>Get on the list</h1>
+          <p className="lede">Leave your details and we&apos;ll message you on WhatsApp when the next thing opens up. No spam, no newsletters.</p>
         </section>
-      )}
 
-      {/* --- 5. UNIFIED FOOTER --- */}
-      <footer className="py-20 text-center relative z-10 bg-[#0A0A0B] flex flex-col items-center border-t border-white/10">
-        <div className="w-40 h-12 relative mb-6">
-          <Image src="/images/white_logo.png" alt="3AM Ideas Logo" fill className="object-contain opacity-80" />
+        <section className="wrap formwrap">
+          {status === 'success' ? (
+            <div className="done">
+              <h2>You&apos;re on the list</h2>
+              <p>We&apos;ve got your details. We&apos;ll message you on WhatsApp when the next one opens up. Want it sooner? The community group gets everything first.</p>
+              <div className="btns">
+                <a className="btn dark" href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer">Join WhatsApp</a>
+                <Link className="btn pink" href="/event">See all events</Link>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit}>
+              <div className="field">
+                <label htmlFor="name">Your name</label>
+                <input id="name" type="text" name="name" value={formData.name} onChange={handleChange} required
+                       autoComplete="name" placeholder="What should we call you?" />
+              </div>
+
+              <div className="field">
+                <label htmlFor="whatsapp">WhatsApp number</label>
+                <input id="whatsapp" type="tel" name="whatsapp" value={formData.whatsapp} onChange={handleChange} required
+                       autoComplete="tel" inputMode="tel" placeholder="+91 00000 00000" />
+                <span className="hint">This is the only way we&apos;ll reach you.</span>
+              </div>
+
+              <div className="field">
+                <label>What pulls you in?</label>
+                <div className="choices">
+                  {INTERESTS.map(opt => (
+                    <label key={opt.value} className={`choice ${formData.interest === opt.value ? 'on' : ''}`}>
+                      <input type="radio" name="interest" value={opt.value} required
+                             checked={formData.interest === opt.value} onChange={handleChange} />
+                      <span className="ttl">{opt.label}</span>
+                      <span className="note">{opt.note}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="field">
+                <label htmlFor="message">Anything you want to say? <span className="hint">(optional)</span></label>
+                <textarea id="message" name="message" rows="3" value={formData.message} onChange={handleChange}
+                          placeholder="A thought, a question, or what brought you here…"></textarea>
+              </div>
+
+              <div>
+                <button className="submit" type="submit" disabled={status === 'loading'}>
+                  {status === 'loading' ? 'Sending…' : 'Send my details'}
+                </button>
+                {status === 'error' && (
+                  <p className="err">That didn&apos;t go through. Try again, or message us on WhatsApp.</p>
+                )}
+              </div>
+            </form>
+          )}
+        </section>
+
+        <section className="wrap next">
+          <h2 className="h2">What happens next</h2>
+          <ol className="steps">
+            <li><b>1</b><span>We save your details. Nothing goes out publicly, and we don&apos;t share your number.</span></li>
+            <li><b>2</b><span>When something opens that matches what you picked, we message you on WhatsApp.</span></li>
+            <li><b>3</b><span>You decide then. Being on the list doesn&apos;t commit you to anything.</span></li>
+          </ol>
+        </section>
+      </main>
+
+      <footer>
+        <div className="wrap bar">
+          <div>
+            <Image src="/images/white_logo.png" alt="3 AM Ideas" width={120} height={30} style={{ height: 24, width: 'auto' }} />
+            <small>© {new Date().getFullYear()} 3 AM Ideas, Bangalore</small>
+          </div>
+          <nav>
+            <Link href="/">Home</Link>
+            <Link href="/about">About</Link>
+            <Link href="/terms">Terms &amp; Conditions</Link>
+            <a href="mailto:wearemusawwir@gmail.com">Contact</a>
+          </nav>
         </div>
-        <p className="font-serif italic text-white/60 text-2xl mb-8 px-4">Some ideas are too good to sleep on.</p>
-        
-        <div className="flex flex-wrap justify-center items-center gap-4 sm:gap-6 mb-6 px-4">
-          <Link href="/" className="font-sans text-[10px] text-white/50 tracking-widest uppercase font-bold hover:text-[#FF2D78] transition-colors py-2">Home</Link>
-          <span className="w-1 h-1 rounded-full bg-white/20"></span>
-          <Link href="/about" className="font-sans text-[10px] text-white/50 tracking-widest uppercase font-bold hover:text-[#FF2D78] transition-colors py-2">About Us</Link>
-          <span className="w-1 h-1 rounded-full bg-white/20"></span>
-          <a href="mailto:wearemusawwir@gmail.com" className="font-sans text-[10px] text-white/50 tracking-widest uppercase font-bold hover:text-[#FF2D78] transition-colors py-2">Contact</a>
-        </div>
-        
-        <p className="font-sans text-[9px] text-white/30 uppercase tracking-widest">© {new Date().getFullYear()} 3AM Ideas. All rights reserved.</p>
       </footer>
     </div>
   );
