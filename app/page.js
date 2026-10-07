@@ -8,7 +8,7 @@ import Papa from 'papaparse';
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSSCmEDqxpPn1OEzXR3geUaynoeGhrswVO5xf8zKETC8xOq1oimP1SiapOAsSPY_nEMTHoDeacTgKC/pub?gid=0&single=true&output=csv";
 const WHATSAPP_URL = "https://chat.whatsapp.com/B68V6Q62HZPHHsGMG0t4jP";
 const TZ = "Asia/Kolkata";
-const DESC_MAX = 50;
+const DESC_MAX = 30;
 
 const SLOTS = [
   { style: 'bcc',       shortLabel: 'BCC',     fullName: 'Broken Camera Crew',   dummyDesc: 'One-day filmmaking chaos. Next edition drops soon.' },
@@ -41,7 +41,7 @@ function formatDate(raw) {
   if (isNaN(d.getTime())) return raw.toString().trim();
   return new Intl.DateTimeFormat('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: TZ }).format(d);
 }
-/* Hard cap at 50 characters. Whatever's in the sheet, the card never grows past this. */
+/* Hard cap at 30 characters. Whatever's in the sheet, the card never grows past this. */
 function truncate(text, max = DESC_MAX) {
   const t = (text || '').trim();
   if (!t) return '';
@@ -171,11 +171,20 @@ export default function App() {
     return () => observer.disconnect();
   }, [isLoading, events, galleryImages]);
 
+  /* Scroll handling: throttled via requestAnimationFrame, with hysteresis
+     (separate show/hide thresholds) on both the sticky CTA and the
+     "near footer" check, so hovering near a boundary can't flicker it. */
   useEffect(() => {
     let ticking = false;
     let prevY = window.scrollY;
     let navVisibleRef = true;
     let ctaVisibleRef = false;
+    let nearBottomRef = false;
+
+    const SHOW_AFTER = 950;
+    const HIDE_BEFORE = 820;
+    const BOTTOM_ENTER = 420;
+    const BOTTOM_EXIT = 520;
 
     const compute = () => {
       const y = window.scrollY;
@@ -187,8 +196,14 @@ export default function App() {
       }
 
       const distanceFromBottom = document.documentElement.scrollHeight - (y + window.innerHeight);
-      const nearBottom = distanceFromBottom < 420;
-      const shouldShowCta = y > 900 && !shouldShowNav && !nearBottom;
+      const nearBottomNow = nearBottomRef
+        ? distanceFromBottom < BOTTOM_EXIT
+        : distanceFromBottom < BOTTOM_ENTER;
+      nearBottomRef = nearBottomNow;
+
+      const shouldShowCta = ctaVisibleRef
+        ? (y > HIDE_BEFORE && !shouldShowNav && !nearBottomNow)
+        : (y > SHOW_AFTER && !shouldShowNav && !nearBottomNow);
       if (shouldShowCta !== ctaVisibleRef) {
         ctaVisibleRef = shouldShowCta;
         setShowMobileCta(shouldShowCta);
@@ -378,9 +393,12 @@ export default function App() {
 
           .tam footer nav{gap:16px;margin-top:16px}
 
-          .tam .mcta{display:block;position:fixed;left:20px;right:20px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:60;
+          .tam .mcta{
+            display:block;position:fixed;left:20px;right:20px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:60;
             text-align:center;background:var(--pink);color:var(--white);font-weight:600;font-size:15px;padding:15px;text-decoration:none;border:2px solid var(--black);
-            box-shadow:4px 4px 0 var(--black);transition:transform .3s ease, opacity .3s ease}
+            box-shadow:4px 4px 0 var(--black);transition:transform .3s ease, opacity .3s ease;
+            will-change:transform, opacity; backface-visibility:hidden;
+          }
           .tam .mcta.off{transform:translateY(140%);opacity:0;pointer-events:none}
         }
 
@@ -420,7 +438,6 @@ export default function App() {
         </div>
       </header>
 
-      {/* Running belt: date is computed automatically, nothing to edit monthly */}
       <div className="belt" aria-label="Free community meetup announcement">
         <div className="belt-track">
           {Array.from({ length: 6 }).map((_, i) => (
