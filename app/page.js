@@ -11,23 +11,16 @@ const WHATSAPP_URL = "https://chat.whatsapp.com/B68V6Q62HZPHHsGMG0t4jP";
 const TZ = "Asia/Kolkata";
 const DESC_MAX = 30;
 
-/* The 4 slots that always appear. "format" column in the sheet decides which
-   slot an event lands in; the "status" column decides how it LOOKS. */
-const SLOTS = [
-  { key: 'bcc',       shortLabel: 'BCC',     dummyName: 'BCC',              dummyDesc: 'One-day filmmaking chaos.',   dummyStatus: 'SOON' },
-  { key: 'odc',       shortLabel: 'ODC',     dummyName: 'One Day Crew',     dummyDesc: 'Teams, a challenge, a day.',  dummyStatus: 'SOON' },
-  { key: 'premium',   shortLabel: 'Premium', dummyName: 'Something new',    dummyDesc: 'A deeper, hands-on session.', dummyStatus: 'SOON' },
-  { key: 'community', shortLabel: 'Free',    dummyName: 'Community meetup', dummyDesc: 'Meet people, grab lunch.',    dummyStatus: 'FREE' },
-];
+const FORMAT_LABELS = { bcc: 'BCC', odc: 'ODC', community: 'Free', premium: 'Premium' };
 
-function getSlot(event) {
+function getFormatLabel(event) {
   const f = (event.format || '').toLowerCase().trim();
-  if (['bcc', 'odc', 'premium', 'community'].includes(f)) return f;
+  if (FORMAT_LABELS[f]) return FORMAT_LABELS[f];
   const text = `${event.id} ${event.title}`.toLowerCase();
-  if (text.includes('bcc') || text.includes('broken camera')) return 'bcc';
-  if (text.includes('odc') || text.includes('one day crew')) return 'odc';
-  if (isFree(event)) return 'community';
-  return 'premium';
+  if (text.includes('bcc') || text.includes('broken camera')) return 'BCC';
+  if (text.includes('odc') || text.includes('one day crew')) return 'ODC';
+  if (isFree(event)) return 'Free';
+  return 'Premium';
 }
 function isFree(event) {
   const p = (event.price || '').toString().trim().toLowerCase();
@@ -65,35 +58,52 @@ function lastSundayOfMonth() {
 
 const ABOUT_COPY = [
   "3 AM is a creative community for people who want to make, explore, experiment and meet people along the way.",
-  "We bring strangers together through experiences built around filmmaking, music, writing, photography, art, conversations, games and whatever creative chaos we feel like creating next.",
-  "You don't need to be a filmmaker. You don't need to be an artist. You don't even need to know what you're good at yet.",
-  "You just need to be curious enough to show up.",
-  "Some 3 AM experiences are free and open to everyone. Some are curated. Some are chaotic. Some are built around making something together. Some are simply about finding a bunch of people you didn't know you needed to meet.",
-  "There isn't really one way to do 3 AM.",
+  "We bring people together through filmmaking, music, writing, photography, art, conversations, games and creative chaos.",
+  "You don't need to be an artist. You don't need experience. You don't need to know anyone.",
+  "Just be curious enough to show up.",
+  "Some experiences are free. Some are curated. Some are chaotic. Some are built around making something together. Some are simply about meeting people and doing something different.",
+  "There isn't one way to do 3 AM.",
   "That's kind of the point.",
 ];
-const BCC_COPY = [
-  "Broken Camera Crew, or BCC, is one of 3 AM's signature experiences.",
-  "A bunch of people. A creative challenge. A limited amount of time. And a whole lot of figuring things out together.",
-  "You don't need to arrive with a crew, a script or years of filmmaking experience. We bring people together, form teams and give everyone a reason to make something.",
-  "Every BCC can be different.",
-  "Different people. Different themes. Different locations. Different stories.",
-  "Sometimes it's filmmaking. Sometimes it's a completely ridiculous theme. Sometimes it's a special edition built around a place, a story or a moment.",
-  "The only consistent thing is that you show up with strangers and leave having made something together.",
-  "Broken camera. Working imagination.",
-];
-const COMMUNITY_COPY = [
-  "This is the easiest way to enter 3 AM.",
-  "No ticket. No audition. No need to know anyone.",
-  "Just come meet the people behind the community.",
-  "We'll get together, talk, wander around, maybe do something creative, grab some food and see where the day takes us.",
-  "It's not a networking event where everyone walks around asking, \"So... what do you do?\"",
-  "It's just a bunch of people who are curious, creative or simply looking for something different on a Sunday.",
-  "Come alone. Come with a friend. Leave with new people in your phone.",
-  "The event is free.",
-  "If you enjoy being part of it and want to help us keep creating more free community experiences, you can optionally contribute ₹99 or any amount you feel comfortable with. ₹0 is completely okay too.",
-  "Whatever comes in goes back into helping more people discover 3 AM.",
-  "Come meet the community. That's it. No pressure.",
+
+const FORMATS = [
+  {
+    name: '3 AM Community',
+    line: 'Free meetups. The easiest way in.',
+    body: [
+      "Come meet the people behind 3 AM. No ticket, no audition and no need to know anyone.",
+      "We talk, wander, eat, make things, play around and see where the day takes us.",
+      "It's not networking. It's just people meeting people.",
+      "Free to join. Optional contribution.",
+    ],
+  },
+  {
+    name: 'One Day Crew',
+    line: 'Teams, a challenge, a deadline. You make the thing.',
+    body: [
+      "Get a brief, find your crew and make something together.",
+      "You don't need to know exactly what you're doing. That's half the fun.",
+    ],
+  },
+  {
+    name: 'Broken Camera Crew',
+    line: 'Our signature one-day filmmaking chaos.',
+    body: [
+      "You show up. We put people together, give you a challenge and a limited amount of time.",
+      "Then you make a story.",
+      "No crew required. No filmmaking experience required. Just a willingness to figure it out together.",
+      "Broken camera. Working imagination.",
+    ],
+  },
+  {
+    name: 'Creative Experiences',
+    line: 'Hands-on experiences for curious people.',
+    body: [
+      "Art, music, writing, conversations, experiments and whatever strange idea comes next.",
+      "Not workshops. Not networking.",
+      "Just something worth showing up for.",
+    ],
+  },
 ];
 
 export default function App() {
@@ -103,8 +113,7 @@ export default function App() {
   const [month, setMonth] = useState('This month');
   const [clock, setClock] = useState(null);
   const [beltDate, setBeltDate] = useState('');
-  const [isNavVisible, setIsNavVisible] = useState(true);
-  const [showMobileCta, setShowMobileCta] = useState(false);
+  const [isNavHidden, setIsNavHidden] = useState(false);
   const revealRefs = useRef([]);
 
   const setRef = (el) => {
@@ -112,7 +121,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    fetch(CSV_URL)
+    fetch(`${CSV_URL}&cb=${Date.now()}`, { cache: 'no-store' })
       .then(res => res.text())
       .then(text => {
         Papa.parse(text, {
@@ -165,49 +174,52 @@ export default function App() {
     return () => observer.disconnect();
   }, [isLoading, events, galleryImages]);
 
+  /* Header hide-on-scroll.
+     DELTA means small wobbles (trackpad drift, rubber-banding, a tap that
+     nudges the page a pixel) are ignored entirely — that was the flicker.
+     TOP_ZONE means the header is always visible near the top of the page. */
   useEffect(() => {
-    let ticking = false;
-    let prevY = window.scrollY;
-    let navVisibleRef = true;
-    let ctaVisibleRef = false;
-    let nearBottomRef = false;
+    const DELTA = 12;
+    const TOP_ZONE = 90;
 
-    const SHOW_AFTER = 950, HIDE_BEFORE = 820, BOTTOM_ENTER = 420, BOTTOM_EXIT = 520;
+    let ticking = false;
+    let lastY = window.scrollY;
+    let hidden = false;
 
     const compute = () => {
-      const y = window.scrollY;
-      const shouldShowNav = y <= 50 || y < prevY;
-      if (shouldShowNav !== navVisibleRef) { navVisibleRef = shouldShowNav; setIsNavVisible(shouldShowNav); }
+      const y = Math.max(0, window.scrollY);
+      const diff = y - lastY;
 
-      const dist = document.documentElement.scrollHeight - (y + window.innerHeight);
-      const nearBottomNow = nearBottomRef ? dist < BOTTOM_EXIT : dist < BOTTOM_ENTER;
-      nearBottomRef = nearBottomNow;
-
-      const shouldShowCta = ctaVisibleRef
-        ? (y > HIDE_BEFORE && !shouldShowNav && !nearBottomNow)
-        : (y > SHOW_AFTER && !shouldShowNav && !nearBottomNow);
-      if (shouldShowCta !== ctaVisibleRef) { ctaVisibleRef = shouldShowCta; setShowMobileCta(shouldShowCta); }
-
-      prevY = y;
+      if (Math.abs(diff) >= DELTA || y <= TOP_ZONE) {
+        const shouldHide = y > TOP_ZONE && diff > 0;
+        if (shouldHide !== hidden) {
+          hidden = shouldHide;
+          setIsNavHidden(shouldHide);
+        }
+        lastY = y;
+      }
       ticking = false;
     };
 
-    const onScroll = () => { if (!ticking) { ticking = true; requestAnimationFrame(compute); } };
+    const onScroll = () => {
+      if (!ticking) { ticking = true; requestAnimationFrame(compute); }
+    };
+
     window.addEventListener('scroll', onScroll, { passive: true });
-    compute();
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  const cards = SLOTS.flatMap(slot => {
-    const real = events.filter(e => getSlot(e) === slot.key);
-    return real.length
-      ? real.map(e => ({ type: 'real', slot, event: e }))
-      : [{ type: 'dummy', slot }];
-  });
-
   const beltMsg = `FREE 3 AM COMMUNITY MEETUP  •  ${beltDate || 'Last Sunday of the month'}  •  Open to everyone, no ticket needed`;
 
-  /* Badge markup shared by real and placeholder cards */
+  const renderLights = () => (
+    <span className="lights" aria-hidden="true">
+      <svg viewBox="0 0 300 26" preserveAspectRatio="none">
+        <path d="M0 4 Q 37 22 75 4 T 150 4 T 225 4 T 300 4" fill="none" stroke="currentColor" strokeWidth="1.5" opacity=".55" />
+      </svg>
+      {Array.from({ length: 9 }).map((_, i) => <i key={i} style={{ animationDelay: `${(i % 4) * 0.35}s` }} />)}
+    </span>
+  );
+
   const renderBadge = (s) => {
     if (s.badgeType === 'none' || !s.badge) return null;
     if (s.badgeType === 'stamp') return <span className="stamp">{s.badge}</span>;
@@ -238,9 +250,11 @@ export default function App() {
         .tam .reveal{opacity:0;transform:translateY(24px);transition:opacity .8s cubic-bezier(.16,1,.3,1),transform .8s cubic-bezier(.16,1,.3,1)}
         .tam .reveal.active{opacity:1;transform:none}
 
-        /* Header */
-        .tam .top{position:sticky;top:0;z-index:60;background:var(--black);color:var(--white);padding-top:env(safe-area-inset-top,0px);transition:transform .35s ease}
-        .tam .top.hidden{transform:translateY(-100%)}
+        /* Header — transform only, GPU-composited, no layout thrash */
+        .tam .top{position:sticky;top:0;z-index:60;background:var(--black);color:var(--white);
+          padding-top:env(safe-area-inset-top,0px);
+          transition:transform .3s cubic-bezier(.4,0,.2,1);will-change:transform;backface-visibility:hidden}
+        .tam .top.hidden{transform:translate3d(0,-100%,0)}
         .tam .bar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-top:16px;padding-bottom:16px;min-height:64px}
         .tam .navlinks{display:flex;align-items:center;gap:20px;font-size:16px;font-weight:500;flex:0 0 auto}
         .tam .navlinks a{text-decoration:none;opacity:.85;padding:8px 2px;display:inline-block;white-space:nowrap}
@@ -256,13 +270,15 @@ export default function App() {
         @keyframes tambelt{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 
         /* Hero */
-        .tam .hero{padding-top:44px;padding-bottom:8px;text-align:center;display:flex;flex-direction:column;align-items:center}
+        .tam .hero{padding-top:44px;padding-bottom:10px;text-align:center;display:flex;flex-direction:column;align-items:center}
         .tam .tagline{font-weight:500;color:var(--pink);font-size:16px;margin:0}
         .tam h1{font-family:var(--display);font-weight:900;font-size:clamp(40px,11vw,150px);line-height:.92;letter-spacing:-.5px;margin:10px 0 18px}
-        .tam .lede{max-width:56ch;font-size:17px;color:#222;margin:0 auto}
+        .tam .lede{max-width:60ch;font-size:17px;color:#222;margin:0 auto}
+        .tam .lede + .lede{margin-top:10px}
+        .tam .seeline{font-weight:600;font-size:16px;margin:22px 0 0}
 
-        /* ── CARDS ── */
-        .tam .events{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;padding:28px 0 72px;align-items:stretch}
+        /* Cards */
+        .tam .events{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;padding:26px 0 72px;align-items:stretch}
         .tam .card{position:relative;display:flex;flex-direction:column;height:100%;text-decoration:none;
           border:2px solid var(--black);background:var(--white);color:var(--black);
           transition:transform .15s ease, box-shadow .15s ease}
@@ -278,16 +294,16 @@ export default function App() {
         .tam .cta{display:block;text-align:center;padding:12px;font-weight:600;font-size:14.5px;border:2px solid currentColor;min-height:44px}
 
         /* Badges */
-        .tam .badge{position:absolute;top:12px;left:12px;z-index:2;display:inline-flex;align-items:center;gap:7px;
+        .tam .badge{position:absolute;top:12px;left:12px;z-index:4;display:inline-flex;align-items:center;gap:7px;
           font-size:12px;font-weight:600;padding:4px 10px;background:var(--white);color:var(--black);border:2px solid var(--black)}
         .tam .badge .blink{width:9px;height:9px;border-radius:50%;background:var(--pink);
           animation:tamblink 1.1s steps(1) infinite;flex:0 0 auto}
         @keyframes tamblink{50%{opacity:0}}
-        .tam .stamp{position:absolute;top:12px;right:12px;z-index:2;font-family:var(--display);font-weight:900;
+        .tam .stamp{position:absolute;top:12px;right:12px;z-index:4;font-family:var(--display);font-weight:900;
           font-size:24px;line-height:1.2;color:var(--pink);background:var(--white);transform:rotate(6deg);
           border:3px solid var(--pink);padding:0 8px}
 
-        /* Themes — driven by the status column */
+        /* Themes from the status column */
         .tam .t-dark{background:var(--black);color:var(--white)}
         .tam .t-dark .cta{background:var(--pink);border-color:var(--pink);color:var(--white)}
         .tam .t-dark .badge{background:var(--black);color:var(--white);border-color:var(--white)}
@@ -306,26 +322,53 @@ export default function App() {
         .tam .t-soft{background:var(--pink-soft);border-style:dashed}
         .tam .t-soft .cta{background:var(--black);border-color:var(--black);color:var(--white)}
 
+        /* Invite only — free, but not for everyone */
+        .tam .t-invite{background:var(--black);color:var(--white);border-style:dashed;border-color:var(--pink);border-width:3px}
+        .tam .t-invite .cta{background:var(--pink);border-color:var(--pink);color:var(--white)}
+        .tam .t-invite .badge{background:transparent;color:var(--pink);border-color:var(--pink)}
+
+        /* Festival — string lights */
+        .tam .t-festival{background:var(--black);color:var(--white);overflow:hidden}
+        .tam .t-festival .card-body{padding-top:56px}
+        .tam .t-festival.hasbadge .card-body{padding-top:76px}
+        .tam .t-festival .cta{background:var(--pink);border-color:var(--pink);color:var(--white)}
+        .tam .t-festival .badge{background:var(--black);color:var(--white);border-color:var(--white);top:36px}
+        .tam .lights{position:absolute;top:0;left:0;right:0;height:26px;z-index:3;color:#fff;pointer-events:none;display:block}
+        .tam .lights svg{position:absolute;inset:0;width:100%;height:100%}
+        .tam .lights i{position:absolute;top:0;width:7px;height:7px;border-radius:50%;animation:tamglow 2.4s ease-in-out infinite}
+        .tam .lights i:nth-child(2){left:6%;top:9px;background:#FF0065;box-shadow:0 0 8px #FF0065}
+        .tam .lights i:nth-child(3){left:17%;top:15px;background:#FFC53D;box-shadow:0 0 8px #FFC53D}
+        .tam .lights i:nth-child(4){left:28%;top:9px;background:#4DA3FF;box-shadow:0 0 8px #4DA3FF}
+        .tam .lights i:nth-child(5){left:39%;top:4px;background:#FF0065;box-shadow:0 0 8px #FF0065}
+        .tam .lights i:nth-child(6){left:50%;top:9px;background:#3DDC84;box-shadow:0 0 8px #3DDC84}
+        .tam .lights i:nth-child(7){left:61%;top:15px;background:#FFC53D;box-shadow:0 0 8px #FFC53D}
+        .tam .lights i:nth-child(8){left:72%;top:9px;background:#FF0065;box-shadow:0 0 8px #FF0065}
+        .tam .lights i:nth-child(9){left:83%;top:4px;background:#4DA3FF;box-shadow:0 0 8px #4DA3FF}
+        .tam .lights i:nth-child(10){left:93%;top:11px;background:#FFC53D;box-shadow:0 0 8px #FFC53D}
+        @keyframes tamglow{0%,100%{opacity:1}50%{opacity:.35}}
+
         .tam .faded{opacity:.5}
         .tam .faded .cta{background:transparent !important;color:inherit !important;border-color:currentColor !important}
         .tam .faded .blink{animation:none;background:currentColor}
 
         @media (hover:hover){
           .tam .card:hover{transform:translate(-3px,-3px);box-shadow:6px 6px 0 var(--black)}
-          .tam .t-dark:hover{box-shadow:6px 6px 0 var(--pink)}
+          .tam .t-dark:hover,.tam .t-festival:hover,.tam .t-invite:hover{box-shadow:6px 6px 0 var(--pink)}
           .tam .faded:hover{transform:none;box-shadow:none}
         }
 
-        .tam .state{padding:40px 0 80px;font-size:17px;color:var(--grey);text-align:center}
+        /* Empty state */
+        .tam .state{padding:36px 0 72px;text-align:center}
+        .tam .empty{border:2px dashed var(--black);padding:40px 24px;max-width:620px;margin:0 auto}
+        .tam .empty h3{font-family:var(--display);font-weight:900;font-size:clamp(28px,5vw,44px);line-height:1;margin:0 0 10px}
+        .tam .empty p{margin:0 auto 20px;max-width:42ch;color:var(--grey)}
 
         /* About */
         .tam .about{border-top:2px solid var(--black);padding-top:60px;padding-bottom:60px;display:grid;grid-template-columns:1fr 1.3fr;gap:48px}
         .tam .h2{font-family:var(--display);font-weight:900;font-size:clamp(34px,6vw,72px);line-height:.92;margin:0}
         .tam .about p{max-width:60ch;margin:0 0 14px;font-size:16px}
-        .tam .formats{margin:24px 0 0;border-top:1px solid var(--black)}
+        .tam .formats{margin:26px 0 0;border-top:1px solid var(--black)}
         .tam .fmt{border-bottom:1px solid var(--black)}
-        .tam .fmt.plain{display:grid;grid-template-columns:200px 1fr;gap:12px;padding:16px 4px;font-size:16px}
-        .tam .fmt.plain strong{font-weight:600}
         .tam .fmt > summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px 4px;font-size:16px}
         .tam .fmt > summary::-webkit-details-marker{display:none}
         .tam .fmt > summary strong{font-weight:600;margin-right:6px}
@@ -350,11 +393,11 @@ export default function App() {
         .tam .btn.wa{background:var(--black);border-color:var(--black);color:var(--white)}
 
         /* Footer */
-        .tam footer{background:var(--black);color:var(--white);padding:32px 0 calc(90px + env(safe-area-inset-bottom,0px))}
-        .tam footer .bar{flex-wrap:wrap;align-items:flex-start;min-height:auto}
+        .tam footer{background:var(--black);color:var(--white);padding:36px 0 calc(40px + env(safe-area-inset-bottom,0px))}
+        .tam footer .fbar{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;flex-wrap:wrap}
+        .tam footer .fline{margin:12px 0 0;max-width:40ch;color:#bdbdbd;font-size:15px}
         .tam footer nav{display:flex;gap:20px;flex-wrap:wrap;font-size:15px}
-        .tam footer small{display:block;color:#9a9a9a;margin-top:10px;font-size:13px}
-        .tam .mcta{display:none}
+        .tam footer small{display:block;color:#8d8d8d;margin-top:18px;font-size:13px}
 
         @media (max-width:1024px){ .tam .name{font-size:30px} }
 
@@ -368,10 +411,13 @@ export default function App() {
           .tam .hero{padding-top:32px;padding-bottom:6px}
           .tam .tagline{font-size:14.5px}
           .tam .lede{font-size:15.5px;line-height:1.55}
+          .tam .seeline{font-size:15px;margin-top:18px}
 
           .tam .events{grid-template-columns:repeat(2,1fr);gap:14px;padding:22px 0 52px}
           .tam .card-body{padding:16px;min-height:200px}
           .tam .card.hasbadge .card-body{padding-top:46px}
+          .tam .t-festival .card-body{padding-top:48px}
+          .tam .t-festival.hasbadge .card-body{padding-top:70px}
           .tam .format{font-size:12px}
           .tam .name{font-size:22px;margin:8px 0 6px}
           .tam .desc{font-size:13px;line-height:1.45}
@@ -380,24 +426,19 @@ export default function App() {
           .tam .cta{padding:11px;font-size:13.5px}
           .tam .badge{top:10px;left:10px;font-size:10.5px;padding:3px 8px;gap:5px}
           .tam .badge .blink{width:7px;height:7px}
+          .tam .t-festival .badge{top:32px}
           .tam .stamp{font-size:16px;top:10px;right:10px;padding:0 6px;border-width:2px}
 
           .tam .about{grid-template-columns:1fr;gap:20px;padding-top:44px;padding-bottom:44px}
           .tam .about p{font-size:15.5px}
-          .tam .fmt.plain{grid-template-columns:1fr;gap:3px;font-size:15px;padding:14px 4px}
           .tam .fmt > summary{font-size:15px;padding:14px 4px}
           .tam .fmt-body{font-size:15px;padding:0 4px 18px}
           .tam .proof{padding:44px 0}
           .tam .strip{padding:0 20px 8px}
-          .tam .join{padding-top:44px;padding-bottom:112px;flex-direction:column;align-items:flex-start}
+          .tam .join{padding-top:44px;padding-bottom:44px;flex-direction:column;align-items:flex-start}
           .tam .btns{width:100%}
           .tam .btn{padding:14px 10px;font-size:14px}
-          .tam footer nav{gap:16px;margin-top:16px}
-
-          .tam .mcta{display:block;position:fixed;left:20px;right:20px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:60;
-            text-align:center;background:var(--pink);color:var(--white);font-weight:600;font-size:15px;padding:15px;text-decoration:none;border:2px solid var(--black);
-            box-shadow:4px 4px 0 var(--black);transition:transform .3s ease, opacity .3s ease;will-change:transform,opacity;backface-visibility:hidden}
-          .tam .mcta.off{transform:translateY(140%);opacity:0;pointer-events:none}
+          .tam footer nav{gap:16px}
         }
 
         @media (max-width:380px){ .tam .navlinks{gap:12px;font-size:13.5px} }
@@ -411,12 +452,12 @@ export default function App() {
 
         @media (prefers-reduced-motion:reduce){
           .tam .reveal{opacity:1;transform:none;transition:none}
-          .tam .card,.tam .top,.tam .mcta,.tam .belt-track{transition:none;animation:none}
-          .tam .blink{animation:none}
+          .tam .card,.tam .top,.tam .belt-track{transition:none;animation:none}
+          .tam .blink,.tam .lights i{animation:none}
         }
       `}} />
 
-      <header className={`top ${isNavVisible ? '' : 'hidden'}`}>
+      <header className={`top ${isNavHidden ? 'hidden' : ''}`}>
         <div className="wrap bar">
           <Link href="/" aria-label="3 AM Ideas home" style={{ display: 'flex', alignItems: 'center' }}>
             <Image src="/images/white_logo.png" alt="3 AM Ideas" width={130} height={32} priority style={{ height: 28, width: 'auto' }} />
@@ -445,46 +486,36 @@ export default function App() {
         <section className="wrap hero">
           <p className="tagline">Some ideas are too good to sleep on.</p>
           <h1>{month} at <span className="brand">3 AM</span></h1>
-          <p className="lede">A creative community in Bangalore. Strangers make films, run citywide hunts and chase the ideas they&apos;d normally talk themselves out of. Pick one and come along.</p>
+          <p className="lede">A creative community in Bangalore for people who want to make things, try things, meet people and chase ideas they&apos;d normally talk themselves out of.</p>
+          <p className="lede">Filmmaking, music, art, stories, games, experiments and whatever we feel like creating next.</p>
+          <p className="seeline">See what&apos;s happening this month.</p>
         </section>
 
         <section id="event" aria-label="Upcoming events">
           <div className="wrap">
             {isLoading ? (
-              <p className="state">Loading this month&apos;s events…</p>
+              <div className="state"><p>Loading this month&apos;s events…</p></div>
+            ) : events.length === 0 ? (
+              <div className="state">
+                <div className="empty">
+                  <h3>Nothing open right now</h3>
+                  <p>The next calendar drops on the 1st of the month. The WhatsApp community hears first.</p>
+                  <a className="btn pink" href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer"
+                     style={{ flex: '0 1 auto', display: 'inline-block' }}>Join WhatsApp</a>
+                </div>
+              </div>
             ) : (
               <div className="events">
-                {cards.map((c, i) => {
-                  const { slot } = c;
-
-                  if (c.type === 'dummy') {
-                    const s = parseStatus(slot.dummyStatus);
-                    return (
-                      <a key={`dummy-${slot.key}`} href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer"
-                         className={`card t-${s.theme} ${s.faded ? 'faded' : ''} ${s.badgeType !== 'none' && s.badge ? 'hasbadge' : ''}`}>
-                        {renderBadge(s)}
-                        <div className="card-body">
-                          <span className="format">{slot.shortLabel}</span>
-                          <span className="name">{slot.dummyName}</span>
-                          <span className="desc">{truncate(slot.dummyDesc)}</span>
-                          <div className="meta">
-                            <div><span>Date</span><b>Soon</b></div>
-                            <div><span>Price</span><b>{slot.key === 'community' ? 'Free' : 'TBA'}</b></div>
-                          </div>
-                          <span className="cta">{s.cta}</span>
-                        </div>
-                      </a>
-                    );
-                  }
-
-                  const event = c.event;
+                {events.map((event, i) => {
                   const s = parseStatus(event.status);
+                  const hasBadge = s.badgeType !== 'none' && s.badge;
                   return (
                     <Link key={event.id || i} href={`/event/${event.id.trim()}`}
-                          className={`card t-${s.theme} ${s.faded ? 'faded' : ''} ${s.badgeType !== 'none' && s.badge ? 'hasbadge' : ''}`}>
+                          className={`card t-${s.theme} ${s.faded ? 'faded' : ''} ${hasBadge ? 'hasbadge' : ''}`}>
+                      {s.lit && renderLights()}
                       {renderBadge(s)}
                       <div className="card-body">
-                        <span className="format">{slot.shortLabel}</span>
+                        <span className="format">{getFormatLabel(event)}</span>
                         <span className="name">{event.title}</span>
                         {truncate(event.tagline || event.description) && (
                           <span className="desc">{truncate(event.tagline || event.description)}</span>
@@ -508,22 +539,17 @@ export default function App() {
           <div id="values">
             {ABOUT_COPY.map((p, i) => <p key={i}><Pink3AM text={p} /></p>)}
             <div className="formats">
-              <details className="fmt">
-                <summary>
-                  <span><strong>3 AM Community</strong> — Free meetups. The easiest way in.</span>
-                  <span className="plus">+</span>
-                </summary>
-                <div className="fmt-body">{COMMUNITY_COPY.map((p, i) => <p key={i}><Pink3AM text={p} /></p>)}</div>
-              </details>
-              <div className="fmt plain"><strong>One Day Crew</strong><span>Teams, a challenge, a deadline. You run it.</span></div>
-              <details className="fmt">
-                <summary>
-                  <span><strong>Broken Camera Crew</strong> — Our signature one-day filmmaking chaos.</span>
-                  <span className="plus">+</span>
-                </summary>
-                <div className="fmt-body">{BCC_COPY.map((p, i) => <p key={i}><Pink3AM text={p} /></p>)}</div>
-              </details>
-              <div className="fmt plain"><strong>Creative experiences</strong><span>Deeper, hands-on sessions.</span></div>
+              {FORMATS.map((f) => (
+                <details className="fmt" key={f.name}>
+                  <summary>
+                    <span><strong>{f.name}</strong> — {f.line}</span>
+                    <span className="plus">+</span>
+                  </summary>
+                  <div className="fmt-body">
+                    {f.body.map((p, i) => <p key={i}><Pink3AM text={p} /></p>)}
+                  </div>
+                </details>
+              ))}
             </div>
           </div>
         </section>
@@ -531,7 +557,7 @@ export default function App() {
         {galleryImages.length > 0 && (
           <section className="proof">
             <div className="wrap proof-head reveal" ref={setRef}>
-              <h2 className="h2">A glimpse of the events</h2>
+              <h2 className="h2">This is what <span className="brand">3 AM</span> looks like.</h2>
             </div>
             <div className="strip">
               {galleryImages.map((filename, index) => (
@@ -546,7 +572,7 @@ export default function App() {
 
         <section className="wrap join reveal" ref={setRef}>
           <div>
-            <h2 className="h2">Hear about the next one first</h2>
+            <h2 className="h2">Be there for the next one.</h2>
             <p>The full calendar drops on the 1st of every month. The WhatsApp community gets it before anyone else.</p>
           </div>
           <div className="btns">
@@ -557,9 +583,10 @@ export default function App() {
       </main>
 
       <footer>
-        <div className="wrap bar">
+        <div className="wrap fbar">
           <div>
-            <Image src="/images/white_logo.png" alt="3 AM Ideas" width={120} height={30} style={{ height: 24, width: 'auto' }} />
+            <Image src="/images/white_logo.png" alt="3 AM Ideas" width={120} height={30} style={{ height: 26, width: 'auto' }} />
+            <p className="fline">A creative community for people who&apos;d rather make something than just talk about it.</p>
             <small>© {new Date().getFullYear()} 3 AM Ideas, Bangalore</small>
           </div>
           <nav>
@@ -569,8 +596,6 @@ export default function App() {
           </nav>
         </div>
       </footer>
-
-      <a href="#event" className={`mcta ${showMobileCta ? '' : 'off'}`}>See {month}&apos;s events</a>
     </div>
   );
 }

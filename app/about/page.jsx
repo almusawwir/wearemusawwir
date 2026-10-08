@@ -7,7 +7,6 @@ import { useRouter } from 'next/navigation';
 
 const WHATSAPP_URL = "https://chat.whatsapp.com/B68V6Q62HZPHHsGMG0t4jP";
 
-/* Wraps every standalone "3 AM" in the brand pink. */
 function Pink3AM({ text }) {
   const parts = text.split(/(3 AM)/g);
   return parts.map((part, i) =>
@@ -15,50 +14,74 @@ function Pink3AM({ text }) {
   );
 }
 
-const ABOUT_COPY = [
-  "3 AM is a creative community for people who want to make, explore, experiment and meet people along the way.",
-  "We bring strangers together through experiences built around filmmaking, music, writing, photography, art, conversations, games and whatever creative chaos we feel like creating next.",
-  "You don't need to be a filmmaker. You don't need to be an artist. You don't even need to know what you're good at yet.",
+const INTRO = [
+  "3 AM is a creative community for people who want to make things, try things, meet people, and occasionally do something that makes absolutely no sense on paper.",
+  "We bring curious people together through filmmaking, music, writing, art, conversations, games, experiments, and whatever idea we can't stop thinking about.",
+];
+
+const NEEDS = [
+  "You don't need to be an artist.",
+  "You don't need a portfolio.",
+  "You don't need to know anyone.",
+];
+
+const OUTRO = [
   "You just need to be curious enough to show up.",
-  "Some 3 AM experiences are free and open to everyone. Some are curated. Some are chaotic. Some are built around making something together. Some are simply about finding a bunch of people you didn't know you needed to meet.",
-  "There isn't really one way to do 3 AM.",
+  "Some experiences are free. Some are curated. Some are chaotic. Some ask you to make something. Some simply give you a few hours with people you wouldn't have met otherwise.",
+  "There isn't one way to do 3 AM.",
   "That's kind of the point.",
 ];
 
-const BCC_COPY = [
-  "Broken Camera Crew, or BCC, is one of 3 AM's signature experiences.",
-  "A bunch of people. A creative challenge. A limited amount of time. And a whole lot of figuring things out together.",
-  "You don't need to arrive with a crew, a script or years of filmmaking experience. We bring people together, form teams and give everyone a reason to make something.",
-  "Every BCC can be different.",
-  "Different people. Different themes. Different locations. Different stories.",
-  "Sometimes it's filmmaking. Sometimes it's a completely ridiculous theme. Sometimes it's a special edition built around a place, a story or a moment.",
-  "The only consistent thing is that you show up with strangers and leave having made something together.",
-  "Broken camera. Working imagination.",
-];
-
-const COMMUNITY_COPY = [
-  "This is the easiest way to enter 3 AM.",
-  "No ticket. No audition. No need to know anyone.",
-  "Just come meet the people behind the community.",
-  "We'll get together, talk, wander around, maybe do something creative, grab some food and see where the day takes us.",
-  "It's not a networking event where everyone walks around asking, \"So... what do you do?\"",
-  "It's just a bunch of people who are curious, creative or simply looking for something different on a Sunday.",
-  "Come alone. Come with a friend. Leave with new people in your phone.",
-  "The event is free.",
-  "If you enjoy being part of it and want to help us keep creating more free community experiences, you can optionally contribute ₹99 or any amount you feel comfortable with. ₹0 is completely okay too.",
-  "Whatever comes in goes back into helping more people discover 3 AM.",
-  "Come meet the community. That's it. No pressure.",
+const FORMATS = [
+  {
+    name: '3 AM Community',
+    line: 'The easiest way in.',
+    body: [
+      "Free, low-pressure meetups for anyone curious about the people behind 3 AM.",
+      "Come alone. Come with a friend. Walk around, talk, make something, grab food, or just exist around interesting people for a few hours.",
+      "No ticket. No audition. No networking script.",
+      "Just people.",
+    ],
+  },
+  {
+    name: 'One Day Crew',
+    line: 'A team. A challenge. A deadline. Your move.',
+    body: [
+      "You get a small crew, a creative brief, and enough time to make something.",
+      "You choose how to do it.",
+      "Less workshop. More side quest.",
+    ],
+  },
+  {
+    name: 'Broken Camera Crew',
+    line: 'Our signature one-day filmmaking chaos.',
+    body: [
+      "You arrive without a crew.",
+      "We bring people together, give you a story, build teams, figure out the roles, find the locations, and start shooting.",
+      "You don't need filmmaking experience. You don't even need to know what role you want.",
+      "You might direct. You might act. You might write. You might hold the camera. You might end up asking strangers ridiculous questions for the paper department.",
+      "The point isn't to make a perfect film.",
+      "The point is to spend a day making something with people you met that morning.",
+      "Broken camera. Working imagination.",
+    ],
+  },
+  {
+    name: 'Creative Experiences',
+    line: 'For when an idea needs a little more time.',
+    body: [
+      "Painting. Music. Writing. Conversations. Experiments. Weird little concepts that don't fit anywhere else.",
+      "Different format. Same philosophy.",
+      "Come curious. Leave with a story.",
+    ],
+  },
 ];
 
 export default function AboutPage() {
   const router = useRouter();
 
   const handleBack = () => {
-    if (window.history.length <= 2) {
-      router.push('/');
-    } else {
-      router.back();
-    }
+    if (window.history.length <= 2) router.push('/');
+    else router.back();
   };
 
   return (
@@ -80,9 +103,8 @@ export default function AboutPage() {
         .tam a{color:inherit}
         .tam .brand{color:var(--pink)}
         .tam :focus-visible{outline:3px solid var(--pink);outline-offset:3px}
-        .tam .wrap{max-width:1180px;margin:0 auto;padding:0 24px;width:100%}
+        .tam .wrap{max-width:1000px;margin:0 auto;padding:0 24px;width:100%}
 
-        /* Header */
         .tam .top{position:sticky;top:0;z-index:60;background:var(--black);color:var(--white);padding-top:env(safe-area-inset-top,0px)}
         .tam .bar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-top:16px;padding-bottom:16px;min-height:64px}
         .tam .navlinks{display:flex;align-items:center;gap:20px;font-size:16px;font-weight:500;flex:0 0 auto}
@@ -90,71 +112,64 @@ export default function AboutPage() {
           background:none;border:0;color:inherit;font:inherit;cursor:pointer}
         .tam .navlinks a:hover,.tam .navlinks button:hover{opacity:1;color:var(--pink)}
 
-        /* Hero */
-        .tam .hero{padding-top:48px;padding-bottom:28px;text-align:center;display:flex;flex-direction:column;align-items:center}
-        .tam .eyebrow{font-weight:500;color:var(--pink);font-size:15px;margin:0;letter-spacing:.04em;text-transform:uppercase}
-        .tam h1{font-family:var(--display);font-weight:900;font-size:clamp(46px,12vw,150px);line-height:.92;letter-spacing:-.5px;margin:12px 0 0}
+        .tam .hero{padding-top:48px;padding-bottom:26px;text-align:center;display:flex;flex-direction:column;align-items:center}
+        .tam .eyebrow{font-weight:500;color:var(--pink);font-size:14px;margin:0;letter-spacing:.06em;text-transform:uppercase}
+        .tam h1{font-family:var(--display);font-weight:900;font-size:clamp(46px,12vw,140px);line-height:.92;letter-spacing:-.5px;margin:12px 0 0}
 
-        /* Body copy */
-        .tam .story{border-top:2px solid var(--black);padding-top:48px;padding-bottom:48px;max-width:68ch;margin-left:auto;margin-right:auto}
+        .tam .story{border-top:2px solid var(--black);padding-top:44px;padding-bottom:44px;max-width:68ch;margin-left:auto;margin-right:auto}
         .tam .story p{margin:0 0 16px;font-size:17px}
-        .tam .story p.lead{font-size:21px;font-weight:500;line-height:1.45}
-        .tam .pull{border-left:5px solid var(--pink);padding:4px 0 4px 18px;margin:28px 0;font-family:var(--display);font-weight:900;
-          font-size:clamp(26px,4.5vw,40px);line-height:1.08}
+        .tam .story p.lead{font-size:20px;font-weight:500;line-height:1.5}
+        .tam .needs{margin:22px 0;padding:0;list-style:none}
+        .tam .needs li{font-family:var(--display);font-weight:900;font-size:clamp(22px,4vw,32px);line-height:1.12;margin-bottom:2px}
+        .tam .beat{font-family:var(--display);font-weight:900;font-size:clamp(24px,4.5vw,38px);line-height:1.1;margin:4px 0 16px}
+        .tam .pull{border-left:5px solid var(--pink);padding:6px 0 6px 18px;margin:30px 0 0;font-family:var(--display);font-weight:900;
+          font-size:clamp(26px,5vw,44px);line-height:1.05}
 
-        /* Formats */
-        .tam .formats-wrap{border-top:2px solid var(--black);padding-top:48px;padding-bottom:48px}
+        .tam .formats-wrap{border-top:2px solid var(--black);padding-top:44px;padding-bottom:44px}
         .tam .h2{font-family:var(--display);font-weight:900;font-size:clamp(34px,6vw,64px);line-height:.95;margin:0 0 20px}
         .tam .formats{border-top:1px solid var(--black)}
         .tam .fmt{border-bottom:1px solid var(--black)}
-        .tam .fmt.plain{display:grid;grid-template-columns:220px 1fr;gap:12px;padding:16px 4px;font-size:16px}
-        .tam .fmt.plain strong{font-weight:600}
-        .tam .fmt > summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px 4px;font-size:16px}
+        .tam .fmt > summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:18px 4px;font-size:16px}
         .tam .fmt > summary::-webkit-details-marker{display:none}
         .tam .fmt > summary strong{font-weight:600;margin-right:6px}
         .tam .fmt .plus{flex:0 0 auto;font-size:22px;font-weight:400;line-height:1;transition:transform .25s ease}
         .tam .fmt[open] .plus{transform:rotate(45deg)}
-        .tam .fmt-body{padding:0 4px 20px;font-size:15.5px;max-width:64ch}
+        .tam .fmt-body{padding:0 4px 22px;font-size:15.5px;max-width:64ch}
         .tam .fmt-body p{margin:0 0 12px}
 
-        /* Signature + CTA */
-        .tam .sign{border-top:2px solid var(--black);padding-top:40px;padding-bottom:48px;display:flex;justify-content:space-between;
-          align-items:flex-end;gap:24px;flex-wrap:wrap}
-        .tam .sign .who{font-family:var(--display);font-weight:900;font-size:clamp(24px,3.5vw,34px);line-height:1.05;margin:0}
-        .tam .sign .note{margin:8px 0 0;font-size:15px;color:var(--grey)}
-        .tam .btns{display:flex;gap:12px;flex-wrap:nowrap}
+        .tam .sign{border-top:2px solid var(--black);padding-top:40px;padding-bottom:48px}
+        .tam .sign p{margin:0 0 14px;font-size:17px;max-width:56ch}
+        .tam .sign .big{font-family:var(--display);font-weight:900;font-size:clamp(26px,5vw,42px);line-height:1.1;margin-bottom:18px}
+        .tam .who{font-family:var(--display);font-weight:900;font-size:clamp(20px,3.5vw,28px);margin:26px 0 22px}
+        .tam .btns{display:flex;gap:12px;flex-wrap:nowrap;max-width:520px}
         .tam .btn{flex:1 1 0;display:inline-block;padding:14px 20px;font-weight:600;font-size:15px;text-decoration:none;
           border:2px solid var(--black);text-align:center;white-space:nowrap}
         .tam .btn.pink{background:var(--pink);border-color:var(--pink);color:var(--white)}
         .tam .btn.dark{background:var(--black);border-color:var(--black);color:var(--white)}
 
-        /* Footer */
-        .tam footer{background:var(--black);color:var(--white);padding:32px 0 calc(40px + env(safe-area-inset-bottom,0px))}
-        .tam footer .bar{flex-wrap:wrap;align-items:flex-start;min-height:auto}
+        .tam footer{background:var(--black);color:var(--white);padding:36px 0 calc(40px + env(safe-area-inset-bottom,0px))}
+        .tam footer .fbar{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;flex-wrap:wrap}
+        .tam footer .fline{margin:12px 0 0;max-width:40ch;color:#bdbdbd;font-size:15px}
         .tam footer nav{display:flex;gap:20px;flex-wrap:wrap;font-size:15px}
-        .tam footer small{display:block;color:#9a9a9a;margin-top:10px;font-size:13px}
+        .tam footer small{display:block;color:#8d8d8d;margin-top:18px;font-size:13px}
 
-        /* Mobile */
         @media (max-width:820px){
           .tam .wrap{padding:0 20px}
-          .tam .bar{padding-top:14px;padding-bottom:14px;min-height:60px;gap:10px}
+          .tam .bar{padding-top:14px;padding-bottom:14px;min-height:60px}
           .tam .navlinks{gap:16px;font-size:14.5px}
           .tam .hero{padding-top:34px;padding-bottom:20px}
-          .tam .eyebrow{font-size:13.5px}
-          .tam .story{padding-top:36px;padding-bottom:36px}
+          .tam .story{padding-top:34px;padding-bottom:34px}
           .tam .story p{font-size:16px}
-          .tam .story p.lead{font-size:18.5px}
-          .tam .pull{margin:22px 0;padding-left:14px;border-left-width:4px}
-          .tam .formats-wrap{padding-top:36px;padding-bottom:36px}
-          .tam .fmt.plain{grid-template-columns:1fr;gap:3px;font-size:15px;padding:14px 4px}
-          .tam .fmt > summary{font-size:15px;padding:14px 4px}
+          .tam .story p.lead{font-size:17.5px}
+          .tam .pull{margin-top:24px;padding-left:14px;border-left-width:4px}
+          .tam .formats-wrap{padding-top:34px;padding-bottom:34px}
+          .tam .fmt > summary{font-size:15px;padding:16px 4px}
           .tam .fmt-body{font-size:15px;padding:0 4px 18px}
-          .tam .sign{padding-top:32px;padding-bottom:40px;flex-direction:column;align-items:flex-start}
-          .tam .btns{width:100%}
-          .tam .btn{padding:14px 10px;font-size:14px}
-          .tam footer nav{gap:16px;margin-top:16px}
+          .tam .sign{padding-top:32px;padding-bottom:40px}
+          .tam .sign p{font-size:16px}
+          .tam .btns{width:100%;flex-direction:column;max-width:none}
+          .tam footer nav{gap:16px}
         }
-
         @media (max-width:380px){ .tam .navlinks{gap:12px;font-size:13.5px} }
         @media (max-width:360px){ .tam .wrap{padding:0 16px} }
       `}} />
@@ -178,46 +193,44 @@ export default function AboutPage() {
         </section>
 
         <section className="wrap story">
-          {ABOUT_COPY.map((p, i) => (
+          {INTRO.map((p, i) => (
             <p key={i} className={i === 0 ? 'lead' : undefined}><Pink3AM text={p} /></p>
           ))}
 
-          <p className="pull">Some ideas are too good to sleep on.</p>
+          <ul className="needs">
+            {NEEDS.map((n, i) => <li key={i}>{n}</li>)}
+          </ul>
 
-          {/* TODO: if you want the Al-Musawwir origin story here, tell me the exact wording
-              and I'll add it — I didn't want to write your history for you. */}
+          <p className="beat">{OUTRO[0]}</p>
+          <p>{OUTRO[1]}</p>
+          <p className="beat"><Pink3AM text={OUTRO[2]} /></p>
+          <p>{OUTRO[3]}</p>
+
+          <p className="pull">Some ideas are too good to sleep on.</p>
         </section>
 
         <section className="wrap formats-wrap">
           <h2 className="h2">The formats</h2>
           <div className="formats">
-            <details className="fmt">
-              <summary>
-                <span><strong>3 AM Community</strong> — Free meetups. The easiest way in.</span>
-                <span className="plus">+</span>
-              </summary>
-              <div className="fmt-body">{COMMUNITY_COPY.map((p, i) => <p key={i}><Pink3AM text={p} /></p>)}</div>
-            </details>
-
-            <div className="fmt plain"><strong>One Day Crew</strong><span>Teams, a challenge, a deadline. You run it.</span></div>
-
-            <details className="fmt">
-              <summary>
-                <span><strong>Broken Camera Crew</strong> — Our signature one-day filmmaking chaos.</span>
-                <span className="plus">+</span>
-              </summary>
-              <div className="fmt-body">{BCC_COPY.map((p, i) => <p key={i}><Pink3AM text={p} /></p>)}</div>
-            </details>
-
-            <div className="fmt plain"><strong>Creative experiences</strong><span>Deeper, hands-on sessions.</span></div>
+            {FORMATS.map((f) => (
+              <details className="fmt" key={f.name}>
+                <summary>
+                  <span><strong>{f.name}</strong> — {f.line}</span>
+                  <span className="plus">+</span>
+                </summary>
+                <div className="fmt-body">
+                  {f.body.map((p, i) => <p key={i}><Pink3AM text={p} /></p>)}
+                </div>
+              </details>
+            ))}
           </div>
         </section>
 
         <section className="wrap sign">
-          <div>
-            <p className="who">— Nazim &amp; the <span className="brand">3 AM</span> team</p>
-            <p className="note">Questions, ideas, or you just want to say hi? Come find us.</p>
-          </div>
+          <h2 className="h2">Come find us</h2>
+          <p className="big"><Pink3AM text="3 AM is built one idea, one event, and one strange conversation at a time." /></p>
+          <p>If you&apos;re wondering whether you belong here, you probably do.</p>
+          <p className="who">— Zimzim &amp; the <span className="brand">3 AM</span> team</p>
           <div className="btns">
             <a className="btn dark" href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer">Join WhatsApp</a>
             <Link className="btn pink" href="/event">See all events</Link>
@@ -226,9 +239,10 @@ export default function AboutPage() {
       </main>
 
       <footer>
-        <div className="wrap bar">
+        <div className="wrap fbar">
           <div>
-            <Image src="/images/white_logo.png" alt="3 AM Ideas" width={120} height={30} style={{ height: 24, width: 'auto' }} />
+            <Image src="/images/white_logo.png" alt="3 AM Ideas" width={120} height={30} style={{ height: 26, width: 'auto' }} />
+            <p className="fline">A creative community for people who&apos;d rather make something than just talk about it.</p>
             <small>© {new Date().getFullYear()} 3 AM Ideas, Bangalore</small>
           </div>
           <nav>
