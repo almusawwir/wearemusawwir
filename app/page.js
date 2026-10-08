@@ -898,6 +898,24 @@ export default function App() {
           </div>
         </section>
 
+        {galleryImages.length > 0 && (
+          <section className="proof">
+            <div className="wrap proof-head reveal" ref={setRef}>
+              <h2 className="h2">This is what <span className="brand">3 AM</span> looks like.</h2>
+              <p className="proof-hint">Tap a photo to see it full screen.</p>
+            </div>
+            <div className="strip">
+              {galleryImages.map((filename, index) => (
+                <button type="button" key={index} className="shot" onClick={() => openLb(index)}
+                        aria-label={`Open photo ${index + 1} of ${galleryImages.length}`}>
+                  <Image src={`/images/home/${filename}`} alt="" fill quality={80}
+                         sizes="(max-width: 820px) 70vw, 340px" style={{ objectFit: 'cover' }} />
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
         <section id="about-section" className="wrap about reveal" ref={setRef}>
           <h2 className="h2">What is <span className="brand">3 AM</span>?</h2>
           <div id="values">
@@ -917,24 +935,6 @@ export default function App() {
             </div>
           </div>
         </section>
-
-        {galleryImages.length > 0 && (
-          <section className="proof">
-            <div className="wrap proof-head reveal" ref={setRef}>
-              <h2 className="h2">This is what <span className="brand">3 AM</span> looks like.</h2>
-              <p className="proof-hint">Tap a photo to see it full screen.</p>
-            </div>
-            <div className="strip">
-              {galleryImages.map((filename, index) => (
-                <button type="button" key={index} className="shot" onClick={() => openLb(index)}
-                        aria-label={`Open photo ${index + 1} of ${galleryImages.length}`}>
-                  <Image src={`/images/home/${filename}`} alt="" fill quality={80}
-                         sizes="(max-width: 820px) 70vw, 340px" style={{ objectFit: 'cover' }} />
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
 
         <section className="wrap join reveal" ref={setRef}>
           <div>
