@@ -7,7 +7,7 @@ import Papa from 'papaparse';
 import { parseStatus } from './lib/eventStyles';
 
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSSCmEDqxpPn1OEzXR3geUaynoeGhrswVO5xf8zKETC8xOq1oimP1SiapOAsSPY_nEMTHoDeacTgKC/pub?gid=0&single=true&output=csv";
-const WHATSAPP_URL = "https://chat.whatsapp.com/B68V6Q62HZPHHsGMG0t4jP";
+const WHATSAPP_URL = "https://chat.whatsapp.com/Gdb1lik7MQy1fjjz03O3OR";
 const TZ = "Asia/Kolkata";
 const DESC_MAX = 30;
 const HOME_LIMIT = 4;
