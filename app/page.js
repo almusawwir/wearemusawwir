@@ -4,20 +4,23 @@ import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import Papa from 'papaparse';
+import { parseStatus } from './lib/eventStyles';
 
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSSCmEDqxpPn1OEzXR3geUaynoeGhrswVO5xf8zKETC8xOq1oimP1SiapOAsSPY_nEMTHoDeacTgKC/pub?gid=0&single=true&output=csv";
 const WHATSAPP_URL = "https://chat.whatsapp.com/B68V6Q62HZPHHsGMG0t4jP";
 const TZ = "Asia/Kolkata";
 const DESC_MAX = 30;
 
+/* The 4 slots that always appear. "format" column in the sheet decides which
+   slot an event lands in; the "status" column decides how it LOOKS. */
 const SLOTS = [
-  { style: 'bcc',       shortLabel: 'BCC',     fullName: 'Broken Camera Crew',   dummyDesc: 'One-day filmmaking chaos. Next edition drops soon.' },
-  { style: 'odc',       shortLabel: 'ODC',     fullName: 'One Day Crew',         dummyDesc: 'Teams, a challenge, a deadline. Next one drops soon.' },
-  { style: 'premium',   shortLabel: 'Premium', fullName: 'Creative experience',  dummyDesc: 'A deeper, hands-on session. Details drop soon.' },
-  { style: 'community', shortLabel: 'Free',    fullName: '3 AM Community',      dummyDesc: 'Free. Meet people, make something, grab lunch.' },
+  { key: 'bcc',       shortLabel: 'BCC',     dummyName: 'BCC',              dummyDesc: 'One-day filmmaking chaos.',   dummyStatus: 'SOON' },
+  { key: 'odc',       shortLabel: 'ODC',     dummyName: 'One Day Crew',     dummyDesc: 'Teams, a challenge, a day.',  dummyStatus: 'SOON' },
+  { key: 'premium',   shortLabel: 'Premium', dummyName: 'Something new',    dummyDesc: 'A deeper, hands-on session.', dummyStatus: 'SOON' },
+  { key: 'community', shortLabel: 'Free',    dummyName: 'Community meetup', dummyDesc: 'Meet people, grab lunch.',    dummyStatus: 'FREE' },
 ];
 
-function getStyle(event) {
+function getSlot(event) {
   const f = (event.format || '').toLowerCase().trim();
   if (['bcc', 'odc', 'premium', 'community'].includes(f)) return f;
   const text = `${event.id} ${event.title}`.toLowerCase();
@@ -41,17 +44,12 @@ function formatDate(raw) {
   if (isNaN(d.getTime())) return raw.toString().trim();
   return new Intl.DateTimeFormat('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: TZ }).format(d);
 }
-/* Hard cap at 30 characters. Whatever's in the sheet, the card never grows past this. */
 function truncate(text, max = DESC_MAX) {
   const t = (text || '').trim();
   if (!t) return '';
   return t.length > max ? t.slice(0, max).trimEnd() + '...' : t;
 }
-function shortDesc(event) {
-  return truncate(event.tagline || event.description || '');
-}
 
-/* Wraps every standalone "3 AM" in the brand pink. */
 function Pink3AM({ text }) {
   const parts = text.split(/(3 AM)/g);
   return parts.map((part, i) =>
@@ -59,14 +57,10 @@ function Pink3AM({ text }) {
   );
 }
 
-/* Last Sunday of the current month, computed fresh every time — never hardcoded. */
 function lastSundayOfMonth() {
   const now = new Date(new Date().toLocaleString('en-US', { timeZone: TZ }));
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const lastDay = new Date(year, month + 1, 0);
-  const lastSunday = new Date(year, month, lastDay.getDate() - lastDay.getDay());
-  return lastSunday;
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return new Date(now.getFullYear(), now.getMonth(), lastDay.getDate() - lastDay.getDay());
 }
 
 const ABOUT_COPY = [
@@ -171,9 +165,6 @@ export default function App() {
     return () => observer.disconnect();
   }, [isLoading, events, galleryImages]);
 
-  /* Scroll handling: throttled via requestAnimationFrame, with hysteresis
-     (separate show/hide thresholds) on both the sticky CTA and the
-     "near footer" check, so hovering near a boundary can't flicker it. */
   useEffect(() => {
     let ticking = false;
     let prevY = window.scrollY;
@@ -181,58 +172,48 @@ export default function App() {
     let ctaVisibleRef = false;
     let nearBottomRef = false;
 
-    const SHOW_AFTER = 950;
-    const HIDE_BEFORE = 820;
-    const BOTTOM_ENTER = 420;
-    const BOTTOM_EXIT = 520;
+    const SHOW_AFTER = 950, HIDE_BEFORE = 820, BOTTOM_ENTER = 420, BOTTOM_EXIT = 520;
 
     const compute = () => {
       const y = window.scrollY;
-
       const shouldShowNav = y <= 50 || y < prevY;
-      if (shouldShowNav !== navVisibleRef) {
-        navVisibleRef = shouldShowNav;
-        setIsNavVisible(shouldShowNav);
-      }
+      if (shouldShowNav !== navVisibleRef) { navVisibleRef = shouldShowNav; setIsNavVisible(shouldShowNav); }
 
-      const distanceFromBottom = document.documentElement.scrollHeight - (y + window.innerHeight);
-      const nearBottomNow = nearBottomRef
-        ? distanceFromBottom < BOTTOM_EXIT
-        : distanceFromBottom < BOTTOM_ENTER;
+      const dist = document.documentElement.scrollHeight - (y + window.innerHeight);
+      const nearBottomNow = nearBottomRef ? dist < BOTTOM_EXIT : dist < BOTTOM_ENTER;
       nearBottomRef = nearBottomNow;
 
       const shouldShowCta = ctaVisibleRef
         ? (y > HIDE_BEFORE && !shouldShowNav && !nearBottomNow)
         : (y > SHOW_AFTER && !shouldShowNav && !nearBottomNow);
-      if (shouldShowCta !== ctaVisibleRef) {
-        ctaVisibleRef = shouldShowCta;
-        setShowMobileCta(shouldShowCta);
-      }
+      if (shouldShowCta !== ctaVisibleRef) { ctaVisibleRef = shouldShowCta; setShowMobileCta(shouldShowCta); }
 
       prevY = y;
       ticking = false;
     };
 
-    const onScroll = () => {
-      if (!ticking) {
-        ticking = true;
-        requestAnimationFrame(compute);
-      }
-    };
-
+    const onScroll = () => { if (!ticking) { ticking = true; requestAnimationFrame(compute); } };
     window.addEventListener('scroll', onScroll, { passive: true });
     compute();
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
   const cards = SLOTS.flatMap(slot => {
-    const real = events.filter(e => getStyle(e) === slot.style);
+    const real = events.filter(e => getSlot(e) === slot.key);
     return real.length
       ? real.map(e => ({ type: 'real', slot, event: e }))
       : [{ type: 'dummy', slot }];
   });
 
   const beltMsg = `FREE 3 AM COMMUNITY MEETUP  •  ${beltDate || 'Last Sunday of the month'}  •  Open to everyone, no ticket needed`;
+
+  /* Badge markup shared by real and placeholder cards */
+  const renderBadge = (s) => {
+    if (s.badgeType === 'none' || !s.badge) return null;
+    if (s.badgeType === 'stamp') return <span className="stamp">{s.badge}</span>;
+    if (s.badgeType === 'dot') return <span className="badge"><i className="blink"></i>{s.badge}</span>;
+    return <span className="badge">{s.badge}</span>;
+  };
 
   return (
     <div className="tam">
@@ -267,7 +248,7 @@ export default function App() {
         .tam .clock{font-size:13px;color:#bdbdbd;margin:0}
         .tam .clock b{color:var(--white);font-weight:600}
 
-        /* Running belt — free Community callout */
+        /* Belt */
         .tam .belt{background:var(--black);color:var(--white);overflow:hidden;white-space:nowrap;border-bottom:2px solid var(--pink)}
         .tam .belt-track{display:inline-flex;width:max-content;animation:tambelt 22s linear infinite}
         .tam .belt-item{padding:9px 28px;font-size:13px;font-weight:600;letter-spacing:.03em;display:inline-flex;align-items:center;white-space:nowrap}
@@ -280,40 +261,64 @@ export default function App() {
         .tam h1{font-family:var(--display);font-weight:900;font-size:clamp(40px,11vw,150px);line-height:.92;letter-spacing:-.5px;margin:10px 0 18px}
         .tam .lede{max-width:56ch;font-size:17px;color:#222;margin:0 auto}
 
-        /* Event grid */
+        /* ── CARDS ── */
         .tam .events{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;padding:28px 0 72px;align-items:stretch}
-        .tam .card{position:relative;display:flex;flex-direction:column;height:100%;text-decoration:none;border:2px solid var(--black);background:var(--white);color:var(--black);transition:transform .15s ease, box-shadow .15s ease}
+        .tam .card{position:relative;display:flex;flex-direction:column;height:100%;text-decoration:none;
+          border:2px solid var(--black);background:var(--white);color:var(--black);
+          transition:transform .15s ease, box-shadow .15s ease}
         .tam .card-body{display:flex;flex-direction:column;flex:1;padding:20px;min-height:220px}
-        .tam .format{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px}
-        .tam .dot{width:8px;height:8px;border-radius:50%;background:var(--pink);animation:tampulse 1.2s infinite}
-        @keyframes tampulse{50%{opacity:.25}}
+        .tam .card.hasbadge .card-body{padding-top:52px}
+        .tam .format{font-size:13px;font-weight:600}
         .tam .name{font-family:var(--display);font-weight:900;font-size:36px;line-height:1.15;margin:8px 0 8px;word-break:break-word}
         .tam .desc{font-size:14.5px;opacity:.85;margin-bottom:auto}
         .tam .meta{display:flex;justify-content:space-between;gap:10px;margin:18px 0 14px;font-size:14px}
         .tam .meta div{display:flex;flex-direction:column;gap:2px}
         .tam .meta span{opacity:.65;font-size:12.5px}
         .tam .meta b{font-weight:600}
-        .tam .status{font-size:13px;font-weight:600;margin-bottom:10px}
         .tam .cta{display:block;text-align:center;padding:12px;font-weight:600;font-size:14.5px;border:2px solid currentColor;min-height:44px}
-        .tam .soon{position:absolute;top:12px;left:12px;font-size:12px;font-weight:600;padding:3px 9px;background:var(--white);color:var(--black);border:2px solid var(--black)}
 
-        .tam .bcc{background:var(--black);color:var(--white)}
-        .tam .bcc .cta{background:var(--pink);border-color:var(--pink);color:var(--white)}
-        .tam .odc{background:var(--pink)}
-        .tam .odc .cta{background:var(--black);color:var(--white);border-color:var(--black)}
-        .tam .premium .cta{background:var(--pink);color:var(--white);border-color:var(--pink)}
-        .tam .community{background:var(--pink-soft);border-style:dashed}
-        .tam .free{position:absolute;top:12px;right:12px;font-family:var(--display);font-weight:900;font-size:24px;line-height:1.2;color:var(--pink);background:var(--white);transform:rotate(6deg);border:3px solid var(--pink);padding:0 8px}
-        .tam .soldout{opacity:.55}
-        .tam .soldout .cta{background:transparent !important;color:inherit !important;border-color:currentColor !important}
-        .tam .state{padding:40px 0 80px;font-size:17px;color:var(--grey);text-align:center}
+        /* Badges */
+        .tam .badge{position:absolute;top:12px;left:12px;z-index:2;display:inline-flex;align-items:center;gap:7px;
+          font-size:12px;font-weight:600;padding:4px 10px;background:var(--white);color:var(--black);border:2px solid var(--black)}
+        .tam .badge .blink{width:9px;height:9px;border-radius:50%;background:var(--pink);
+          animation:tamblink 1.1s steps(1) infinite;flex:0 0 auto}
+        @keyframes tamblink{50%{opacity:0}}
+        .tam .stamp{position:absolute;top:12px;right:12px;z-index:2;font-family:var(--display);font-weight:900;
+          font-size:24px;line-height:1.2;color:var(--pink);background:var(--white);transform:rotate(6deg);
+          border:3px solid var(--pink);padding:0 8px}
+
+        /* Themes — driven by the status column */
+        .tam .t-dark{background:var(--black);color:var(--white)}
+        .tam .t-dark .cta{background:var(--pink);border-color:var(--pink);color:var(--white)}
+        .tam .t-dark .badge{background:var(--black);color:var(--white);border-color:var(--white)}
+
+        .tam .t-pink{background:var(--pink);color:var(--black)}
+        .tam .t-pink .cta{background:var(--black);border-color:var(--black);color:var(--white)}
+        .tam .t-pink .badge{background:var(--white);border-color:var(--black)}
+        .tam .t-pink .badge .blink{background:var(--black)}
+
+        .tam .t-white .cta{background:var(--pink);border-color:var(--pink);color:var(--white)}
+
+        .tam .t-new{border-width:5px;border-color:var(--pink)}
+        .tam .t-new .cta{background:var(--pink);border-color:var(--pink);color:var(--white)}
+        .tam .t-new .badge{border-color:var(--pink);color:var(--pink)}
+
+        .tam .t-soft{background:var(--pink-soft);border-style:dashed}
+        .tam .t-soft .cta{background:var(--black);border-color:var(--black);color:var(--white)}
+
+        .tam .faded{opacity:.5}
+        .tam .faded .cta{background:transparent !important;color:inherit !important;border-color:currentColor !important}
+        .tam .faded .blink{animation:none;background:currentColor}
 
         @media (hover:hover){
           .tam .card:hover{transform:translate(-3px,-3px);box-shadow:6px 6px 0 var(--black)}
-          .tam .bcc:hover{box-shadow:6px 6px 0 var(--pink)}
+          .tam .t-dark:hover{box-shadow:6px 6px 0 var(--pink)}
+          .tam .faded:hover{transform:none;box-shadow:none}
         }
 
-        /* About + formats */
+        .tam .state{padding:40px 0 80px;font-size:17px;color:var(--grey);text-align:center}
+
+        /* About */
         .tam .about{border-top:2px solid var(--black);padding-top:60px;padding-bottom:60px;display:grid;grid-template-columns:1fr 1.3fr;gap:48px}
         .tam .h2{font-family:var(--display);font-weight:900;font-size:clamp(34px,6vw,72px);line-height:.92;margin:0}
         .tam .about p{max-width:60ch;margin:0 0 14px;font-size:16px}
@@ -337,7 +342,7 @@ export default function App() {
         .tam .shot{position:relative;flex:0 0 auto;width:min(70vw,340px);aspect-ratio:4/5;scroll-snap-align:center;background:#eee;overflow:hidden;border:2px solid var(--black)}
 
         /* Join */
-        .tam .join{padding-top:56px;padding-bottom:56px;display:flex;justify-content:space-between;align-items:center;gap:24px;flex-wrap:wrap}
+        .tam .join{border-top:2px solid var(--black);padding-top:56px;padding-bottom:56px;display:flex;justify-content:space-between;align-items:center;gap:24px;flex-wrap:wrap}
         .tam .join p{margin:10px 0 0;max-width:48ch}
         .tam .btns{display:flex;gap:12px;flex-wrap:nowrap}
         .tam .btn{flex:1 1 0;display:inline-block;padding:14px 16px;font-weight:600;font-size:15px;text-decoration:none;border:2px solid var(--black);text-align:center;white-space:nowrap}
@@ -353,7 +358,6 @@ export default function App() {
 
         @media (max-width:1024px){ .tam .name{font-size:30px} }
 
-        /* Mobile */
         @media (max-width:820px){
           .tam .wrap{padding:0 20px}
           .tam .clock{display:none}
@@ -361,61 +365,54 @@ export default function App() {
           .tam .navlinks{gap:16px;font-size:14.5px}
           .tam .belt-item{padding:8px 20px;font-size:11.5px}
           .tam .belt-item::after{margin-left:20px}
-
           .tam .hero{padding-top:32px;padding-bottom:6px}
           .tam .tagline{font-size:14.5px}
           .tam .lede{font-size:15.5px;line-height:1.55}
 
           .tam .events{grid-template-columns:repeat(2,1fr);gap:14px;padding:22px 0 52px}
-          .tam .card-body{padding:16px;padding-top:40px;min-height:200px}
+          .tam .card-body{padding:16px;min-height:200px}
+          .tam .card.hasbadge .card-body{padding-top:46px}
           .tam .format{font-size:12px}
           .tam .name{font-size:22px;margin:8px 0 6px}
           .tam .desc{font-size:13px;line-height:1.45}
           .tam .meta{margin:16px 0 12px;font-size:12.5px}
           .tam .meta span{font-size:11px}
-          .tam .status{font-size:12px;margin-bottom:10px}
           .tam .cta{padding:11px;font-size:13.5px}
-          .tam .free{font-size:16px;top:10px;right:10px;padding:0 6px}
-          .tam .soon{top:10px;left:10px;font-size:11px;padding:2px 8px}
+          .tam .badge{top:10px;left:10px;font-size:10.5px;padding:3px 8px;gap:5px}
+          .tam .badge .blink{width:7px;height:7px}
+          .tam .stamp{font-size:16px;top:10px;right:10px;padding:0 6px;border-width:2px}
 
           .tam .about{grid-template-columns:1fr;gap:20px;padding-top:44px;padding-bottom:44px}
           .tam .about p{font-size:15.5px}
           .tam .fmt.plain{grid-template-columns:1fr;gap:3px;font-size:15px;padding:14px 4px}
           .tam .fmt > summary{font-size:15px;padding:14px 4px}
           .tam .fmt-body{font-size:15px;padding:0 4px 18px}
-
           .tam .proof{padding:44px 0}
           .tam .strip{padding:0 20px 8px}
-
           .tam .join{padding-top:44px;padding-bottom:112px;flex-direction:column;align-items:flex-start}
           .tam .btns{width:100%}
           .tam .btn{padding:14px 10px;font-size:14px}
-
           .tam footer nav{gap:16px;margin-top:16px}
 
-          .tam .mcta{
-            display:block;position:fixed;left:20px;right:20px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:60;
+          .tam .mcta{display:block;position:fixed;left:20px;right:20px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:60;
             text-align:center;background:var(--pink);color:var(--white);font-weight:600;font-size:15px;padding:15px;text-decoration:none;border:2px solid var(--black);
-            box-shadow:4px 4px 0 var(--black);transition:transform .3s ease, opacity .3s ease;
-            will-change:transform, opacity; backface-visibility:hidden;
-          }
+            box-shadow:4px 4px 0 var(--black);transition:transform .3s ease, opacity .3s ease;will-change:transform,opacity;backface-visibility:hidden}
           .tam .mcta.off{transform:translateY(140%);opacity:0;pointer-events:none}
         }
 
-        @media (max-width:380px){
-          .tam .navlinks{gap:12px;font-size:13.5px}
-        }
-
+        @media (max-width:380px){ .tam .navlinks{gap:12px;font-size:13.5px} }
         @media (max-width:360px){
           .tam .wrap{padding:0 16px}
           .tam .events{gap:10px}
           .tam .name{font-size:19px}
-          .tam .card-body{padding:12px;padding-top:36px}
+          .tam .card-body{padding:12px}
+          .tam .card.hasbadge .card-body{padding-top:42px}
         }
 
         @media (prefers-reduced-motion:reduce){
           .tam .reveal{opacity:1;transform:none;transition:none}
           .tam .card,.tam .top,.tam .mcta,.tam .belt-track{transition:none;animation:none}
+          .tam .blink{animation:none}
         }
       `}} />
 
@@ -427,7 +424,7 @@ export default function App() {
           {clock && (
             <p className="clock">
               {clock.isThree
-                ? <>It's <b>3 AM</b> in Bangalore. Good time for an idea.</>
+                ? <>It&apos;s <b>3 AM</b> in Bangalore. Good time for an idea.</>
                 : <>{clock.now} in Bangalore. <b>{clock.h}h {clock.m}m</b> till 3 AM.</>}
             </p>
           )}
@@ -440,9 +437,7 @@ export default function App() {
 
       <div className="belt" aria-label="Free community meetup announcement">
         <div className="belt-track">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <span className="belt-item" key={i}>{beltMsg}</span>
-          ))}
+          {Array.from({ length: 6 }).map((_, i) => <span className="belt-item" key={i}>{beltMsg}</span>)}
         </div>
       </div>
 
@@ -450,52 +445,55 @@ export default function App() {
         <section className="wrap hero">
           <p className="tagline">Some ideas are too good to sleep on.</p>
           <h1>{month} at <span className="brand">3 AM</span></h1>
-          <p className="lede">A creative community in Bangalore. Strangers make films, run citywide hunts and chase the ideas they'd normally talk themselves out of. Pick one and come along.</p>
+          <p className="lede">A creative community in Bangalore. Strangers make films, run citywide hunts and chase the ideas they&apos;d normally talk themselves out of. Pick one and come along.</p>
         </section>
 
         <section id="event" aria-label="Upcoming events">
           <div className="wrap">
             {isLoading ? (
-              <p className="state">Loading this month's events…</p>
+              <p className="state">Loading this month&apos;s events…</p>
             ) : (
               <div className="events">
                 {cards.map((c, i) => {
                   const { slot } = c;
 
                   if (c.type === 'dummy') {
+                    const s = parseStatus(slot.dummyStatus);
                     return (
-                      <a key={`dummy-${slot.style}`} href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer"
-                         className={`card ${slot.style}`}>
-                        {slot.style === 'community' ? <span className="free">Free</span> : <span className="soon">Coming soon</span>}
+                      <a key={`dummy-${slot.key}`} href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer"
+                         className={`card t-${s.theme} ${s.faded ? 'faded' : ''} ${s.badgeType !== 'none' && s.badge ? 'hasbadge' : ''}`}>
+                        {renderBadge(s)}
                         <div className="card-body">
-                          <span className="format">{slot.style === 'bcc' && <span className="dot"></span>}{slot.shortLabel}</span>
-                          <span className="name">{slot.fullName}</span>
+                          <span className="format">{slot.shortLabel}</span>
+                          <span className="name">{slot.dummyName}</span>
                           <span className="desc">{truncate(slot.dummyDesc)}</span>
                           <div className="meta">
                             <div><span>Date</span><b>Soon</b></div>
-                            <div><span>Price</span><b>{slot.style === 'community' ? 'Free' : 'TBA'}</b></div>
+                            <div><span>Price</span><b>{slot.key === 'community' ? 'Free' : 'TBA'}</b></div>
                           </div>
-                          <span className="cta">Get notified</span>
+                          <span className="cta">{s.cta}</span>
                         </div>
                       </a>
                     );
                   }
 
                   const event = c.event;
-                  const isSoldOut = event.status && /sold|closed/i.test(event.status);
+                  const s = parseStatus(event.status);
                   return (
-                    <Link key={event.id || i} href={`/event/${event.id.trim()}`} className={`card ${slot.style} ${isSoldOut ? 'soldout' : ''}`}>
-                      {slot.style === 'community' && <span className="free">Free</span>}
+                    <Link key={event.id || i} href={`/event/${event.id.trim()}`}
+                          className={`card t-${s.theme} ${s.faded ? 'faded' : ''} ${s.badgeType !== 'none' && s.badge ? 'hasbadge' : ''}`}>
+                      {renderBadge(s)}
                       <div className="card-body">
-                        <span className="format">{slot.style === 'bcc' && <span className="dot"></span>}{slot.shortLabel}</span>
+                        <span className="format">{slot.shortLabel}</span>
                         <span className="name">{event.title}</span>
-                        {shortDesc(event) && <span className="desc">{shortDesc(event)}</span>}
+                        {truncate(event.tagline || event.description) && (
+                          <span className="desc">{truncate(event.tagline || event.description)}</span>
+                        )}
                         <div className="meta">
                           <div><span>Date</span><b>{formatDate(event.date)}</b></div>
                           <div><span>Price</span><b>{priceText(event)}</b></div>
                         </div>
-                        {event.status && <span className="status">{event.status}</span>}
-                        <span className="cta">{isSoldOut ? 'Sold out' : (event.button_text || 'View event')}</span>
+                        <span className="cta">{event.button_text || s.cta}</span>
                       </div>
                     </Link>
                   );
@@ -509,7 +507,6 @@ export default function App() {
           <h2 className="h2">What is <span className="brand">3 AM</span>?</h2>
           <div id="values">
             {ABOUT_COPY.map((p, i) => <p key={i}><Pink3AM text={p} /></p>)}
-
             <div className="formats">
               <details className="fmt">
                 <summary>
@@ -518,9 +515,7 @@ export default function App() {
                 </summary>
                 <div className="fmt-body">{COMMUNITY_COPY.map((p, i) => <p key={i}><Pink3AM text={p} /></p>)}</div>
               </details>
-
               <div className="fmt plain"><strong>One Day Crew</strong><span>Teams, a challenge, a deadline. You run it.</span></div>
-
               <details className="fmt">
                 <summary>
                   <span><strong>Broken Camera Crew</strong> — Our signature one-day filmmaking chaos.</span>
@@ -528,7 +523,6 @@ export default function App() {
                 </summary>
                 <div className="fmt-body">{BCC_COPY.map((p, i) => <p key={i}><Pink3AM text={p} /></p>)}</div>
               </details>
-
               <div className="fmt plain"><strong>Creative experiences</strong><span>Deeper, hands-on sessions.</span></div>
             </div>
           </div>
@@ -570,13 +564,13 @@ export default function App() {
           </div>
           <nav>
             <Link href="/about">About</Link>
-            <Link href="/terms">Terms & Conditions</Link>
+            <Link href="/terms">Terms &amp; Conditions</Link>
             <a href="mailto:wearemusawwir@gmail.com">Contact</a>
           </nav>
         </div>
       </footer>
 
-      <a href="#event" className={`mcta ${showMobileCta ? '' : 'off'}`}>See {month}'s events</a>
+      <a href="#event" className={`mcta ${showMobileCta ? '' : 'off'}`}>See {month}&apos;s events</a>
     </div>
   );
 }
