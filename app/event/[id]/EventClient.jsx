@@ -3,26 +3,20 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { parseStatus } from '../../lib/eventStyles';
+import {
+  formatDate, isPastEvent, priceText, getFormatLabel, dmLink, sortUpcoming,
+} from '../../lib/eventHelpers';
 
 const SITE = "https://3amideas.club";
-const WHATSAPP_URL = "https://chat.whatsapp.com/B68V6Q62HZPHHsGMG0t4jP";
-const TZ = "Asia/Kolkata";
 
-function EventImage({ src, alt, className, fill, sizes, priority, quality, style }) {
+function EventImage({ src, alt, fill, sizes, priority, quality, style }) {
   const isExternal = src && src.startsWith('http');
   if (isExternal) {
-    return <img src={src} alt={alt} className={className} style={style}
-                loading={priority ? "eager" : "lazy"} decoding="async" />;
+    return <img src={src} alt={alt} style={style} loading={priority ? "eager" : "lazy"} decoding="async" />;
   }
   return <Image src={src} alt={alt} fill={fill} sizes={sizes} priority={priority} quality={quality}
-                loading={!priority ? "lazy" : undefined} className={className} style={style} />;
-}
-
-function formatDate(raw) {
-  if (!raw || !raw.toString().trim()) return 'TBA';
-  const d = new Date(raw);
-  if (isNaN(d.getTime())) return raw.toString().trim();
-  return new Intl.DateTimeFormat('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: TZ }).format(d);
+                loading={!priority ? "lazy" : undefined} style={style} />;
 }
 
 export default function EventClient({ currentEvent, suggestedEvents, targetId }) {
@@ -42,54 +36,45 @@ export default function EventClient({ currentEvent, suggestedEvents, targetId })
     );
   }
 
-  // Google Sheet line breaks (\n) become paragraphs
-  const paragraphs = currentEvent.description
-    ? currentEvent.description.split('\n').filter(p => p.trim() !== '')
-    : [];
+  const title = currentEvent.title;
+  const s = parseStatus(currentEvent.status);
+  const past = isPastEvent(currentEvent);
+  const longDate = formatDate(currentEvent.date, 'long');
+  const shortDate = formatDate(currentEvent.date);
+  const time = (currentEvent.time || '').trim();
+  const price = priceText(currentEvent, false);
+  const hasOriginalPrice = currentEvent.original_price && currentEvent.original_price.trim() !== '' && price !== 'Free';
 
-  // Comma-separated lists
+  // Sheet text → lists
+  const paragraphs = currentEvent.description ? currentEvent.description.split('\n').filter(p => p.trim() !== '') : [];
   const providedList = currentEvent.provided ? currentEvent.provided.split(',').map(i => i.trim()).filter(Boolean) : [];
   const bringList = currentEvent.bring ? currentEvent.bring.split(',').map(i => i.trim()).filter(Boolean) : [];
-
-  // Flow, one step per line
   const flowList = currentEvent.flow ? currentEvent.flow.split('\n').filter(i => i.trim() !== '') : [];
-
-  // Media
   const galleryImages = currentEvent.gallery ? currentEvent.gallery.split(',').map(i => i.trim()).filter(Boolean) : [];
   const videoSrc = currentEvent.video ? currentEvent.video.trim() : null;
 
   // Sharing
   const shareUrl = `${SITE}/event/${targetId}`;
-  const shareText = `${currentEvent.title}${currentEvent.tagline ? ` — ${currentEvent.tagline}` : ''}\n\nCome along:`;
+  const shareText = `${title}${currentEvent.tagline ? ` — ${currentEvent.tagline}` : ''}\n\nCome along:`;
 
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(shareUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // clipboard blocked
-    }
+    } catch {}
   };
 
   const handleNativeShare = async () => {
     if (navigator.share) {
-      try {
-        await navigator.share({ title: currentEvent.title, text: shareText, url: shareUrl });
-      } catch (err) {
-        if (err?.name !== 'AbortError') console.error("Error sharing", err);
-      }
+      try { await navigator.share({ title, text: shareText, url: shareUrl }); }
+      catch (err) { if (err?.name !== 'AbortError') console.error("Error sharing", err); }
     } else {
       handleCopyLink();
     }
   };
 
-  // Status + booking
-  const isSoldOut = currentEvent.status && /sold|closed/i.test(currentEvent.status);
-  const isFree = ['0', 'free'].includes((currentEvent.price || '').toString().trim().toLowerCase());
-  const hasOriginalPrice = currentEvent.original_price && currentEvent.original_price.trim() !== '' && !isFree;
-  const priceLabel = isFree ? 'Free' : (currentEvent.price ? `₹${currentEvent.price}` : 'TBA');
-
+  // Booking links from the sheet
   const bookingLinks = [
     { id: 'form', url: currentEvent.form_link, label: 'RSVP directly', recommend: true },
     { id: 'district', url: currentEvent.district_link, label: 'Book on District' },
@@ -97,15 +82,40 @@ export default function EventClient({ currentEvent, suggestedEvents, targetId })
     { id: 'bookmyshow', url: currentEvent.bookmyshow_link, label: 'Book on BookMyShow' }
   ].filter(link => link.url && link.url.trim() !== '');
 
-  const handleBookingClick = (e) => {
-    if (bookingLinks.length > 1) {
-      e.preventDefault();
-      setIsModalOpen(true);
-    }
+  const whenText = `${shortDate}${time ? `, ${time}` : ''}`;
+
+  /* What the main button does, decided by date + status */
+  let cta;
+  if (past) {
+    cta = { label: "This one's happened", disabled: true };
+  } else if (s.code === 'SOLDOUT') {
+    cta = { label: 'Sold out', disabled: true };
+  } else if (s.code === 'INVITE') {
+    cta = { label: currentEvent.button_text || s.cta, href: dmLink(`Hi! I'd love an invite to ${title} on ${whenText}.`), external: true };
+  } else if (s.code === 'SOON') {
+    cta = { label: currentEvent.button_text || s.cta, href: dmLink(`Hi! Let me know when booking opens for ${title}.`), external: true };
+  } else if (bookingLinks.length === 0) {
+    cta = {
+      label: currentEvent.button_text || (s.code === 'DEFAULT' ? 'Message us' : s.cta),
+      href: dmLink(`Hi! I'd like to join ${title} on ${whenText}.`),
+      external: true,
+    };
+  } else if (bookingLinks.length === 1) {
+    cta = { label: currentEvent.button_text || s.cta, href: bookingLinks[0].url, external: true };
+  } else {
+    cta = { label: currentEvent.button_text || s.cta, modal: true };
+  }
+
+  const ctaEl = (cls) => {
+    if (cta.disabled) return <span className={`${cls} off`}>{cta.label}</span>;
+    if (cta.modal) return <button type="button" className={cls} onClick={() => setIsModalOpen(true)}>{cta.label}</button>;
+    return <a className={cls} href={cta.href} target="_blank" rel="noopener noreferrer">{cta.label}</a>;
   };
 
-  const ctaLabel = isSoldOut ? 'Sold out' : (bookingLinks.length === 0 ? 'Opening soon' : (currentEvent.button_text || 'Book now'));
-  const ctaDisabled = isSoldOut || bookingLinks.length === 0;
+  const showBadge = !past && s.badgeType !== 'none' && s.badge;
+
+  // Other upcoming events only
+  const others = sortUpcoming((suggestedEvents || []).filter(e => e.id && !isPastEvent(e))).slice(0, 6);
 
   return (
     <div className="tam">
@@ -124,25 +134,51 @@ export default function EventClient({ currentEvent, suggestedEvents, targetId })
 
       <main>
         {/* Hero */}
-        <section className="hero">
+        <section className={`hero ${s.lit && !past ? 'lit' : ''}`}>
+          {s.lit && !past && (
+            <span className="lights" aria-hidden="true">
+              <svg viewBox="0 0 300 26" preserveAspectRatio="none">
+                <path d="M0 4 Q 37 22 75 4 T 150 4 T 225 4 T 300 4" fill="none" stroke="currentColor" strokeWidth="1.5" opacity=".55" />
+              </svg>
+              {Array.from({ length: 9 }).map((_, i) => <i key={i} style={{ animationDelay: `${(i % 4) * 0.35}s` }} />)}
+            </span>
+          )}
           <div className="wrap">
-            <h1>{currentEvent.title}</h1>
+            <div className="tags">
+              <span className="fmtlabel">{getFormatLabel(currentEvent)}</span>
+              {showBadge && (
+                <span className={`hbadge ${s.badgeType === 'stamp' ? 'stampy' : ''}`}>
+                  {s.badgeType === 'dot' && <i className="blink"></i>}
+                  {s.badge}
+                </span>
+              )}
+              {past && <span className="hbadge">Happened</span>}
+            </div>
+            <h1>{title}</h1>
             {currentEvent.tagline && <p className="tagline">{currentEvent.tagline}</p>}
           </div>
           {currentEvent.image_url && (
             <div className="heroimg">
-              <EventImage src={currentEvent.image_url} alt={currentEvent.title} fill priority quality={85}
-                          sizes="100vw" style={{ objectFit: 'cover' }} />
+              <EventImage src={currentEvent.image_url} alt={title} fill priority quality={85}
+                          sizes="100vw" style={{ objectFit: 'cover', width: '100%', height: '100%' }} />
             </div>
           )}
         </section>
 
-        {/* Date & time, then location, then what it is */}
+        {past && (
+          <div className="wrap">
+            <div className="pastnote">
+              <p>This event has already happened.</p>
+              <Link href="/event">See what&apos;s coming up →</Link>
+            </div>
+          </div>
+        )}
+
         <section className="wrap block">
           <h2 className="h2">Date &amp; time</h2>
           <div>
-            <p className="big">{formatDate(currentEvent.date)}</p>
-            {currentEvent.time && <p className="plain">{currentEvent.time}</p>}
+            <p className="big">{longDate}</p>
+            {time && <p className="plain">{time}</p>}
           </div>
         </section>
 
@@ -160,21 +196,18 @@ export default function EventClient({ currentEvent, suggestedEvents, targetId })
         {paragraphs.length > 0 && (
           <section className="wrap block">
             <h2 className="h2">What is this?</h2>
-            <div className="prose">
-              {paragraphs.map((p, idx) => <p key={idx}>{p}</p>)}
-            </div>
+            <div className="prose">{paragraphs.map((p, idx) => <p key={idx}>{p}</p>)}</div>
           </section>
         )}
 
-        {/* Price */}
         <section className="wrap block">
           <h2 className="h2">Price</h2>
           <div>
             <p className="big">
               {hasOriginalPrice && <span className="old">₹{currentEvent.original_price}</span>}
-              {priceLabel}
+              {price}
             </p>
-            {currentEvent.status && <p className="plain">{currentEvent.status}</p>}
+            {s.code === 'INVITE' && !past && <p className="plain">Free, but by invite only.</p>}
           </div>
         </section>
 
@@ -182,9 +215,7 @@ export default function EventClient({ currentEvent, suggestedEvents, targetId })
           <section className="wrap block">
             <h2 className="h2">The flow</h2>
             <ol className="flow">
-              {flowList.map((step, idx) => (
-                <li key={idx}><b>{idx + 1}</b><span>{step}</span></li>
-              ))}
+              {flowList.map((step, idx) => <li key={idx}><b>{idx + 1}</b><span>{step}</span></li>)}
             </ol>
           </section>
         )}
@@ -196,17 +227,13 @@ export default function EventClient({ currentEvent, suggestedEvents, targetId })
               {providedList.length > 0 && (
                 <div>
                   <span className="sublbl">We provide</span>
-                  <ul className="tags">
-                    {providedList.map((item, idx) => <li key={idx}>{item}</li>)}
-                  </ul>
+                  <ul className="tagslist">{providedList.map((item, idx) => <li key={idx}>{item}</li>)}</ul>
                 </div>
               )}
               {bringList.length > 0 && (
                 <div>
                   <span className="sublbl">You bring</span>
-                  <ul className="tags alt">
-                    {bringList.map((item, idx) => <li key={idx}>{item}</li>)}
-                  </ul>
+                  <ul className="tagslist alt">{bringList.map((item, idx) => <li key={idx}>{item}</li>)}</ul>
                 </div>
               )}
             </div>
@@ -218,41 +245,47 @@ export default function EventClient({ currentEvent, suggestedEvents, targetId })
             <div className="wrap"><h2 className="h2 wide">A glimpse</h2></div>
             <div className="strip">
               {videoSrc && (
-                <div className="shot vid">
-                  <video src={videoSrc} autoPlay loop muted playsInline />
-                </div>
+                <div className="shot vid"><video src={videoSrc} autoPlay loop muted playsInline /></div>
               )}
               {galleryImages.map((img, idx) => (
                 <div key={idx} className="shot">
-                  <EventImage src={img} alt={`${currentEvent.title} photo ${idx + 1}`} fill
-                              sizes="(max-width: 820px) 70vw, 340px" style={{ objectFit: 'cover' }} />
+                  <EventImage src={img} alt={`${title} photo ${idx + 1}`} fill
+                              sizes="(max-width: 820px) 70vw, 320px" style={{ objectFit: 'cover', width: '100%', height: '100%' }} />
                 </div>
               ))}
             </div>
           </section>
         )}
 
-        {/* Share */}
-        <section className="wrap block">
-          <h2 className="h2">Bring someone</h2>
-          <div className="sharebtns">
-            <button type="button" className="btn" onClick={handleCopyLink}>{copied ? 'Link copied' : 'Copy link'}</button>
-            <button type="button" className="btn dark" onClick={handleNativeShare}>Share</button>
-          </div>
-        </section>
+        {!past && (
+          <section className="wrap block">
+            <h2 className="h2">Bring someone</h2>
+            <div className="sharebtns">
+              <button type="button" className="btn" onClick={handleCopyLink}>{copied ? 'Link copied' : 'Copy link'}</button>
+              <button type="button" className="btn dark" onClick={handleNativeShare}>Share</button>
+            </div>
+          </section>
+        )}
 
-        {/* Suggested */}
-        {suggestedEvents.length > 0 && (
+        {others.length > 0 && (
           <section className="block noborder">
-            <div className="wrap"><h2 className="h2 wide">Other events</h2></div>
+            <div className="wrap"><h2 className="h2 wide">Coming up</h2></div>
             <div className="strip">
-              {suggestedEvents.map((event) => (
-                <Link href={`/event/${event.id?.trim()}`} key={event.id} className="sugg">
-                  <span className="sdate">{formatDate(event.date)}</span>
-                  <span className="sname">{event.title}</span>
-                  <span className="sgo">View event</span>
-                </Link>
-              ))}
+              {others.map((event) => {
+                const es = parseStatus(event.status);
+                return (
+                  <Link href={`/event/${event.id.trim()}`} key={event.id} className="sugg">
+                    {es.badgeType !== 'none' && es.badge && (
+                      <span className="sbadge">
+                        {es.badgeType === 'dot' && <i className="blink"></i>}{es.badge}
+                      </span>
+                    )}
+                    <span className="sdate">{formatDate(event.date)}</span>
+                    <span className="sname">{event.title}</span>
+                    <span className="sgo">View event</span>
+                  </Link>
+                );
+              })}
             </div>
           </section>
         )}
@@ -279,21 +312,11 @@ export default function EventClient({ currentEvent, suggestedEvents, targetId })
           <div className="sbinfo">
             <span className="sbprice">
               {hasOriginalPrice && <span className="old">₹{currentEvent.original_price}</span>}
-              {priceLabel}
+              {price}
             </span>
-            <span className="sbdate">{formatDate(currentEvent.date)}</span>
+            <span className="sbdate">{whenText}</span>
           </div>
-          {ctaDisabled ? (
-            <span className="sbcta off">{ctaLabel}</span>
-          ) : (
-            <a className="sbcta"
-               href={bookingLinks.length === 1 ? bookingLinks[0].url : '#'}
-               target={bookingLinks.length === 1 ? '_blank' : undefined}
-               rel={bookingLinks.length === 1 ? 'noreferrer' : undefined}
-               onClick={handleBookingClick}>
-              {ctaLabel}
-            </a>
-          )}
+          {ctaEl('sbcta')}
         </div>
       </div>
 
@@ -308,8 +331,7 @@ export default function EventClient({ currentEvent, suggestedEvents, targetId })
             </div>
             <div className="mlinks">
               {bookingLinks.map((link) => (
-                <a key={link.id} href={link.url} target="_blank" rel="noreferrer"
-                   className={link.recommend ? 'mlink best' : 'mlink'}>
+                <a key={link.id} href={link.url} target="_blank" rel="noreferrer" className={link.recommend ? 'mlink best' : 'mlink'}>
                   <span>{link.label}</span>
                   {link.recommend && <small>No platform fees. Goes straight to us.</small>}
                 </a>
@@ -326,19 +348,19 @@ const baseCss = `
 @import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Instrument+Sans:wght@400;500;600&display=swap');
 
 html,body{margin:0;padding:0;width:100%;max-width:100%}
+html{scroll-behavior:smooth}
 .tam{
   min-width:0;
   --pink:#FF0065; --pink-soft:#FFE3EE; --black:#000; --white:#fff; --grey:#5c5c5c;
   --display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
   --body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   font-family:var(--body); background:var(--white); color:var(--black);
-  line-height:1.55; font-size:17px; width:100%; max-width:100vw; overflow-x:hidden; min-height:100vh;
+  line-height:1.55; font-size:17px; width:100%; max-width:100vw; min-height:100vh;
+  overflow-x:hidden; overflow-x:clip;
   padding-bottom:96px;
 }
-html{scroll-behavior:smooth}
 .tam *{box-sizing:border-box}
 .tam a{color:inherit}
-.tam .brand{color:var(--pink)}
 .tam :focus-visible{outline:3px solid var(--pink);outline-offset:3px}
 .tam .wrap{max-width:900px;margin:0 auto;padding:0 24px;width:100%}
 
@@ -355,15 +377,43 @@ html{scroll-behavior:smooth}
 .tam .navlinks a:hover{opacity:1;color:var(--pink)}
 
 /* Hero */
-.tam .hero{padding-top:36px}
+.tam .hero{position:relative;padding-top:34px}
+.tam .hero.lit{background:var(--black);color:var(--white);padding-top:52px;overflow:hidden}
+.tam .tags{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px}
+.tam .fmtlabel{font-size:13px;font-weight:600}
+.tam .hbadge{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;padding:4px 10px;border:2px solid currentColor}
+.tam .hbadge.stampy{color:var(--pink);border-color:var(--pink);font-family:var(--display);font-weight:900;font-size:18px;
+  transform:rotate(-3deg);padding:1px 10px}
+.tam .blink{width:9px;height:9px;border-radius:50%;background:var(--pink);animation:tamblink 1.1s steps(1) infinite;flex:0 0 auto;display:inline-block}
+@keyframes tamblink{50%{opacity:0}}
 .tam .hero h1{font-family:var(--display);font-weight:900;font-size:clamp(44px,11vw,120px);line-height:.94;letter-spacing:-.5px;margin:0;word-break:break-word}
 .tam .tagline{font-size:19px;color:var(--pink);font-weight:500;margin:12px 0 0;max-width:46ch}
 .tam .heroimg{position:relative;width:100%;aspect-ratio:16/9;margin-top:26px;border-top:2px solid var(--black);border-bottom:2px solid var(--black);background:#eee;overflow:hidden}
-.tam .heroimg img{width:100%;height:100%;object-fit:cover}
+.tam .hero.lit .heroimg{border-color:var(--white)}
+
+/* Festival lights */
+.tam .lights{position:absolute;top:0;left:0;right:0;height:30px;z-index:3;color:#fff;pointer-events:none;display:block}
+.tam .lights svg{position:absolute;inset:0;width:100%;height:100%}
+.tam .lights i{position:absolute;top:0;width:8px;height:8px;border-radius:50%;animation:tamglow 2.4s ease-in-out infinite}
+.tam .lights i:nth-child(2){left:6%;top:10px;background:#FF0065;box-shadow:0 0 9px #FF0065}
+.tam .lights i:nth-child(3){left:17%;top:17px;background:#FFC53D;box-shadow:0 0 9px #FFC53D}
+.tam .lights i:nth-child(4){left:28%;top:10px;background:#4DA3FF;box-shadow:0 0 9px #4DA3FF}
+.tam .lights i:nth-child(5){left:39%;top:4px;background:#FF0065;box-shadow:0 0 9px #FF0065}
+.tam .lights i:nth-child(6){left:50%;top:10px;background:#3DDC84;box-shadow:0 0 9px #3DDC84}
+.tam .lights i:nth-child(7){left:61%;top:17px;background:#FFC53D;box-shadow:0 0 9px #FFC53D}
+.tam .lights i:nth-child(8){left:72%;top:10px;background:#FF0065;box-shadow:0 0 9px #FF0065}
+.tam .lights i:nth-child(9){left:83%;top:4px;background:#4DA3FF;box-shadow:0 0 9px #4DA3FF}
+.tam .lights i:nth-child(10){left:93%;top:12px;background:#FFC53D;box-shadow:0 0 9px #FFC53D}
+@keyframes tamglow{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* Past note */
+.tam .pastnote{margin-top:24px;border:2px dashed var(--black);padding:16px 18px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.tam .pastnote p{margin:0;font-weight:600}
+.tam .pastnote a{font-weight:600;color:var(--pink);text-decoration:none}
 
 /* Blocks */
 .tam .block{display:grid;grid-template-columns:190px 1fr;gap:28px;padding-top:28px;padding-bottom:28px;border-bottom:1px solid var(--black)}
-.tam .block.noborder{display:block;border-bottom:1px solid var(--black)}
+.tam .block.noborder{display:block}
 .tam .h2{font-family:var(--display);font-weight:900;font-size:30px;line-height:1;margin:0}
 .tam .h2.wide{margin-bottom:18px}
 .tam .big{font-family:var(--display);font-weight:900;font-size:clamp(26px,4.5vw,38px);line-height:1.08;margin:0}
@@ -373,31 +423,29 @@ html{scroll-behavior:smooth}
 .tam .prose p{margin:0 0 14px;font-size:16.5px;max-width:64ch}
 .tam .prose p:last-child{margin-bottom:0}
 
-/* Flow */
 .tam .flow{list-style:none;margin:0;padding:0}
 .tam .flow li{display:grid;grid-template-columns:40px 1fr;gap:12px;padding:10px 0;border-bottom:1px dashed #bbb;font-size:16px}
 .tam .flow li:last-child{border-bottom:0}
 .tam .flow b{font-family:var(--display);font-weight:900;font-size:24px;line-height:1;color:var(--pink)}
 
-/* Provided / bring */
 .tam .twocol{display:grid;grid-template-columns:1fr 1fr;gap:26px}
 .tam .sublbl{font-size:12.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--grey);display:block;margin-bottom:10px}
-.tam .tags{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px}
-.tam .tags li{border:2px solid var(--black);padding:6px 12px;font-size:14.5px;font-weight:500}
-.tam .tags.alt li{background:var(--pink-soft);border-color:var(--pink)}
+.tam .tagslist{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px}
+.tam .tagslist li{border:2px solid var(--black);padding:6px 12px;font-size:14.5px;font-weight:500}
+.tam .tagslist.alt li{background:var(--pink-soft);border-color:var(--pink)}
 
 /* Strips */
-.tam .strip{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:0 24px 10px;scrollbar-width:none}
+.tam .strip{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x proximity;padding:0 24px 10px;scrollbar-width:none;
+  overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
 .tam .strip::-webkit-scrollbar{display:none}
-.tam .shot{position:relative;flex:0 0 auto;width:min(70vw,320px);aspect-ratio:4/5;scroll-snap-align:center;background:#eee;
-  overflow:hidden;border:2px solid var(--black)}
+.tam .shot{position:relative;flex:0 0 auto;width:min(70vw,320px);aspect-ratio:4/5;scroll-snap-align:center;background:#eee;overflow:hidden;border:2px solid var(--black)}
 .tam .shot img{width:100%;height:100%;object-fit:cover}
 .tam .shot.vid{aspect-ratio:9/16;width:min(58vw,250px);background:#000}
 .tam .shot.vid video{width:100%;height:100%;object-fit:cover;display:block}
 
-/* Suggested */
-.tam .sugg{flex:0 0 auto;width:min(68vw,280px);scroll-snap-align:start;border:2px solid var(--black);padding:18px;
+.tam .sugg{position:relative;flex:0 0 auto;width:min(68vw,280px);scroll-snap-align:start;border:2px solid var(--black);padding:18px;
   display:flex;flex-direction:column;gap:6px;text-decoration:none;background:var(--white);transition:transform .15s ease, box-shadow .15s ease}
+.tam .sbadge{display:inline-flex;align-self:flex-start;align-items:center;gap:6px;font-size:11.5px;font-weight:600;padding:2px 8px;border:2px solid var(--black);margin-bottom:4px}
 .tam .sdate{font-size:13px;font-weight:600;color:var(--pink)}
 .tam .sname{font-family:var(--display);font-weight:900;font-size:28px;line-height:1.08;word-break:break-word}
 .tam .sgo{margin-top:8px;font-size:14px;font-weight:600;text-decoration:underline}
@@ -426,11 +474,11 @@ html{scroll-behavior:smooth}
 .tam .sbprice .old{font-family:var(--body);font-weight:400;font-size:15px;text-decoration:line-through;opacity:.45;margin-right:8px}
 .tam .sbdate{font-size:13px;color:var(--grey);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tam .sbcta{flex:0 0 auto;display:inline-block;padding:15px 30px;font-weight:600;font-size:16px;text-decoration:none;
-  background:var(--pink);border:2px solid var(--pink);color:var(--white);text-align:center}
+  background:var(--pink);border:2px solid var(--pink);color:var(--white);text-align:center;cursor:pointer;font-family:inherit}
 .tam .sbcta.off{background:var(--white);border-color:#bbb;color:var(--grey);cursor:not-allowed}
 
 /* Modal */
-.tam .modalwrap{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;padding:0}
+.tam .modalwrap{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center}
 .tam .modal{background:var(--white);width:100%;max-width:520px;border:3px solid var(--black);border-bottom:0;padding:22px 22px calc(26px + env(safe-area-inset-bottom,0px))}
 .tam .mhead{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}
 .tam .mhead h3{font-family:var(--display);font-weight:900;font-size:30px;line-height:1;margin:0}
@@ -440,7 +488,6 @@ html{scroll-behavior:smooth}
 .tam .mlink small{display:block;font-weight:400;font-size:13px;opacity:.75;margin-top:3px}
 .tam .mlink.best{background:var(--pink);border-color:var(--pink);color:var(--white)}
 
-/* Mobile */
 @media (max-width:820px){
   .tam{padding-bottom:92px}
   .tam .wrap{padding:0 20px}
@@ -448,6 +495,7 @@ html{scroll-behavior:smooth}
   .tam .bar{padding-top:14px;padding-bottom:14px;min-height:60px}
   .tam .navlinks{gap:16px;font-size:14.5px}
   .tam .hero{padding-top:26px}
+  .tam .hero.lit{padding-top:44px}
   .tam .tagline{font-size:16.5px}
   .tam .heroimg{aspect-ratio:4/3;margin-top:20px}
   .tam .block{grid-template-columns:1fr;gap:10px;padding-top:22px;padding-bottom:22px}
@@ -458,14 +506,18 @@ html{scroll-behavior:smooth}
   .tam .sharebtns .btn{width:100%}
   .tam .sb{padding-top:10px;padding-bottom:10px;gap:12px}
   .tam .sbprice{font-size:26px}
-  .tam .sbcta{padding:14px 20px;font-size:15px;flex:1 1 auto;max-width:60%}
+  .tam .sbcta{padding:14px 18px;font-size:15px;flex:1 1 auto;max-width:62%}
   .tam footer nav{gap:16px;margin-top:16px}
 }
 @media (max-width:360px){
   .tam .wrap{padding:0 16px}
   .tam .strip{padding:0 16px 10px}
   .tam .sbprice{font-size:22px}
-  .tam .sbcta{padding:13px 14px;font-size:14px}
+  .tam .sbcta{padding:13px 12px;font-size:14px}
 }
-@media (prefers-reduced-motion:reduce){ .tam .sugg{transition:none} }
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .tam .sugg{transition:none}
+  .tam .blink,.tam .lights i{animation:none}
+}
 `;

@@ -34,7 +34,7 @@ export default function TermsPage() {
           --display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
           --body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
           font-family:var(--body); background:var(--white); color:var(--black);
-          line-height:1.55; font-size:17px; width:100%; max-width:100vw; overflow-x:hidden; min-height:100vh;
+          line-height:1.55; font-size:17px; width:100%; max-width:100vw; overflow-x:hidden; overflow-x:clip; min-height:100vh;
         }
         html{scroll-behavior:smooth}
         .tam *{box-sizing:border-box}

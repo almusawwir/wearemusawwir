@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
-const WHATSAPP_URL = "https://chat.whatsapp.com/B68V6Q62HZPHHsGMG0t4jP";
+const WHATSAPP_URL = "https://chat.whatsapp.com/Gdb1lik7MQy1fjjz03O3OR";
 
 function Pink3AM({ text }) {
   const parts = text.split(/(3 AM)/g);
@@ -96,7 +96,7 @@ export default function AboutPage() {
           --display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
           --body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
           font-family:var(--body); background:var(--white); color:var(--black);
-          line-height:1.55; font-size:17px; width:100%; max-width:100vw; overflow-x:hidden; min-height:100vh;
+          line-height:1.55; font-size:17px; width:100%; max-width:100vw; overflow-x:hidden; overflow-x:clip; min-height:100vh;
         }
         html{scroll-behavior:smooth}
         .tam *{box-sizing:border-box}
