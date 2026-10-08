@@ -12,10 +12,10 @@ const TZ = "Asia/Kolkata";
 const DESC_MAX = 30;
 const HOME_LIMIT = 4;
 
-/* ── Recurring fallback schedule ──
-   A fallback card only shows if the sheet has NO upcoming event of that
-   kind. The sheet's "format" column decides the kind: write "bcc" or
-   "community" there and you can name the event anything you like. */
+/* ── Extra cards ──
+   0 upcoming events in the sheet → show BCC + Free community cards
+   1 upcoming event              → show it + a "Join the WhatsApp community" card
+   2 or more                     → show only the real events */
 const BCC_WEEK = 3;                 // 3rd week of the month
 const BCC_WEEKDAY = 0;              // 0 = Sunday, 1 = Monday … 6 = Saturday
 const BCC_TIME = '10am – 5pm';
@@ -83,18 +83,6 @@ function isPastEvent(event) {
   if (parseStatus(event.status).code === 'PAST') return true;
   const d = parseEventDate(event.date);
   return d ? d < todayIST() : false; // no date = keep it (TBA events stay)
-}
-
-/* Which recurring format is this sheet row? The "format" column wins;
-   the title is only a backup. */
-function eventKind(event) {
-  const f = (event.format || '').toLowerCase().trim();
-  if (f === 'bcc') return 'bcc';
-  if (f === 'community') return 'community';
-  const text = `${event.id} ${event.title}`.toLowerCase();
-  if (text.includes('bcc') || text.includes('broken camera')) return 'bcc';
-  if (text.includes('community')) return 'community';
-  return null;
 }
 
 /* ── Cards ── */
@@ -218,7 +206,6 @@ export default function App() {
   const [galleryImages, setGalleryImages] = useState([]);
   const [month, setMonth] = useState('This month');
   const [clock, setClock] = useState(null);
-  const [beltDate, setBeltDate] = useState('');
   const [fallback, setFallback] = useState(null);
   const [isNavHidden, setIsNavHidden] = useState(false);
   const [popup, setPopup] = useState(null);
@@ -254,13 +241,10 @@ export default function App() {
       .catch(err => console.error("Could not load gallery images:", err));
   }, []);
 
-  // Month heading, belt date, fallback dates, Bangalore clock
+  // Month heading, fallback dates, Bangalore clock
   useEffect(() => {
     setMonth(new Intl.DateTimeFormat('en-IN', { month: 'long', timeZone: TZ }).format(new Date()));
-
-    const community = nextCommunityDate();
-    setBeltDate(new Intl.DateTimeFormat('en-IN', { weekday: 'long', day: 'numeric', month: 'long' }).format(community));
-    setFallback({ bcc: nextBccDate(), community });
+    setFallback({ bcc: nextBccDate(), community: nextCommunityDate() });
 
     const tick = () => {
       const parts = Object.fromEntries(
@@ -437,42 +421,51 @@ export default function App() {
   const homeEvents = upcoming.slice(0, HOME_LIMIT);
   const hiddenCount = upcoming.length - homeEvents.length;
 
-  // Fallback cards: only for kinds the sheet doesn't already cover,
-  // and only into slots the real events haven't filled.
-  const coveredKinds = new Set(upcoming.map(eventKind).filter(Boolean));
-  const fallbackCards = fallback ? [
-    {
-      kind: 'bcc',
-      key: 'fb-bcc',
-      href: dmLink(`Hi! I'd like to join the next Broken Camera Crew on ${formatDay(fallback.bcc)}, ${BCC_TIME}.`),
-      status: 'REC | Next BCC',
-      format: 'BCC',
-      title: 'Broken Camera Crew',
-      desc: 'One-day filmmaking chaos.',
-      date: formatDay(fallback.bcc),
-      time: BCC_TIME,
-      price: 'TBA',
-      cta: 'Message us',
-    },
-    {
-      kind: 'community',
-      key: 'fb-community',
-      href: dmLink(`Hi! I'd like to come to the free 3 AM Community meetup on ${formatDay(fallback.community)}, ${COMMUNITY_TIME}.`),
-      status: 'FREE',
-      format: 'Free',
-      title: '3 AM Community',
-      desc: 'Meet people, grab lunch.',
-      date: formatDay(fallback.community),
-      time: COMMUNITY_TIME,
-      price: 'Free',
-      cta: 'Save my spot',
-    },
-  ] : [];
-  const fillers = fallbackCards
-    .filter(c => !coveredKinds.has(c.kind))
-    .slice(0, Math.max(0, HOME_LIMIT - homeEvents.length));
-
-  const beltMsg = `FREE 3 AM COMMUNITY MEETUP  •  ${beltDate || 'Last Sunday of the month'}, ${COMMUNITY_TIME}  •  Open to everyone, no ticket needed`;
+  /* Extra cards, depending on how many real events there are */
+  let fillers = [];
+  if (fallback && upcoming.length === 0) {
+    fillers = [
+      {
+        key: 'fb-bcc',
+        href: dmLink(`Hi! I'd like to join the next Broken Camera Crew on ${formatDay(fallback.bcc)}, ${BCC_TIME}.`),
+        status: 'REC | Next BCC',
+        format: 'BCC',
+        title: 'Broken Camera Crew',
+        desc: 'One-day filmmaking chaos.',
+        date: formatDay(fallback.bcc),
+        time: BCC_TIME,
+        price: 'TBA',
+        cta: 'Message us',
+      },
+      {
+        key: 'fb-community',
+        href: dmLink(`Hi! I'd like to come to the free 3 AM Community meetup on ${formatDay(fallback.community)}, ${COMMUNITY_TIME}.`),
+        status: 'FREE',
+        format: 'Free',
+        title: '3 AM Community',
+        desc: 'Meet people, grab lunch.',
+        date: formatDay(fallback.community),
+        time: COMMUNITY_TIME,
+        price: 'Free',
+        cta: 'Save my spot',
+      },
+    ];
+  } else if (upcoming.length === 1) {
+    fillers = [
+      {
+        key: 'fb-join',
+        href: WHATSAPP_URL,
+        status: 'NEW | Always open',
+        format: 'Community',
+        title: 'Join the WhatsApp community',
+        desc: 'Hear about every event first.',
+        date: 'Every month',
+        time: '',
+        price: 'Free',
+        cta: 'Join WhatsApp',
+      },
+    ];
+  }
 
   const renderLights = () => (
     <span className="lights" aria-hidden="true">
@@ -490,7 +483,7 @@ export default function App() {
     return <span className="badge">{s.badge}</span>;
   };
 
-  /* One card layout for both real events and fallback cards */
+  /* One card layout for both real events and extra cards */
   const renderCard = ({ key, href, external, s, format, title, desc, date, time, price, cta, delay }) => {
     const hasBadge = s.badgeType !== 'none' && s.badge;
     const className = `card t-${s.theme} ${s.faded ? 'faded' : ''} ${hasBadge ? 'hasbadge' : ''}`;
@@ -556,15 +549,8 @@ export default function App() {
         .tam .clock{font-size:13px;color:#bdbdbd;margin:0}
         .tam .clock b{color:var(--white);font-weight:600}
 
-        /* Belt */
-        .tam .belt{background:var(--black);color:var(--white);overflow:hidden;white-space:nowrap;border-bottom:2px solid var(--pink)}
-        .tam .belt-track{display:inline-flex;width:max-content;animation:tambelt 26s linear infinite}
-        .tam .belt-item{padding:9px 28px;font-size:13px;font-weight:600;letter-spacing:.03em;display:inline-flex;align-items:center;white-space:nowrap}
-        .tam .belt-item::after{content:'●';color:var(--pink);margin-left:28px;font-size:8px}
-        @keyframes tambelt{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-
         /* Hero */
-        .tam .hero{padding-top:36px;padding-bottom:4px;text-align:center;display:flex;flex-direction:column;align-items:center}
+        .tam .hero{padding-top:40px;padding-bottom:4px;text-align:center;display:flex;flex-direction:column;align-items:center}
         .tam .tagline{font-weight:500;color:var(--pink);font-size:16px;margin:0}
         .tam h1{font-family:var(--display);font-weight:900;font-size:clamp(40px,11vw,150px);line-height:.92;letter-spacing:-.5px;margin:10px 0 14px}
         .tam .lede{max-width:52ch;font-size:17px;color:#222;margin:0 auto}
@@ -688,14 +674,16 @@ export default function App() {
         .tam .fmt-body{padding:0 4px 20px;font-size:15.5px;max-width:64ch}
         .tam .fmt-body p{margin:0 0 12px}
 
-        /* Gallery strip */
+        /* Gallery strip — first photo lines up with the heading on wide screens */
         .tam .proof{background:var(--white);color:var(--black);border-top:2px solid var(--black);padding:56px 0}
         .tam .proof-head{margin-bottom:24px;display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
         .tam .proof-hint{font-size:14px;color:var(--grey);margin:0}
-        .tam .strip{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x proximity;padding:0 24px 8px;scrollbar-width:none;
-          overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
+        .tam .strip{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x proximity;
+          padding:0 max(24px, calc((100vw - 1180px) / 2 + 24px)) 8px;
+          scroll-padding:0 max(24px, calc((100vw - 1180px) / 2 + 24px));
+          scrollbar-width:none;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
         .tam .strip::-webkit-scrollbar{display:none}
-        .tam .shot{position:relative;flex:0 0 auto;width:min(70vw,340px);aspect-ratio:4/5;scroll-snap-align:center;background:#eee;
+        .tam .shot{position:relative;flex:0 0 auto;width:min(70vw,340px);aspect-ratio:4/5;scroll-snap-align:start;background:#eee;
           overflow:hidden;border:2px solid var(--black);padding:0;margin:0;cursor:zoom-in;display:block;
           appearance:none;-webkit-appearance:none;font:inherit}
         .tam .shot img{transition:transform .6s ease}
@@ -768,9 +756,7 @@ export default function App() {
           .tam .clock{display:none}
           .tam .bar{padding-top:14px;padding-bottom:14px;min-height:60px;gap:10px}
           .tam .navlinks{gap:16px;font-size:14.5px}
-          .tam .belt-item{padding:8px 20px;font-size:11.5px}
-          .tam .belt-item::after{margin-left:20px}
-          .tam .hero{padding-top:26px;padding-bottom:2px}
+          .tam .hero{padding-top:28px;padding-bottom:2px}
           .tam .tagline{font-size:14px}
           .tam h1{margin:8px 0 10px}
           .tam .lede{font-size:15px;line-height:1.5}
@@ -803,7 +789,7 @@ export default function App() {
           .tam .fmt-body{font-size:15px;padding:0 4px 18px}
           .tam .proof{padding:44px 0}
           .tam .proof-hint{font-size:13px}
-          .tam .strip{padding:0 20px 8px}
+          .tam .strip{padding:0 20px 8px;scroll-padding:0 20px}
           .tam .join{padding-top:44px;padding-bottom:44px;flex-direction:column;align-items:flex-start}
           .tam .btns{width:100%}
           .tam .btn{padding:14px 10px;font-size:14px}
@@ -817,6 +803,7 @@ export default function App() {
         @media (max-width:380px){ .tam .navlinks{gap:12px;font-size:13.5px} }
         @media (max-width:360px){
           .tam .wrap{padding:0 16px}
+          .tam .strip{padding:0 16px 8px;scroll-padding:0 16px}
           .tam .events{gap:10px}
           .tam .name{font-size:19px}
           .tam .card-body{padding:12px}
@@ -826,7 +813,7 @@ export default function App() {
         @media (prefers-reduced-motion:reduce){
           html{scroll-behavior:auto}
           .tam .reveal{opacity:1;transform:none;transition:none}
-          .tam .card,.tam .skelcard,.tam .top,.tam .belt-track,.tam .shot img{transition:none;animation:none}
+          .tam .card,.tam .skelcard,.tam .top,.tam .shot img{transition:none;animation:none}
           .tam .blink,.tam .lights i,.tam .tri path,.tam .dots i,.tam .pop,.tam .pop-wrap,.tam .lb{animation:none}
           .tam .tri path{stroke-dashoffset:0}
         }
@@ -850,12 +837,6 @@ export default function App() {
           </nav>
         </div>
       </header>
-
-      <div className="belt" aria-label="Free community meetup announcement">
-        <div className="belt-track">
-          {Array.from({ length: 6 }).map((_, i) => <span className="belt-item" key={i}>{beltMsg}</span>)}
-        </div>
-      </div>
 
       <main>
         <section className="wrap hero">
