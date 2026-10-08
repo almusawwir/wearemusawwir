@@ -10,6 +10,7 @@ const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSSCmEDqxpPn1O
 const WHATSAPP_URL = "https://chat.whatsapp.com/B68V6Q62HZPHHsGMG0t4jP";
 const TZ = "Asia/Kolkata";
 const DESC_MAX = 30;
+const HOME_LIMIT = 4;
 
 const FORMAT_LABELS = { bcc: 'BCC', odc: 'ODC', community: 'Free', premium: 'Premium' };
 
@@ -54,6 +55,38 @@ function lastSundayOfMonth() {
   const now = new Date(new Date().toLocaleString('en-US', { timeZone: TZ }));
   const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
   return new Date(now.getFullYear(), now.getMonth(), lastDay.getDate() - lastDay.getDay());
+}
+
+/* ── This-week popup ──
+   Lower number = higher priority. FREE is last, so it only shows if
+   nothing else bookable is happening this week. */
+const POPUP_RANK = { LAST: 1, FILLING: 2, OPEN: 3, FESTIVAL: 4, REC: 5, NEW: 6, DEFAULT: 7, FREE: 8 };
+const POPUP_SKIP = ['SOLDOUT', 'PAST', 'INVITE', 'WAITLIST', 'SOON'];
+
+function pickPopupEvent(events) {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const daysToSunday = (7 - today.getDay()) % 7;
+  const weekEnd = new Date(today);
+  weekEnd.setDate(today.getDate() + daysToSunday);
+
+  const thisWeek = events
+    .map(e => {
+      const d = new Date(e.date);
+      if (isNaN(d.getTime())) return null;
+      const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      if (day < today || day > weekEnd) return null;
+      const s = parseStatus(e.status);
+      if (POPUP_SKIP.includes(s.code)) return null;
+      return { event: e, s, day };
+    })
+    .filter(Boolean);
+
+  if (!thisWeek.length) return null;
+  thisWeek.sort((a, b) =>
+    (POPUP_RANK[a.s.code] ?? 7) - (POPUP_RANK[b.s.code] ?? 7) || a.day - b.day
+  );
+  return thisWeek[0];
 }
 
 const ABOUT_COPY = [
@@ -114,12 +147,14 @@ export default function App() {
   const [clock, setClock] = useState(null);
   const [beltDate, setBeltDate] = useState('');
   const [isNavHidden, setIsNavHidden] = useState(false);
+  const [popup, setPopup] = useState(null);
   const revealRefs = useRef([]);
 
   const setRef = (el) => {
     if (el && !revealRefs.current.includes(el)) revealRefs.current.push(el);
   };
 
+  // Events from the sheet + gallery images
   useEffect(() => {
     fetch(`${CSV_URL}&cb=${Date.now()}`, { cache: 'no-store' })
       .then(res => res.text())
@@ -142,6 +177,7 @@ export default function App() {
       .catch(err => console.error("Could not load gallery images:", err));
   }, []);
 
+  // Month heading, belt date, Bangalore clock
   useEffect(() => {
     setMonth(new Intl.DateTimeFormat('en-IN', { month: 'long', timeZone: TZ }).format(new Date()));
     setBeltDate(new Intl.DateTimeFormat('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: TZ }).format(lastSundayOfMonth()));
@@ -160,6 +196,7 @@ export default function App() {
     return () => clearInterval(t);
   }, []);
 
+  // Scroll reveal
   useEffect(() => {
     if (isLoading) return;
     const observer = new IntersectionObserver((entries) => {
@@ -174,14 +211,10 @@ export default function App() {
     return () => observer.disconnect();
   }, [isLoading, events, galleryImages]);
 
-  /* Header hide-on-scroll.
-     DELTA means small wobbles (trackpad drift, rubber-banding, a tap that
-     nudges the page a pixel) are ignored entirely — that was the flicker.
-     TOP_ZONE means the header is always visible near the top of the page. */
+  // Header hide-on-scroll (ignores small wobbles, always visible near the top)
   useEffect(() => {
     const DELTA = 12;
     const TOP_ZONE = 90;
-
     let ticking = false;
     let lastY = window.scrollY;
     let hidden = false;
@@ -189,7 +222,6 @@ export default function App() {
     const compute = () => {
       const y = Math.max(0, window.scrollY);
       const diff = y - lastY;
-
       if (Math.abs(diff) >= DELTA || y <= TOP_ZONE) {
         const shouldHide = y > TOP_ZONE && diff > 0;
         if (shouldHide !== hidden) {
@@ -208,6 +240,44 @@ export default function App() {
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  // Pick and show the this-week popup once per session per event
+  useEffect(() => {
+    if (isLoading || !events.length) return;
+    const pick = pickPopupEvent(events);
+    if (!pick) return;
+    const key = `tam-popup-${pick.event.id.trim()}`;
+    try { if (sessionStorage.getItem(key)) return; } catch {}
+    const t = setTimeout(() => {
+      setPopup(pick);
+      try { sessionStorage.setItem(key, '1'); } catch {}
+    }, 900);
+    return () => clearTimeout(t);
+  }, [isLoading, events]);
+
+  const closePopup = () => setPopup(null);
+
+  // Esc to close the popup, and stop the page scrolling behind it
+  useEffect(() => {
+    if (!popup) return;
+    const onKey = (e) => { if (e.key === 'Escape') setPopup(null); };
+    document.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [popup]);
+
+  // Bookable events first, sold-out / past ones last, then cap the homepage at 4
+  const sortedEvents = [...events].sort((a, b) => {
+    const fa = parseStatus(a.status).faded ? 1 : 0;
+    const fb = parseStatus(b.status).faded ? 1 : 0;
+    return fa - fb;
+  });
+  const homeEvents = sortedEvents.slice(0, HOME_LIMIT);
+  const hiddenCount = events.length - homeEvents.length;
 
   const beltMsg = `FREE 3 AM COMMUNITY MEETUP  •  ${beltDate || 'Last Sunday of the month'}  •  Open to everyone, no ticket needed`;
 
@@ -250,7 +320,7 @@ export default function App() {
         .tam .reveal{opacity:0;transform:translateY(24px);transition:opacity .8s cubic-bezier(.16,1,.3,1),transform .8s cubic-bezier(.16,1,.3,1)}
         .tam .reveal.active{opacity:1;transform:none}
 
-        /* Header — transform only, GPU-composited, no layout thrash */
+        /* Header */
         .tam .top{position:sticky;top:0;z-index:60;background:var(--black);color:var(--white);
           padding-top:env(safe-area-inset-top,0px);
           transition:transform .3s cubic-bezier(.4,0,.2,1);will-change:transform;backface-visibility:hidden}
@@ -277,8 +347,15 @@ export default function App() {
         .tam .lede + .lede{margin-top:10px}
         .tam .seeline{font-weight:600;font-size:16px;margin:22px 0 0}
 
+        /* Events section */
+        .tam #event{padding-bottom:56px}
+        .tam .events{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;padding:26px 0 0;align-items:stretch}
+        .tam .more{display:flex;justify-content:center;margin-top:28px}
+        .tam .more a{display:inline-block;padding:13px 26px;font-weight:600;font-size:15px;text-decoration:none;
+          border:2px solid var(--black);background:var(--white);color:var(--black)}
+        @media (hover:hover){ .tam .more a:hover{background:var(--black);color:var(--white)} }
+
         /* Cards */
-        .tam .events{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;padding:26px 0 72px;align-items:stretch}
         .tam .card{position:relative;display:flex;flex-direction:column;height:100%;text-decoration:none;
           border:2px solid var(--black);background:var(--white);color:var(--black);
           transition:transform .15s ease, box-shadow .15s ease}
@@ -292,6 +369,18 @@ export default function App() {
         .tam .meta span{opacity:.65;font-size:12.5px}
         .tam .meta b{font-weight:600}
         .tam .cta{display:block;text-align:center;padding:12px;font-weight:600;font-size:14.5px;border:2px solid currentColor;min-height:44px}
+
+        /* Loading cards — light triangle that draws itself */
+        .tam .skelcard{border:2px dashed #cfcfcf;min-height:300px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+        .tam .tri{width:46px;height:42px;overflow:visible}
+        .tam .tri path{fill:none;stroke:var(--pink);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round;
+          stroke-dasharray:100;stroke-dashoffset:100;animation:tamdraw 1.8s ease-in-out infinite}
+        @keyframes tamdraw{0%{stroke-dashoffset:100}50%{stroke-dashoffset:0}100%{stroke-dashoffset:-100}}
+        .tam .dots{display:flex;gap:6px}
+        .tam .dots i{width:6px;height:6px;border-radius:50%;background:var(--black);opacity:.15;animation:tamdot 1.2s ease-in-out infinite}
+        .tam .dots i:nth-child(2){animation-delay:.2s}
+        .tam .dots i:nth-child(3){animation-delay:.4s}
+        @keyframes tamdot{0%,100%{opacity:.15}50%{opacity:.9}}
 
         /* Badges */
         .tam .badge{position:absolute;top:12px;left:12px;z-index:4;display:inline-flex;align-items:center;gap:7px;
@@ -322,12 +411,10 @@ export default function App() {
         .tam .t-soft{background:var(--pink-soft);border-style:dashed}
         .tam .t-soft .cta{background:var(--black);border-color:var(--black);color:var(--white)}
 
-        /* Invite only — free, but not for everyone */
         .tam .t-invite{background:var(--black);color:var(--white);border-style:dashed;border-color:var(--pink);border-width:3px}
         .tam .t-invite .cta{background:var(--pink);border-color:var(--pink);color:var(--white)}
         .tam .t-invite .badge{background:transparent;color:var(--pink);border-color:var(--pink)}
 
-        /* Festival — string lights */
         .tam .t-festival{background:var(--black);color:var(--white);overflow:hidden}
         .tam .t-festival .card-body{padding-top:56px}
         .tam .t-festival.hasbadge .card-body{padding-top:76px}
@@ -358,7 +445,7 @@ export default function App() {
         }
 
         /* Empty state */
-        .tam .state{padding:36px 0 72px;text-align:center}
+        .tam .state{padding:36px 0 20px;text-align:center}
         .tam .empty{border:2px dashed var(--black);padding:40px 24px;max-width:620px;margin:0 auto}
         .tam .empty h3{font-family:var(--display);font-weight:900;font-size:clamp(28px,5vw,44px);line-height:1;margin:0 0 10px}
         .tam .empty p{margin:0 auto 20px;max-width:42ch;color:var(--grey)}
@@ -399,6 +486,37 @@ export default function App() {
         .tam footer nav{display:flex;gap:20px;flex-wrap:wrap;font-size:15px}
         .tam footer small{display:block;color:#8d8d8d;margin-top:18px;font-size:13px}
 
+        /* This-week popup */
+        .tam .pop-wrap{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.6);display:flex;align-items:center;
+          justify-content:center;padding:20px;animation:tamfade .25s ease}
+        .tam .pop{position:relative;width:100%;max-width:440px;border:3px solid var(--black);background:var(--white);
+          color:var(--black);padding:28px 24px 24px;box-shadow:8px 8px 0 var(--pink);overflow:hidden;
+          animation:tampop .35s cubic-bezier(.16,1,.3,1)}
+        .tam .pop.t-festival{padding-top:44px}
+        .tam .pop-x{position:absolute;top:8px;right:8px;z-index:5;width:44px;height:44px;background:none;border:0;
+          color:inherit;font-size:20px;cursor:pointer;font-family:inherit}
+        .tam .pop-eyebrow{display:block;font-size:12.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
+          opacity:.75;margin-bottom:12px}
+        .tam .pop-badge{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;padding:4px 10px;
+          border:2px solid currentColor;margin-bottom:12px}
+        .tam .pop-badge .blink{width:9px;height:9px;border-radius:50%;background:var(--pink);animation:tamblink 1.1s steps(1) infinite}
+        .tam .pop.t-pink .pop-badge .blink{background:var(--black)}
+        .tam .pop-name{font-family:var(--display);font-weight:900;font-size:clamp(34px,9vw,52px);line-height:1.02;
+          margin:0 0 8px;word-break:break-word;padding-right:34px}
+        .tam .pop-tag{margin:0 0 18px;font-size:15.5px;opacity:.85}
+        .tam .pop-meta{display:flex;gap:28px;margin:0 0 22px;font-size:15px}
+        .tam .pop-meta div{display:flex;flex-direction:column;gap:2px}
+        .tam .pop-meta span{font-size:12px;opacity:.65}
+        .tam .pop-meta b{font-weight:600}
+        .tam .pop-btns{display:flex;flex-direction:column;gap:10px}
+        .tam .pop-go,.tam .pop-skip{display:block;text-align:center;padding:14px;font-weight:600;font-size:15.5px;
+          text-decoration:none;border:2px solid currentColor}
+        .tam .pop-go{background:var(--pink);border-color:var(--pink);color:var(--white)}
+        .tam .pop.t-pink .pop-go{background:var(--black);border-color:var(--black)}
+        .tam .pop-skip{background:transparent;color:inherit}
+        @keyframes tamfade{from{opacity:0}to{opacity:1}}
+        @keyframes tampop{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
+
         @media (max-width:1024px){ .tam .name{font-size:30px} }
 
         @media (max-width:820px){
@@ -413,7 +531,11 @@ export default function App() {
           .tam .lede{font-size:15.5px;line-height:1.55}
           .tam .seeline{font-size:15px;margin-top:18px}
 
-          .tam .events{grid-template-columns:repeat(2,1fr);gap:14px;padding:22px 0 52px}
+          .tam #event{padding-bottom:44px}
+          .tam .events{grid-template-columns:repeat(2,1fr);gap:14px;padding-top:22px}
+          .tam .more{margin-top:22px}
+          .tam .more a{width:100%;text-align:center}
+          .tam .skelcard{min-height:240px}
           .tam .card-body{padding:16px;min-height:200px}
           .tam .card.hasbadge .card-body{padding-top:46px}
           .tam .t-festival .card-body{padding-top:48px}
@@ -439,6 +561,10 @@ export default function App() {
           .tam .btns{width:100%}
           .tam .btn{padding:14px 10px;font-size:14px}
           .tam footer nav{gap:16px}
+
+          .tam .pop-wrap{align-items:flex-end;padding:0}
+          .tam .pop{max-width:none;border-bottom:0;box-shadow:none;
+            padding-bottom:calc(24px + env(safe-area-inset-bottom,0px))}
         }
 
         @media (max-width:380px){ .tam .navlinks{gap:12px;font-size:13.5px} }
@@ -453,7 +579,8 @@ export default function App() {
         @media (prefers-reduced-motion:reduce){
           .tam .reveal{opacity:1;transform:none;transition:none}
           .tam .card,.tam .top,.tam .belt-track{transition:none;animation:none}
-          .tam .blink,.tam .lights i{animation:none}
+          .tam .blink,.tam .lights i,.tam .tri path,.tam .dots i,.tam .pop,.tam .pop-wrap{animation:none}
+          .tam .tri path{stroke-dashoffset:0}
         }
       `}} />
 
@@ -494,7 +621,16 @@ export default function App() {
         <section id="event" aria-label="Upcoming events">
           <div className="wrap">
             {isLoading ? (
-              <div className="state"><p>Loading this month&apos;s events…</p></div>
+              <div className="events" aria-busy="true" aria-label="Loading events">
+                {Array.from({ length: HOME_LIMIT }).map((_, i) => (
+                  <div className="skelcard" key={i}>
+                    <svg className="tri" viewBox="0 0 46 42" aria-hidden="true">
+                      <path d="M23 3 L43 39 L3 39 Z" pathLength="100" style={{ animationDelay: `${i * 0.18}s` }} />
+                    </svg>
+                    <span className="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                  </div>
+                ))}
+              </div>
             ) : events.length === 0 ? (
               <div className="state">
                 <div className="empty">
@@ -505,31 +641,38 @@ export default function App() {
                 </div>
               </div>
             ) : (
-              <div className="events">
-                {events.map((event, i) => {
-                  const s = parseStatus(event.status);
-                  const hasBadge = s.badgeType !== 'none' && s.badge;
-                  return (
-                    <Link key={event.id || i} href={`/event/${event.id.trim()}`}
-                          className={`card t-${s.theme} ${s.faded ? 'faded' : ''} ${hasBadge ? 'hasbadge' : ''}`}>
-                      {s.lit && renderLights()}
-                      {renderBadge(s)}
-                      <div className="card-body">
-                        <span className="format">{getFormatLabel(event)}</span>
-                        <span className="name">{event.title}</span>
-                        {truncate(event.tagline || event.description) && (
-                          <span className="desc">{truncate(event.tagline || event.description)}</span>
-                        )}
-                        <div className="meta">
-                          <div><span>Date</span><b>{formatDate(event.date)}</b></div>
-                          <div><span>Price</span><b>{priceText(event)}</b></div>
+              <>
+                <div className="events">
+                  {homeEvents.map((event, i) => {
+                    const s = parseStatus(event.status);
+                    const hasBadge = s.badgeType !== 'none' && s.badge;
+                    return (
+                      <Link key={event.id || i} href={`/event/${event.id.trim()}`}
+                            className={`card t-${s.theme} ${s.faded ? 'faded' : ''} ${hasBadge ? 'hasbadge' : ''}`}>
+                        {s.lit && renderLights()}
+                        {renderBadge(s)}
+                        <div className="card-body">
+                          <span className="format">{getFormatLabel(event)}</span>
+                          <span className="name">{event.title}</span>
+                          {truncate(event.tagline || event.description) && (
+                            <span className="desc">{truncate(event.tagline || event.description)}</span>
+                          )}
+                          <div className="meta">
+                            <div><span>Date</span><b>{formatDate(event.date)}</b></div>
+                            <div><span>Price</span><b>{priceText(event)}</b></div>
+                          </div>
+                          <span className="cta">{event.button_text || s.cta}</span>
                         </div>
-                        <span className="cta">{event.button_text || s.cta}</span>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+                {hiddenCount > 0 && (
+                  <div className="more">
+                    <Link href="/event">See all {events.length} events</Link>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </section>
@@ -596,6 +739,34 @@ export default function App() {
           </nav>
         </div>
       </footer>
+
+      {popup && (
+        <div className="pop-wrap" role="dialog" aria-modal="true" aria-labelledby="pop-title" onClick={closePopup}>
+          <div className={`pop t-${popup.s.theme}`} onClick={(e) => e.stopPropagation()}>
+            {popup.s.lit && renderLights()}
+            <button type="button" className="pop-x" onClick={closePopup} aria-label="Close" autoFocus>✕</button>
+            <span className="pop-eyebrow">This week at 3 AM</span>
+            {popup.s.badge && popup.s.badgeType !== 'none' && (
+              <span className="pop-badge">
+                {popup.s.badgeType === 'dot' && <i className="blink"></i>}
+                {popup.s.badge}
+              </span>
+            )}
+            <h2 id="pop-title" className="pop-name">{popup.event.title}</h2>
+            {popup.event.tagline && <p className="pop-tag">{popup.event.tagline}</p>}
+            <div className="pop-meta">
+              <div><span>Date</span><b>{formatDate(popup.event.date)}</b></div>
+              <div><span>Price</span><b>{priceText(popup.event)}</b></div>
+            </div>
+            <div className="pop-btns">
+              <Link className="pop-go" href={`/event/${popup.event.id.trim()}`} onClick={closePopup}>
+                {popup.event.button_text || popup.s.cta}
+              </Link>
+              <a className="pop-skip" href="#event" onClick={closePopup}>See other events</a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
