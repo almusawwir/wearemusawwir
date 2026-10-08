@@ -222,7 +222,10 @@ export default function App() {
   const [fallback, setFallback] = useState(null);
   const [isNavHidden, setIsNavHidden] = useState(false);
   const [popup, setPopup] = useState(null);
+  const [lbOpen, setLbOpen] = useState(null);   // index the viewer opened at, or null
+  const [lbIndex, setLbIndex] = useState(0);    // photo currently on screen
   const revealRefs = useRef([]);
+  const lbRef = useRef(null);
 
   const setRef = (el) => {
     if (el && !revealRefs.current.includes(el)) revealRefs.current.push(el);
@@ -288,35 +291,51 @@ export default function App() {
     return () => observer.disconnect();
   }, [isLoading, events, galleryImages]);
 
-  /* Header hide-on-scroll.
-     - Ignores movements under 12px (trackpad / finger wobble)
-     - Always visible in the top 90px
-     - Frozen near the bottom, so the phone's bounce-back can't flicker it */
+  /* Header hide-on-scroll — waits until it's sure what the user is doing.
+     HIDE_AFTER / SHOW_AFTER: how far you must scroll in ONE direction
+     LOCK_MS: after it moves, it can't move again for this long
+     JUMP: anything bigger in a single frame is a layout jump, not a scroll */
   useEffect(() => {
-    const DELTA = 12;
-    const TOP_ZONE = 90;
-    const BOTTOM_ZONE = 60;
+    const HIDE_AFTER = 80;
+    const SHOW_AFTER = 50;
+    const TOP_ZONE = 120;
+    const BOTTOM_ZONE = 80;
+    const LOCK_MS = 400;
+    const JUMP = 250;
+
     let ticking = false;
     let lastY = window.scrollY;
+    let dir = 0;
+    let travelled = 0;
     let hidden = false;
+    let lockUntil = 0;
 
     const setHidden = (v) => {
-      if (v !== hidden) { hidden = v; setIsNavHidden(v); }
+      if (v === hidden) return;
+      hidden = v;
+      travelled = 0;
+      lockUntil = performance.now() + LOCK_MS;
+      setIsNavHidden(v);
     };
 
     const compute = () => {
+      ticking = false;
       const max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
       const y = Math.min(Math.max(0, window.scrollY), max);
       const diff = y - lastY;
+      lastY = y;
 
-      if (y <= TOP_ZONE) {
-        setHidden(false);
-        lastY = y;
-      } else if (max - y > BOTTOM_ZONE && Math.abs(diff) >= DELTA) {
-        setHidden(diff > 0);
-        lastY = y;
-      }
-      ticking = false;
+      if (y <= TOP_ZONE) { travelled = 0; setHidden(false); return; }
+      if (max - y < BOTTOM_ZONE) return;
+      if (Math.abs(diff) > JUMP) { travelled = 0; return; }
+      if (diff === 0 || performance.now() < lockUntil) return;
+
+      const d = diff > 0 ? 1 : -1;
+      if (d !== dir) { dir = d; travelled = 0; }
+      travelled += Math.abs(diff);
+
+      if (dir === 1 && !hidden && travelled >= HIDE_AFTER) setHidden(true);
+      else if (dir === -1 && hidden && travelled >= SHOW_AFTER) setHidden(false);
     };
 
     const onScroll = () => {
@@ -348,18 +367,60 @@ export default function App() {
 
   const closePopup = () => setPopup(null);
 
-  // Esc closes the popup; page doesn't scroll behind it
+  // Esc closes the popup
   useEffect(() => {
     if (!popup) return;
     const onKey = (e) => { if (e.key === 'Escape') setPopup(null); };
     document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [popup]);
+
+  /* ── Photo viewer ── */
+  const openLb = (i) => { setLbIndex(i); setLbOpen(i); };
+  const closeLb = () => setLbOpen(null);
+
+  // Jump straight to the tapped photo when the viewer opens
+  useEffect(() => {
+    if (lbOpen === null) return;
+    const el = lbRef.current;
+    if (el) el.scrollTop = lbOpen * el.clientHeight;
+  }, [lbOpen]);
+
+  const onLbScroll = () => {
+    const el = lbRef.current;
+    if (!el || !el.clientHeight) return;
+    const i = Math.round(el.scrollTop / el.clientHeight);
+    setLbIndex(prev => (prev === i ? prev : i));
+  };
+
+  // Keyboard: Esc closes, arrows / space move between photos
+  useEffect(() => {
+    if (lbOpen === null) return;
+    const onKey = (e) => {
+      const el = lbRef.current;
+      if (!el) return;
+      if (e.key === 'Escape') { setLbOpen(null); return; }
+      if (['ArrowDown', 'ArrowRight', 'PageDown', ' '].includes(e.key)) {
+        e.preventDefault();
+        el.scrollBy({ top: el.clientHeight, behavior: 'smooth' });
+      }
+      if (['ArrowUp', 'ArrowLeft', 'PageUp'].includes(e.key)) {
+        e.preventDefault();
+        el.scrollBy({ top: -el.clientHeight, behavior: 'smooth' });
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [lbOpen]);
+
+  // Freeze the page behind any overlay (popup or photo viewer)
+  const anyOverlay = !!popup || lbOpen !== null;
+  useEffect(() => {
+    if (!anyOverlay) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prev;
-    };
-  }, [popup]);
+    return () => { document.body.style.overflow = prev; };
+  }, [anyOverlay]);
 
   // Upcoming only → bookable before sold-out → soonest first → cap at 4
   const upcoming = events
@@ -486,7 +547,7 @@ export default function App() {
         /* Header */
         .tam .top{position:sticky;top:0;z-index:60;background:var(--black);color:var(--white);
           padding-top:env(safe-area-inset-top,0px);
-          transition:transform .3s cubic-bezier(.4,0,.2,1)}
+          transition:transform .38s cubic-bezier(.33,1,.68,1)}
         .tam .top.hidden{transform:translate3d(0,-100%,0)}
         .tam .bar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-top:16px;padding-bottom:16px;min-height:64px}
         .tam .navlinks{display:flex;align-items:center;gap:20px;font-size:16px;font-weight:500;flex:0 0 auto}
@@ -627,13 +688,31 @@ export default function App() {
         .tam .fmt-body{padding:0 4px 20px;font-size:15.5px;max-width:64ch}
         .tam .fmt-body p{margin:0 0 12px}
 
-        /* Gallery */
+        /* Gallery strip */
         .tam .proof{background:var(--white);color:var(--black);border-top:2px solid var(--black);padding:56px 0}
-        .tam .proof-head{margin-bottom:24px}
+        .tam .proof-head{margin-bottom:24px;display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+        .tam .proof-hint{font-size:14px;color:var(--grey);margin:0}
         .tam .strip{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x proximity;padding:0 24px 8px;scrollbar-width:none;
           overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
         .tam .strip::-webkit-scrollbar{display:none}
-        .tam .shot{position:relative;flex:0 0 auto;width:min(70vw,340px);aspect-ratio:4/5;scroll-snap-align:center;background:#eee;overflow:hidden;border:2px solid var(--black)}
+        .tam .shot{position:relative;flex:0 0 auto;width:min(70vw,340px);aspect-ratio:4/5;scroll-snap-align:center;background:#eee;
+          overflow:hidden;border:2px solid var(--black);padding:0;margin:0;cursor:zoom-in;display:block;
+          appearance:none;-webkit-appearance:none;font:inherit}
+        .tam .shot img{transition:transform .6s ease}
+        @media (hover:hover){ .tam .shot:hover img{transform:scale(1.04)} }
+
+        /* Fullscreen photo viewer — scroll / swipe up and down between photos */
+        .tam .lb{position:fixed;inset:0;z-index:300;background:#000;color:#fff;animation:tamfade .2s ease}
+        .tam .lb-scroll{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;scroll-snap-type:y mandatory;
+          overscroll-behavior:contain;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+        .tam .lb-scroll::-webkit-scrollbar{display:none}
+        .tam .lb-slide{position:relative;width:100%;height:100%;scroll-snap-align:start;scroll-snap-stop:always}
+        .tam .lb-x{position:absolute;top:calc(12px + env(safe-area-inset-top,0px));right:12px;z-index:2;width:48px;height:48px;
+          background:rgba(0,0,0,.6);border:2px solid #fff;color:#fff;font-size:20px;cursor:pointer;font-family:inherit}
+        .tam .lb-count{position:absolute;top:calc(24px + env(safe-area-inset-top,0px));left:16px;z-index:2;font-size:14px;font-weight:600;
+          background:rgba(0,0,0,.6);padding:4px 10px;pointer-events:none}
+        .tam .lb-hint{position:absolute;bottom:calc(20px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);z-index:2;
+          font-size:13px;background:rgba(0,0,0,.6);padding:5px 12px;pointer-events:none;white-space:nowrap}
 
         /* Join */
         .tam .join{border-top:2px solid var(--black);padding-top:56px;padding-bottom:56px;display:flex;justify-content:space-between;align-items:center;gap:24px;flex-wrap:wrap}
@@ -723,6 +802,7 @@ export default function App() {
           .tam .fmt > summary{font-size:15px;padding:14px 4px}
           .tam .fmt-body{font-size:15px;padding:0 4px 18px}
           .tam .proof{padding:44px 0}
+          .tam .proof-hint{font-size:13px}
           .tam .strip{padding:0 20px 8px}
           .tam .join{padding-top:44px;padding-bottom:44px;flex-direction:column;align-items:flex-start}
           .tam .btns{width:100%}
@@ -746,8 +826,8 @@ export default function App() {
         @media (prefers-reduced-motion:reduce){
           html{scroll-behavior:auto}
           .tam .reveal{opacity:1;transform:none;transition:none}
-          .tam .card,.tam .skelcard,.tam .top,.tam .belt-track{transition:none;animation:none}
-          .tam .blink,.tam .lights i,.tam .tri path,.tam .dots i,.tam .pop,.tam .pop-wrap{animation:none}
+          .tam .card,.tam .skelcard,.tam .top,.tam .belt-track,.tam .shot img{transition:none;animation:none}
+          .tam .blink,.tam .lights i,.tam .tri path,.tam .dots i,.tam .pop,.tam .pop-wrap,.tam .lb{animation:none}
           .tam .tri path{stroke-dashoffset:0}
         }
       `}} />
@@ -861,13 +941,15 @@ export default function App() {
           <section className="proof">
             <div className="wrap proof-head reveal" ref={setRef}>
               <h2 className="h2">This is what <span className="brand">3 AM</span> looks like.</h2>
+              <p className="proof-hint">Tap a photo to see it full screen.</p>
             </div>
             <div className="strip">
               {galleryImages.map((filename, index) => (
-                <div key={index} className="shot">
-                  <Image src={`/images/home/${filename}`} alt={`3 AM Ideas event photo ${index + 1}`} fill quality={80}
+                <button type="button" key={index} className="shot" onClick={() => openLb(index)}
+                        aria-label={`Open photo ${index + 1} of ${galleryImages.length}`}>
+                  <Image src={`/images/home/${filename}`} alt="" fill quality={80}
                          sizes="(max-width: 820px) 70vw, 340px" style={{ objectFit: 'cover' }} />
-                </div>
+                </button>
               ))}
             </div>
           </section>
@@ -900,6 +982,24 @@ export default function App() {
         </div>
       </footer>
 
+      {/* Fullscreen photo viewer */}
+      {lbOpen !== null && (
+        <div className="lb" role="dialog" aria-modal="true" aria-label="Photo viewer">
+          <button type="button" className="lb-x" onClick={closeLb} aria-label="Close photos" autoFocus>✕</button>
+          <span className="lb-count" aria-live="polite">{lbIndex + 1} / {galleryImages.length}</span>
+          <div className="lb-scroll" ref={lbRef} onScroll={onLbScroll}>
+            {galleryImages.map((filename, i) => (
+              <div className="lb-slide" key={i}>
+                <Image src={`/images/home/${filename}`} alt={`3 AM Ideas event photo ${i + 1}`} fill quality={85}
+                       sizes="100vw" style={{ objectFit: 'contain' }} />
+              </div>
+            ))}
+          </div>
+          {lbIndex < galleryImages.length - 1 && <span className="lb-hint">Scroll for the next one ↓</span>}
+        </div>
+      )}
+
+      {/* This-week popup */}
       {popup && (
         <div className="pop-wrap" role="dialog" aria-modal="true" aria-labelledby="pop-title" onClick={closePopup}>
           <div className={`pop t-${popup.s.theme}`} onClick={(e) => e.stopPropagation()}>
