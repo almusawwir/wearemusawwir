@@ -12,6 +12,11 @@ const TZ = "Asia/Kolkata";
 const DESC_MAX = 30;
 const HOME_LIMIT = 4;
 
+/* ── Gallery loading ── */
+const GALLERY_EAGER = 3;      // photos loaded as soon as the gallery is near
+const GALLERY_AHEAD_PX = 700; // how far ahead (sideways) to start loading ≈ 2 photos
+const LB_NEAR = 2;            // fullscreen viewer: load this many either side
+
 /* ── Extra cards ──
    0 upcoming events in the sheet → show BCC + Free community cards
    1 upcoming event              → show it + a "Join the WhatsApp community" card
@@ -122,6 +127,81 @@ function Pink3AM({ text }) {
   );
 }
 
+/* Triangle + dots loader, shared by the gallery and the fullscreen viewer */
+function Loader({ delay = 0 }) {
+  return (
+    <span className="ldr" aria-hidden="true">
+      <svg className="tri" viewBox="0 0 46 42">
+        <path d="M23 3 L43 39 L3 39 Z" pathLength="100" style={{ animationDelay: `${delay}s` }} />
+      </svg>
+      <span className="dots"><i></i><i></i><i></i></span>
+    </span>
+  );
+}
+
+/* One gallery photo in the strip. Downloads only when the gallery is
+   on screen AND this photo is within ~2 photos of what's visible. */
+function LazyShot({ filename, index, total, active, rootRef, onOpen }) {
+  const ref = useRef(null);
+  const [inRange, setInRange] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (!active || inRange) return;
+    if (index < GALLERY_EAGER) { setInRange(true); return; }
+
+    const el = ref.current;
+    const root = rootRef.current;
+    if (!el || !root) { setInRange(true); return; }
+
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some(e => e.isIntersecting)) {
+        setInRange(true);
+        io.disconnect();
+      }
+    }, { root, rootMargin: `0px ${GALLERY_AHEAD_PX}px 0px ${GALLERY_AHEAD_PX}px` });
+
+    io.observe(el);
+    return () => io.disconnect();
+  }, [active, inRange, index, rootRef]);
+
+  return (
+    <button type="button" ref={ref} className={`shot ${loaded ? 'is-loaded' : ''}`}
+            onClick={() => onOpen(index)} aria-label={`Open photo ${index + 1} of ${total}`}>
+      {!loaded && !failed && <Loader delay={(index % 4) * 0.2} />}
+      {failed && <span className="ldr fail">Photo unavailable</span>}
+      {inRange && !failed && (
+        <Image src={`/images/home/${filename}`} alt="" fill quality={80}
+               sizes="(max-width: 820px) 70vw, 340px" className="lz" style={{ objectFit: 'cover' }}
+               onLoad={() => setLoaded(true)} onError={() => setFailed(true)} />
+      )}
+    </button>
+  );
+}
+
+/* One slide in the fullscreen viewer. Loads only when it's within
+   LB_NEAR of the photo on screen, and stays loaded after that. */
+function LbSlide({ filename, index, near }) {
+  const [mounted, setMounted] = useState(near);
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => { if (near) setMounted(true); }, [near]);
+
+  return (
+    <div className={`lb-slide ${loaded ? 'is-loaded' : ''}`}>
+      {!loaded && !failed && <Loader />}
+      {failed && <span className="ldr fail">Photo unavailable</span>}
+      {mounted && !failed && (
+        <Image src={`/images/home/${filename}`} alt={`3 AM Ideas event photo ${index + 1}`} fill quality={85}
+               sizes="100vw" className="lz" style={{ objectFit: 'contain' }}
+               onLoad={() => setLoaded(true)} onError={() => setFailed(true)} />
+      )}
+    </div>
+  );
+}
+
 /* ── This-week popup ──
    Lower number = higher priority. FREE is last, so it only shows if
    nothing else bookable is happening this week. */
@@ -211,8 +291,10 @@ export default function App() {
   const [popup, setPopup] = useState(null);
   const [lbOpen, setLbOpen] = useState(null);   // index the viewer opened at, or null
   const [lbIndex, setLbIndex] = useState(0);    // photo currently on screen
+  const [stripActive, setStripActive] = useState(false);
   const revealRefs = useRef([]);
   const lbRef = useRef(null);
+  const stripRef = useRef(null);
 
   const setRef = (el) => {
     if (el && !revealRefs.current.includes(el)) revealRefs.current.push(el);
@@ -240,6 +322,21 @@ export default function App() {
       .then(data => { if (Array.isArray(data)) setGalleryImages(data); })
       .catch(err => console.error("Could not load gallery images:", err));
   }, []);
+
+  // Start loading gallery photos only once the gallery is close to the screen
+  useEffect(() => {
+    if (stripActive) return;
+    const el = stripRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setStripActive(true);
+        io.disconnect();
+      }
+    }, { rootMargin: '300px 0px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [galleryImages.length, stripActive]);
 
   // Month heading, fallback dates, Bangalore clock
   useEffect(() => {
@@ -585,9 +682,11 @@ export default function App() {
         .tam .meta small{font-size:12.5px;font-weight:500;opacity:.8}
         .tam .cta{display:block;text-align:center;padding:12px;font-weight:600;font-size:14.5px;border:2px solid currentColor;min-height:44px}
 
-        /* Loading placeholders */
+        /* Loading placeholders (event cards) */
         .tam .skelcard{border:2px dashed #d4d4d4;min-height:300px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
           animation:tamrise .7s cubic-bezier(.16,1,.3,1) backwards}
+
+        /* Triangle + dots loader (cards, gallery, viewer) */
         .tam .tri{width:46px;height:42px;overflow:visible}
         .tam .tri path{fill:none;stroke:var(--pink);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round;
           stroke-dasharray:100;stroke-dashoffset:100;animation:tamdraw 2.2s cubic-bezier(.65,0,.35,1) infinite}
@@ -597,6 +696,8 @@ export default function App() {
         .tam .dots i:nth-child(2){animation-delay:.2s}
         .tam .dots i:nth-child(3){animation-delay:.4s}
         @keyframes tamdot{0%,100%{opacity:.15;transform:translateY(0)}50%{opacity:.8;transform:translateY(-3px)}}
+        .tam .ldr{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:1;pointer-events:none}
+        .tam .ldr.fail{font-size:13px;color:var(--grey);font-weight:500}
 
         /* Badges */
         .tam .badge{position:absolute;top:12px;left:12px;z-index:4;display:inline-flex;align-items:center;gap:7px;
@@ -683,11 +784,12 @@ export default function App() {
           scroll-padding:0 max(24px, calc((100vw - 1180px) / 2 + 24px));
           scrollbar-width:none;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
         .tam .strip::-webkit-scrollbar{display:none}
-        .tam .shot{position:relative;flex:0 0 auto;width:min(70vw,340px);aspect-ratio:4/5;scroll-snap-align:start;background:#eee;
+        .tam .shot{position:relative;flex:0 0 auto;width:min(70vw,340px);aspect-ratio:4/5;scroll-snap-align:start;background:#f3f3f3;
           overflow:hidden;border:2px solid var(--black);padding:0;margin:0;cursor:zoom-in;display:block;
           appearance:none;-webkit-appearance:none;font:inherit}
-        .tam .shot img{transition:transform .6s ease}
-        @media (hover:hover){ .tam .shot:hover img{transform:scale(1.04)} }
+        .tam .shot .lz{opacity:0;transform:scale(1.02);transition:opacity .55s ease, transform .8s cubic-bezier(.16,1,.3,1)}
+        .tam .shot.is-loaded .lz{opacity:1;transform:none}
+        @media (hover:hover){ .tam .shot.is-loaded:hover .lz{transform:scale(1.04)} }
 
         /* Fullscreen photo viewer — scroll / swipe up and down between photos */
         .tam .lb{position:fixed;inset:0;z-index:300;background:#000;color:#fff;animation:tamfade .2s ease}
@@ -695,6 +797,10 @@ export default function App() {
           overscroll-behavior:contain;scrollbar-width:none;-webkit-overflow-scrolling:touch}
         .tam .lb-scroll::-webkit-scrollbar{display:none}
         .tam .lb-slide{position:relative;width:100%;height:100%;scroll-snap-align:start;scroll-snap-stop:always}
+        .tam .lb-slide .lz{opacity:0;transition:opacity .45s ease}
+        .tam .lb-slide.is-loaded .lz{opacity:1}
+        .tam .lb .dots i{background:#fff}
+        .tam .lb .ldr.fail{color:#aaa}
         .tam .lb-x{position:absolute;top:calc(12px + env(safe-area-inset-top,0px));right:12px;z-index:2;width:48px;height:48px;
           background:rgba(0,0,0,.6);border:2px solid #fff;color:#fff;font-size:20px;cursor:pointer;font-family:inherit}
         .tam .lb-count{position:absolute;top:calc(24px + env(safe-area-inset-top,0px));left:16px;z-index:2;font-size:14px;font-weight:600;
@@ -813,7 +919,7 @@ export default function App() {
         @media (prefers-reduced-motion:reduce){
           html{scroll-behavior:auto}
           .tam .reveal{opacity:1;transform:none;transition:none}
-          .tam .card,.tam .skelcard,.tam .top,.tam .shot img{transition:none;animation:none}
+          .tam .card,.tam .skelcard,.tam .top,.tam .shot .lz,.tam .lb-slide .lz{transition:none;animation:none}
           .tam .blink,.tam .lights i,.tam .tri path,.tam .dots i,.tam .pop,.tam .pop-wrap,.tam .lb{animation:none}
           .tam .tri path{stroke-dashoffset:0}
         }
@@ -904,13 +1010,10 @@ export default function App() {
               <h2 className="h2">This is what <span className="brand">3 AM</span> looks like.</h2>
               <p className="proof-hint">Tap a photo to see it full screen.</p>
             </div>
-            <div className="strip">
+            <div className="strip" ref={stripRef}>
               {galleryImages.map((filename, index) => (
-                <button type="button" key={index} className="shot" onClick={() => openLb(index)}
-                        aria-label={`Open photo ${index + 1} of ${galleryImages.length}`}>
-                  <Image src={`/images/home/${filename}`} alt="" fill quality={80}
-                         sizes="(max-width: 820px) 70vw, 340px" style={{ objectFit: 'cover' }} />
-                </button>
+                <LazyShot key={filename || index} filename={filename} index={index} total={galleryImages.length}
+                          active={stripActive} rootRef={stripRef} onOpen={openLb} />
               ))}
             </div>
           </section>
@@ -970,10 +1073,8 @@ export default function App() {
           <span className="lb-count" aria-live="polite">{lbIndex + 1} / {galleryImages.length}</span>
           <div className="lb-scroll" ref={lbRef} onScroll={onLbScroll}>
             {galleryImages.map((filename, i) => (
-              <div className="lb-slide" key={i}>
-                <Image src={`/images/home/${filename}`} alt={`3 AM Ideas event photo ${i + 1}`} fill quality={85}
-                       sizes="100vw" style={{ objectFit: 'contain' }} />
-              </div>
+              <LbSlide key={filename || i} filename={filename} index={i}
+                       near={Math.abs(i - lbIndex) <= LB_NEAR} />
             ))}
           </div>
           {lbIndex < galleryImages.length - 1 && <span className="lb-hint">Scroll for the next one ↓</span>}

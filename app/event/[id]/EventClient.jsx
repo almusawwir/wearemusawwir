@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { parseStatus } from '../../lib/eventStyles';
@@ -9,19 +9,89 @@ import {
 } from '../../lib/eventHelpers';
 
 const SITE = "https://3amideas.club";
+const EAGER_COUNT = 3;      // photos loaded as soon as the gallery is near
+const AHEAD_PX = 700;       // how far ahead (sideways) to start loading ≈ 2 photos
 
-function EventImage({ src, alt, fill, sizes, priority, quality, style }) {
+function EventImage({ src, alt, fill, sizes, priority, quality, style, className, onLoad, onError }) {
   const isExternal = src && src.startsWith('http');
   if (isExternal) {
-    return <img src={src} alt={alt} style={style} loading={priority ? "eager" : "lazy"} decoding="async" />;
+    return <img src={src} alt={alt} style={style} className={className}
+                loading={priority ? "eager" : "lazy"} decoding="async"
+                onLoad={onLoad} onError={onError} />;
   }
   return <Image src={src} alt={alt} fill={fill} sizes={sizes} priority={priority} quality={quality}
-                loading={!priority ? "lazy" : undefined} style={style} />;
+                loading={!priority ? "lazy" : undefined} style={style} className={className}
+                onLoad={onLoad} onError={onError} />;
+}
+
+/* One gallery photo. Shows the triangle loader until the image is ready.
+   It only starts downloading when the gallery is on screen AND this photo
+   is within about 2 photos of the visible area. */
+function LazyShot({ src, alt, index, active, rootRef }) {
+  const ref = useRef(null);
+  const [inRange, setInRange] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (!active || inRange) return;
+    if (index < EAGER_COUNT) { setInRange(true); return; }
+
+    const el = ref.current;
+    const root = rootRef.current;
+    if (!el || !root) { setInRange(true); return; }
+
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some(e => e.isIntersecting)) {
+        setInRange(true);
+        io.disconnect();
+      }
+    }, { root, rootMargin: `0px ${AHEAD_PX}px 0px ${AHEAD_PX}px` });
+
+    io.observe(el);
+    return () => io.disconnect();
+  }, [active, inRange, index, rootRef]);
+
+  return (
+    <div ref={ref} className={`shot ${loaded ? 'is-loaded' : ''}`}>
+      {!loaded && !failed && (
+        <span className="ldr" aria-hidden="true">
+          <svg className="tri" viewBox="0 0 46 42">
+            <path d="M23 3 L43 39 L3 39 Z" pathLength="100" style={{ animationDelay: `${(index % 4) * 0.2}s` }} />
+          </svg>
+          <span className="dots"><i></i><i></i><i></i></span>
+        </span>
+      )}
+      {failed && <span className="ldr fail">Photo unavailable</span>}
+      {inRange && !failed && (
+        <EventImage src={src} alt={alt} fill sizes="(max-width: 820px) 70vw, 320px"
+                    className="lz" style={{ objectFit: 'cover', width: '100%', height: '100%' }}
+                    onLoad={() => setLoaded(true)}
+                    onError={() => setFailed(true)} />
+      )}
+    </div>
+  );
 }
 
 export default function EventClient({ currentEvent, suggestedEvents, targetId }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const stripRef = useRef(null);
+  const [stripActive, setStripActive] = useState(false);
+
+  // Start loading gallery photos only once the gallery is close to the screen
+  useEffect(() => {
+    const el = stripRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setStripActive(true);
+        io.disconnect();
+      }
+    }, { rootMargin: '300px 0px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
   if (!currentEvent) {
     return (
@@ -242,16 +312,19 @@ export default function EventClient({ currentEvent, suggestedEvents, targetId })
 
         {(galleryImages.length > 0 || videoSrc) && (
           <section className="block noborder">
-            <div className="wrap"><h2 className="h2 wide">A glimpse</h2></div>
-            <div className="strip">
+            <div className="wrap ghead">
+              <h2 className="h2">A glimpse</h2>
+              {galleryImages.length > 3 && <span className="gcount">{galleryImages.length} photos · swipe →</span>}
+            </div>
+            <div className="strip" ref={stripRef}>
               {videoSrc && (
-                <div className="shot vid"><video src={videoSrc} autoPlay loop muted playsInline /></div>
+                <div className="shot vid is-loaded">
+                  {stripActive && <video src={videoSrc} autoPlay loop muted playsInline preload="metadata" />}
+                </div>
               )}
               {galleryImages.map((img, idx) => (
-                <div key={idx} className="shot">
-                  <EventImage src={img} alt={`${title} photo ${idx + 1}`} fill
-                              sizes="(max-width: 820px) 70vw, 320px" style={{ objectFit: 'cover', width: '100%', height: '100%' }} />
-                </div>
+                <LazyShot key={idx} src={img} index={idx} alt={`${title} photo ${idx + 1}`}
+                          active={stripActive} rootRef={stripRef} />
               ))}
             </div>
           </section>
@@ -416,6 +489,8 @@ html{scroll-behavior:smooth}
 .tam .block.noborder{display:block}
 .tam .h2{font-family:var(--display);font-weight:900;font-size:30px;line-height:1;margin:0}
 .tam .h2.wide{margin-bottom:18px}
+.tam .ghead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:18px}
+.tam .gcount{font-size:13.5px;color:var(--grey);font-weight:500;white-space:nowrap}
 .tam .big{font-family:var(--display);font-weight:900;font-size:clamp(26px,4.5vw,38px);line-height:1.08;margin:0}
 .tam .big .old{font-family:var(--body);font-weight:400;font-size:18px;text-decoration:line-through;opacity:.45;margin-right:10px}
 .tam .plain{margin:6px 0 0;font-size:16px;color:var(--grey)}
@@ -438,11 +513,27 @@ html{scroll-behavior:smooth}
 .tam .strip{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x proximity;padding:0 24px 10px;scrollbar-width:none;
   overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
 .tam .strip::-webkit-scrollbar{display:none}
-.tam .shot{position:relative;flex:0 0 auto;width:min(70vw,320px);aspect-ratio:4/5;scroll-snap-align:center;background:#eee;overflow:hidden;border:2px solid var(--black)}
-.tam .shot img{width:100%;height:100%;object-fit:cover}
+
+/* Gallery photo + loader */
+.tam .shot{position:relative;flex:0 0 auto;width:min(70vw,320px);aspect-ratio:4/5;scroll-snap-align:center;background:#f3f3f3;
+  overflow:hidden;border:2px solid var(--black)}
+.tam .shot .lz{opacity:0;transform:scale(1.02);transition:opacity .55s ease, transform .8s cubic-bezier(.16,1,.3,1)}
+.tam .shot.is-loaded .lz{opacity:1;transform:none}
 .tam .shot.vid{aspect-ratio:9/16;width:min(58vw,250px);background:#000}
 .tam .shot.vid video{width:100%;height:100%;object-fit:cover;display:block}
+.tam .ldr{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:1}
+.tam .ldr.fail{font-size:13px;color:var(--grey);font-weight:500}
+.tam .tri{width:40px;height:36px;overflow:visible}
+.tam .tri path{fill:none;stroke:var(--pink);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round;
+  stroke-dasharray:100;stroke-dashoffset:100;animation:tamdraw 2.2s cubic-bezier(.65,0,.35,1) infinite}
+@keyframes tamdraw{0%{stroke-dashoffset:100;opacity:.35}45%{stroke-dashoffset:0;opacity:1}55%{stroke-dashoffset:0;opacity:1}100%{stroke-dashoffset:-100;opacity:.35}}
+.tam .dots{display:flex;gap:6px}
+.tam .dots i{width:6px;height:6px;border-radius:50%;background:var(--black);opacity:.15;animation:tamdot 1.4s ease-in-out infinite}
+.tam .dots i:nth-child(2){animation-delay:.2s}
+.tam .dots i:nth-child(3){animation-delay:.4s}
+@keyframes tamdot{0%,100%{opacity:.15;transform:translateY(0)}50%{opacity:.8;transform:translateY(-3px)}}
 
+/* Suggested events */
 .tam .sugg{position:relative;flex:0 0 auto;width:min(68vw,280px);scroll-snap-align:start;border:2px solid var(--black);padding:18px;
   display:flex;flex-direction:column;gap:6px;text-decoration:none;background:var(--white);transition:transform .15s ease, box-shadow .15s ease}
 .tam .sbadge{display:inline-flex;align-self:flex-start;align-items:center;gap:6px;font-size:11.5px;font-weight:600;padding:2px 8px;border:2px solid var(--black);margin-bottom:4px}
@@ -500,6 +591,7 @@ html{scroll-behavior:smooth}
   .tam .heroimg{aspect-ratio:4/3;margin-top:20px}
   .tam .block{grid-template-columns:1fr;gap:10px;padding-top:22px;padding-bottom:22px}
   .tam .h2{font-size:24px}
+  .tam .gcount{font-size:12.5px}
   .tam .prose p{font-size:16px}
   .tam .twocol{grid-template-columns:1fr;gap:20px}
   .tam .sharebtns{flex-direction:column}
@@ -517,7 +609,8 @@ html{scroll-behavior:smooth}
 }
 @media (prefers-reduced-motion:reduce){
   html{scroll-behavior:auto}
-  .tam .sugg{transition:none}
-  .tam .blink,.tam .lights i{animation:none}
+  .tam .sugg,.tam .shot .lz{transition:none}
+  .tam .blink,.tam .lights i,.tam .tri path,.tam .dots i{animation:none}
+  .tam .tri path{stroke-dashoffset:0}
 }
 `;
