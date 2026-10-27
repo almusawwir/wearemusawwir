@@ -11,6 +11,7 @@ import {
 const SITE = "https://3amideas.club";
 const EAGER_COUNT = 3;      // photos loaded as soon as the gallery is near
 const AHEAD_PX = 700;       // how far ahead (sideways) to start loading ≈ 2 photos
+const LB_NEAR = 2;          // fullscreen viewer: load this many either side
 const DESC_PREVIEW = 200;   // characters of description shown before "See more"
 
 /* Only direct video files can play in the browser's video player */
@@ -40,9 +41,10 @@ function Loader({ delay = 0 }) {
   );
 }
 
-/* One gallery photo. Downloads only when the gallery is on screen AND
-   this photo is within about 2 photos of the visible area. */
-function LazyShot({ src, alt, index, active, rootRef }) {
+/* One gallery photo in the strip. Downloads only when the gallery is on
+   screen AND this photo is within about 2 photos of the visible area.
+   Tapping it opens the fullscreen viewer. */
+function LazyShot({ src, alt, index, total, active, rootRef, onOpen }) {
   const ref = useRef(null);
   const [inRange, setInRange] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -68,7 +70,8 @@ function LazyShot({ src, alt, index, active, rootRef }) {
   }, [active, inRange, index, rootRef]);
 
   return (
-    <div ref={ref} className={`shot ${loaded ? 'is-loaded' : ''}`}>
+    <button type="button" ref={ref} className={`shot ${loaded ? 'is-loaded' : ''}`}
+            onClick={() => onOpen(index)} aria-label={`Open photo ${index + 1} of ${total}`}>
       {!loaded && !failed && <Loader delay={(index % 4) * 0.2} />}
       {failed && <span className="ldr fail">Photo unavailable</span>}
       {inRange && !failed && (
@@ -76,6 +79,28 @@ function LazyShot({ src, alt, index, active, rootRef }) {
                     className="lz" style={{ objectFit: 'cover', width: '100%', height: '100%' }}
                     onLoad={() => setLoaded(true)}
                     onError={() => setFailed(true)} />
+      )}
+    </button>
+  );
+}
+
+/* One slide in the fullscreen viewer. Loads only when it's within
+   LB_NEAR of the photo on screen, and stays loaded after that. */
+function LbSlide({ src, alt, near }) {
+  const [mounted, setMounted] = useState(near);
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => { if (near) setMounted(true); }, [near]);
+
+  return (
+    <div className={`lb-slide ${loaded ? 'is-loaded' : ''}`}>
+      {!loaded && !failed && <Loader />}
+      {failed && <span className="ldr fail">Photo unavailable</span>}
+      {mounted && !failed && (
+        <EventImage src={src} alt={alt} fill sizes="100vw" quality={85}
+                    className="lz" style={{ objectFit: 'contain', width: '100%', height: '100%' }}
+                    onLoad={() => setLoaded(true)} onError={() => setFailed(true)} />
       )}
     </div>
   );
@@ -104,7 +129,10 @@ export default function EventClient({ currentEvent, suggestedEvents, targetId })
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [descOpen, setDescOpen] = useState(false);
+  const [lbOpen, setLbOpen] = useState(null);   // index the viewer opened at, or null
+  const [lbIndex, setLbIndex] = useState(0);    // photo currently on screen
   const stripRef = useRef(null);
+  const lbRef = useRef(null);
   const [stripActive, setStripActive] = useState(false);
 
   // Start loading gallery media only once the gallery is close to the screen
@@ -120,6 +148,53 @@ export default function EventClient({ currentEvent, suggestedEvents, targetId })
     io.observe(el);
     return () => io.disconnect();
   }, []);
+
+  /* ── Photo viewer ── */
+  const openLb = (i) => { setLbIndex(i); setLbOpen(i); };
+  const closeLb = () => setLbOpen(null);
+
+  // Jump straight to the tapped photo when the viewer opens
+  useEffect(() => {
+    if (lbOpen === null) return;
+    const el = lbRef.current;
+    if (el) el.scrollTop = lbOpen * el.clientHeight;
+  }, [lbOpen]);
+
+  const onLbScroll = () => {
+    const el = lbRef.current;
+    if (!el || !el.clientHeight) return;
+    const i = Math.round(el.scrollTop / el.clientHeight);
+    setLbIndex(prev => (prev === i ? prev : i));
+  };
+
+  // Keyboard: Esc closes, arrows / space move between photos
+  useEffect(() => {
+    if (lbOpen === null) return;
+    const onKey = (e) => {
+      const el = lbRef.current;
+      if (!el) return;
+      if (e.key === 'Escape') { setLbOpen(null); return; }
+      if (['ArrowDown', 'ArrowRight', 'PageDown', ' '].includes(e.key)) {
+        e.preventDefault();
+        el.scrollBy({ top: el.clientHeight, behavior: 'smooth' });
+      }
+      if (['ArrowUp', 'ArrowLeft', 'PageUp'].includes(e.key)) {
+        e.preventDefault();
+        el.scrollBy({ top: -el.clientHeight, behavior: 'smooth' });
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [lbOpen]);
+
+  // Freeze the page behind the viewer or the booking picker
+  const anyOverlay = lbOpen !== null || isModalOpen;
+  useEffect(() => {
+    if (!anyOverlay) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [anyOverlay]);
 
   if (!currentEvent) {
     return (
@@ -323,13 +398,18 @@ export default function EventClient({ currentEvent, suggestedEvents, targetId })
           <section className="block noborder gallery">
             <div className="wrap ghead">
               <h2 className="h2">A glimpse</h2>
-              {galleryImages.length > 3 && <span className="gcount">{galleryImages.length} photos · swipe →</span>}
+              {galleryImages.length > 0 && (
+                <span className="gcount">
+                  {galleryImages.length > 3 ? `${galleryImages.length} photos · swipe → · tap to enlarge` : 'Tap to enlarge'}
+                </span>
+              )}
             </div>
             <div className="strip" ref={stripRef}>
               {hasPlayableVideo && <VideoShot src={videoSrc} active={stripActive} />}
               {galleryImages.map((img, idx) => (
-                <LazyShot key={idx} src={img} index={idx} alt={`${title} photo ${idx + 1}`}
-                          active={stripActive} rootRef={stripRef} />
+                <LazyShot key={idx} src={img} index={idx} total={galleryImages.length}
+                          alt={`${title} photo ${idx + 1}`}
+                          active={stripActive} rootRef={stripRef} onOpen={openLb} />
               ))}
             </div>
           </section>
@@ -458,6 +538,21 @@ export default function EventClient({ currentEvent, suggestedEvents, targetId })
           </div>
         </div>
       )}
+
+      {/* Fullscreen photo viewer */}
+      {lbOpen !== null && (
+        <div className="lb" role="dialog" aria-modal="true" aria-label="Photo viewer">
+          <button type="button" className="lb-x" onClick={closeLb} aria-label="Close photos" autoFocus>✕</button>
+          <span className="lb-count" aria-live="polite">{lbIndex + 1} / {galleryImages.length}</span>
+          <div className="lb-scroll" ref={lbRef} onScroll={onLbScroll}>
+            {galleryImages.map((img, i) => (
+              <LbSlide key={i} src={img} alt={`${title} photo ${i + 1}`}
+                       near={Math.abs(i - lbIndex) <= LB_NEAR} />
+            ))}
+          </div>
+          {lbIndex < galleryImages.length - 1 && <span className="lb-hint">Scroll for the next one ↓</span>}
+        </div>
+      )}
     </div>
   );
 }
@@ -535,8 +630,8 @@ html{scroll-behavior:smooth}
 .tam .block.gallery{padding-top:28px;padding-bottom:28px;border-bottom:1px solid var(--black)}
 .tam .h2{font-family:var(--display);font-weight:900;font-size:30px;line-height:1;margin:0}
 .tam .h2.wide{margin-bottom:18px}
-.tam .ghead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:18px}
-.tam .gcount{font-size:13.5px;color:var(--grey);font-weight:500;white-space:nowrap}
+.tam .ghead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+.tam .gcount{font-size:13.5px;color:var(--grey);font-weight:500}
 .tam .big{font-family:var(--display);font-weight:900;font-size:clamp(26px,4.5vw,38px);line-height:1.08;margin:0}
 .tam .big .old{font-family:var(--body);font-weight:400;font-size:18px;text-decoration:line-through;opacity:.45;margin-right:10px}
 .tam .plain{margin:6px 0 0;font-size:16px;color:var(--grey)}
@@ -564,9 +659,12 @@ html{scroll-behavior:smooth}
 
 /* Gallery photo + loader */
 .tam .shot{position:relative;flex:0 0 auto;width:min(70vw,320px);aspect-ratio:4/5;scroll-snap-align:center;background:#f3f3f3;
-  overflow:hidden;border:2px solid var(--black)}
+  overflow:hidden;border:2px solid var(--black);padding:0;margin:0;display:block;font:inherit;
+  appearance:none;-webkit-appearance:none}
+button.shot{cursor:zoom-in}
 .tam .shot .lz{opacity:0;transform:scale(1.02);transition:opacity .55s ease, transform .8s cubic-bezier(.16,1,.3,1)}
 .tam .shot.is-loaded .lz{opacity:1;transform:none}
+@media (hover:hover){ .tam button.shot.is-loaded:hover .lz{transform:scale(1.04)} }
 .tam .shot.vid{aspect-ratio:9/16;width:min(58vw,250px);background:#111}
 .tam .shot.vid video{width:100%;height:100%;object-fit:cover;display:block}
 .tam .shot.vid .dots i{background:#fff}
@@ -581,6 +679,25 @@ html{scroll-behavior:smooth}
 .tam .dots i:nth-child(2){animation-delay:.2s}
 .tam .dots i:nth-child(3){animation-delay:.4s}
 @keyframes tamdot{0%,100%{opacity:.15;transform:translateY(0)}50%{opacity:.8;transform:translateY(-3px)}}
+
+/* Fullscreen photo viewer — scroll / swipe up and down between photos */
+.tam .lb{position:fixed;inset:0;z-index:300;background:#000;color:#fff;animation:tamfade .2s ease}
+@keyframes tamfade{from{opacity:0}to{opacity:1}}
+.tam .lb-scroll{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;scroll-snap-type:y mandatory;
+  overscroll-behavior:contain;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.tam .lb-scroll::-webkit-scrollbar{display:none}
+.tam .lb-slide{position:relative;width:100%;height:100%;scroll-snap-align:start;scroll-snap-stop:always}
+.tam .lb-slide img{position:absolute;inset:0}
+.tam .lb-slide .lz{opacity:0;transition:opacity .45s ease}
+.tam .lb-slide.is-loaded .lz{opacity:1}
+.tam .lb .dots i{background:#fff}
+.tam .lb .ldr.fail{color:#aaa}
+.tam .lb-x{position:absolute;top:calc(12px + env(safe-area-inset-top,0px));right:12px;z-index:2;width:48px;height:48px;
+  background:rgba(0,0,0,.6);border:2px solid #fff;color:#fff;font-size:20px;cursor:pointer;font-family:inherit}
+.tam .lb-count{position:absolute;top:calc(24px + env(safe-area-inset-top,0px));left:16px;z-index:2;font-size:14px;font-weight:600;
+  background:rgba(0,0,0,.6);padding:4px 10px;pointer-events:none}
+.tam .lb-hint{position:absolute;bottom:calc(20px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);z-index:2;
+  font-size:13px;background:rgba(0,0,0,.6);padding:5px 12px;pointer-events:none;white-space:nowrap}
 
 /* Suggested events */
 .tam .sugg{position:relative;flex:0 0 auto;width:min(68vw,280px);scroll-snap-align:start;border:2px solid var(--black);padding:18px;
@@ -659,8 +776,8 @@ html{scroll-behavior:smooth}
 }
 @media (prefers-reduced-motion:reduce){
   html{scroll-behavior:auto}
-  .tam .sugg,.tam .shot .lz{transition:none}
-  .tam .blink,.tam .lights i,.tam .tri path,.tam .dots i{animation:none}
+  .tam .sugg,.tam .shot .lz,.tam .lb-slide .lz{transition:none}
+  .tam .blink,.tam .lights i,.tam .tri path,.tam .dots i,.tam .lb{animation:none}
   .tam .tri path{stroke-dashoffset:0}
 }
 `;
