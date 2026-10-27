@@ -11,6 +11,10 @@ import {
 const SITE = "https://3amideas.club";
 const EAGER_COUNT = 3;      // photos loaded as soon as the gallery is near
 const AHEAD_PX = 700;       // how far ahead (sideways) to start loading ≈ 2 photos
+const DESC_PREVIEW = 200;   // characters of description shown before "See more"
+
+/* Only direct video files can play in the browser's video player */
+const PLAYABLE_VIDEO = /\.(mp4|webm|mov|m4v)(\?|#|$)/i;
 
 function EventImage({ src, alt, fill, sizes, priority, quality, style, className, onLoad, onError }) {
   const isExternal = src && src.startsWith('http');
@@ -24,9 +28,20 @@ function EventImage({ src, alt, fill, sizes, priority, quality, style, className
                 onLoad={onLoad} onError={onError} />;
 }
 
-/* One gallery photo. Shows the triangle loader until the image is ready.
-   It only starts downloading when the gallery is on screen AND this photo
-   is within about 2 photos of the visible area. */
+/* Triangle + dots loader */
+function Loader({ delay = 0 }) {
+  return (
+    <span className="ldr" aria-hidden="true">
+      <svg className="tri" viewBox="0 0 46 42">
+        <path d="M23 3 L43 39 L3 39 Z" pathLength="100" style={{ animationDelay: `${delay}s` }} />
+      </svg>
+      <span className="dots"><i></i><i></i><i></i></span>
+    </span>
+  );
+}
+
+/* One gallery photo. Downloads only when the gallery is on screen AND
+   this photo is within about 2 photos of the visible area. */
 function LazyShot({ src, alt, index, active, rootRef }) {
   const ref = useRef(null);
   const [inRange, setInRange] = useState(false);
@@ -54,14 +69,7 @@ function LazyShot({ src, alt, index, active, rootRef }) {
 
   return (
     <div ref={ref} className={`shot ${loaded ? 'is-loaded' : ''}`}>
-      {!loaded && !failed && (
-        <span className="ldr" aria-hidden="true">
-          <svg className="tri" viewBox="0 0 46 42">
-            <path d="M23 3 L43 39 L3 39 Z" pathLength="100" style={{ animationDelay: `${(index % 4) * 0.2}s` }} />
-          </svg>
-          <span className="dots"><i></i><i></i><i></i></span>
-        </span>
-      )}
+      {!loaded && !failed && <Loader delay={(index % 4) * 0.2} />}
       {failed && <span className="ldr fail">Photo unavailable</span>}
       {inRange && !failed && (
         <EventImage src={src} alt={alt} fill sizes="(max-width: 820px) 70vw, 320px"
@@ -73,13 +81,33 @@ function LazyShot({ src, alt, index, active, rootRef }) {
   );
 }
 
+/* Event video. Shows the loader until it can play; disappears entirely
+   if the link isn't a playable video file or fails to load. */
+function VideoShot({ src, active }) {
+  const [ready, setReady] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  if (failed || !PLAYABLE_VIDEO.test(src)) return null;
+
+  return (
+    <div className={`shot vid ${ready ? 'is-loaded' : ''}`}>
+      {!ready && <Loader />}
+      {active && (
+        <video src={src} className="lz" autoPlay loop muted playsInline preload="metadata"
+               onLoadedData={() => setReady(true)} onError={() => setFailed(true)} />
+      )}
+    </div>
+  );
+}
+
 export default function EventClient({ currentEvent, suggestedEvents, targetId }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [descOpen, setDescOpen] = useState(false);
   const stripRef = useRef(null);
   const [stripActive, setStripActive] = useState(false);
 
-  // Start loading gallery photos only once the gallery is close to the screen
+  // Start loading gallery media only once the gallery is close to the screen
   useEffect(() => {
     const el = stripRef.current;
     if (!el) return;
@@ -115,13 +143,24 @@ export default function EventClient({ currentEvent, suggestedEvents, targetId })
   const price = priceText(currentEvent, false);
   const hasOriginalPrice = currentEvent.original_price && currentEvent.original_price.trim() !== '' && price !== 'Free';
 
-  // Sheet text → lists
+  // Description: full paragraphs, plus a 200-character preview cut at a whole word
   const paragraphs = currentEvent.description ? currentEvent.description.split('\n').filter(p => p.trim() !== '') : [];
+  const flatDesc = paragraphs.join(' ').replace(/\s+/g, ' ').trim();
+  const needsMore = flatDesc.length > DESC_PREVIEW;
+  let descPreview = flatDesc;
+  if (needsMore) {
+    const cut = flatDesc.slice(0, DESC_PREVIEW);
+    const lastSpace = cut.lastIndexOf(' ');
+    descPreview = (lastSpace > DESC_PREVIEW * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[\s,.;:–-]+$/, '') + '…';
+  }
+
+  // Sheet text → lists
   const providedList = currentEvent.provided ? currentEvent.provided.split(',').map(i => i.trim()).filter(Boolean) : [];
   const bringList = currentEvent.bring ? currentEvent.bring.split(',').map(i => i.trim()).filter(Boolean) : [];
   const flowList = currentEvent.flow ? currentEvent.flow.split('\n').filter(i => i.trim() !== '') : [];
   const galleryImages = currentEvent.gallery ? currentEvent.gallery.split(',').map(i => i.trim()).filter(Boolean) : [];
-  const videoSrc = currentEvent.video ? currentEvent.video.trim() : null;
+  const videoSrc = currentEvent.video ? currentEvent.video.trim() : '';
+  const hasPlayableVideo = videoSrc && PLAYABLE_VIDEO.test(videoSrc);
 
   // Sharing
   const shareUrl = `${SITE}/event/${targetId}`;
@@ -266,7 +305,33 @@ export default function EventClient({ currentEvent, suggestedEvents, targetId })
         {paragraphs.length > 0 && (
           <section className="wrap block">
             <h2 className="h2">What is this?</h2>
-            <div className="prose">{paragraphs.map((p, idx) => <p key={idx}>{p}</p>)}</div>
+            <div className="prose">
+              {descOpen || !needsMore
+                ? paragraphs.map((p, idx) => <p key={idx}>{p}</p>)
+                : <p>{descPreview}</p>}
+              {needsMore && (
+                <button type="button" className="more-btn" onClick={() => setDescOpen(o => !o)} aria-expanded={descOpen}>
+                  {descOpen ? 'See less' : 'See more'}
+                </button>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* Gallery, right after the description */}
+        {(galleryImages.length > 0 || hasPlayableVideo) && (
+          <section className="block noborder gallery">
+            <div className="wrap ghead">
+              <h2 className="h2">A glimpse</h2>
+              {galleryImages.length > 3 && <span className="gcount">{galleryImages.length} photos · swipe →</span>}
+            </div>
+            <div className="strip" ref={stripRef}>
+              {hasPlayableVideo && <VideoShot src={videoSrc} active={stripActive} />}
+              {galleryImages.map((img, idx) => (
+                <LazyShot key={idx} src={img} index={idx} alt={`${title} photo ${idx + 1}`}
+                          active={stripActive} rootRef={stripRef} />
+              ))}
+            </div>
           </section>
         )}
 
@@ -306,26 +371,6 @@ export default function EventClient({ currentEvent, suggestedEvents, targetId })
                   <ul className="tagslist alt">{bringList.map((item, idx) => <li key={idx}>{item}</li>)}</ul>
                 </div>
               )}
-            </div>
-          </section>
-        )}
-
-        {(galleryImages.length > 0 || videoSrc) && (
-          <section className="block noborder">
-            <div className="wrap ghead">
-              <h2 className="h2">A glimpse</h2>
-              {galleryImages.length > 3 && <span className="gcount">{galleryImages.length} photos · swipe →</span>}
-            </div>
-            <div className="strip" ref={stripRef}>
-              {videoSrc && (
-                <div className="shot vid is-loaded">
-                  {stripActive && <video src={videoSrc} autoPlay loop muted playsInline preload="metadata" />}
-                </div>
-              )}
-              {galleryImages.map((img, idx) => (
-                <LazyShot key={idx} src={img} index={idx} alt={`${title} photo ${idx + 1}`}
-                          active={stripActive} rootRef={stripRef} />
-              ))}
             </div>
           </section>
         )}
@@ -487,6 +532,7 @@ html{scroll-behavior:smooth}
 /* Blocks */
 .tam .block{display:grid;grid-template-columns:190px 1fr;gap:28px;padding-top:28px;padding-bottom:28px;border-bottom:1px solid var(--black)}
 .tam .block.noborder{display:block}
+.tam .block.gallery{padding-top:28px;padding-bottom:28px;border-bottom:1px solid var(--black)}
 .tam .h2{font-family:var(--display);font-weight:900;font-size:30px;line-height:1;margin:0}
 .tam .h2.wide{margin-bottom:18px}
 .tam .ghead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:18px}
@@ -496,7 +542,9 @@ html{scroll-behavior:smooth}
 .tam .plain{margin:6px 0 0;font-size:16px;color:var(--grey)}
 .tam .inline{display:inline-block;margin-top:12px;font-weight:600;font-size:15px;text-decoration:underline}
 .tam .prose p{margin:0 0 14px;font-size:16.5px;max-width:64ch}
-.tam .prose p:last-child{margin-bottom:0}
+.tam .prose p:last-of-type{margin-bottom:0}
+.tam .more-btn{display:inline-block;margin-top:12px;padding:0;background:none;border:0;font:inherit;font-size:15px;font-weight:600;
+  color:var(--pink);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 
 .tam .flow{list-style:none;margin:0;padding:0}
 .tam .flow li{display:grid;grid-template-columns:40px 1fr;gap:12px;padding:10px 0;border-bottom:1px dashed #bbb;font-size:16px}
@@ -519,9 +567,10 @@ html{scroll-behavior:smooth}
   overflow:hidden;border:2px solid var(--black)}
 .tam .shot .lz{opacity:0;transform:scale(1.02);transition:opacity .55s ease, transform .8s cubic-bezier(.16,1,.3,1)}
 .tam .shot.is-loaded .lz{opacity:1;transform:none}
-.tam .shot.vid{aspect-ratio:9/16;width:min(58vw,250px);background:#000}
+.tam .shot.vid{aspect-ratio:9/16;width:min(58vw,250px);background:#111}
 .tam .shot.vid video{width:100%;height:100%;object-fit:cover;display:block}
-.tam .ldr{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:1}
+.tam .shot.vid .dots i{background:#fff}
+.tam .ldr{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:1;pointer-events:none}
 .tam .ldr.fail{font-size:13px;color:var(--grey);font-weight:500}
 .tam .tri{width:40px;height:36px;overflow:visible}
 .tam .tri path{fill:none;stroke:var(--pink);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round;
@@ -590,6 +639,7 @@ html{scroll-behavior:smooth}
   .tam .tagline{font-size:16.5px}
   .tam .heroimg{aspect-ratio:4/3;margin-top:20px}
   .tam .block{grid-template-columns:1fr;gap:10px;padding-top:22px;padding-bottom:22px}
+  .tam .block.gallery{padding-top:22px;padding-bottom:22px}
   .tam .h2{font-size:24px}
   .tam .gcount{font-size:12.5px}
   .tam .prose p{font-size:16px}
