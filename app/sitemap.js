@@ -7,11 +7,12 @@ export default async function sitemap() {
   const now = new Date();
 
   const staticPages = [
-    { path: '',       changeFrequency: 'daily',   priority: 1.0 },
-    { path: '/event', changeFrequency: 'daily',   priority: 0.9 },
-    { path: '/about', changeFrequency: 'monthly', priority: 0.7 },
-    { path: '/join',  changeFrequency: 'monthly', priority: 0.6 },
-    { path: '/terms', changeFrequency: 'yearly',  priority: 0.3 },
+    { path: '',          changeFrequency: 'daily',   priority: 1.0 },
+    { path: '/event',    changeFrequency: 'daily',   priority: 0.9 },
+    { path: '/about',    changeFrequency: 'monthly', priority: 0.7 },
+    { path: '/wishlist', changeFrequency: 'monthly', priority: 0.6 },
+    { path: '/join',     changeFrequency: 'monthly', priority: 0.6 },
+    { path: '/terms',    changeFrequency: 'yearly',  priority: 0.3 },
   ].map(({ path, changeFrequency, priority }) => ({
     url: `${SITE}${path}`,
     lastModified: now,

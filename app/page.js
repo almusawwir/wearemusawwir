@@ -761,6 +761,13 @@ export default function App() {
           .tam .faded:hover{transform:none;box-shadow:none}
         }
 
+        /* Wishlist strip */
+        .tam .wishbox{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;
+          margin-top:32px;border:2px dashed var(--black);padding:20px 22px}
+        .tam .wishbox p{margin:0;font-weight:600;font-size:16px;max-width:46ch}
+        .tam .wishbtn{display:inline-block;padding:13px 22px;font-weight:600;font-size:15px;text-decoration:none;
+          background:var(--pink);border:2px solid var(--pink);color:var(--white);white-space:nowrap}
+
         /* About */
         .tam .about{border-top:2px solid var(--black);padding-top:60px;padding-bottom:60px;display:grid;grid-template-columns:1fr 1.3fr;gap:48px}
         .tam .h2{font-family:var(--display);font-weight:900;font-size:clamp(34px,6vw,72px);line-height:.92;margin:0}
@@ -860,6 +867,8 @@ export default function App() {
         @media (max-width:820px){
           .tam .wrap{padding:0 20px}
           .tam .clock{display:none}
+          .tam .wishbox{flex-direction:column;align-items:stretch;margin-top:24px;padding:18px}
+          .tam .wishbtn{text-align:center}
           .tam .bar{padding-top:14px;padding-bottom:14px;min-height:60px;gap:10px}
           .tam .navlinks{gap:16px;font-size:14.5px}
           .tam .hero{padding-top:28px;padding-bottom:2px}
@@ -1001,6 +1010,11 @@ export default function App() {
                 )}
               </>
             )}
+
+            <div className="wishbox">
+              <p>Not sure which one is for you? Tell us what you like.</p>
+              <Link href="/wishlist" className="wishbtn">Join the wishlist</Link>
+            </div>
           </div>
         </section>
 
