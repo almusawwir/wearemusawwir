@@ -10,7 +10,7 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw6vQH29lAXj_FtBrCkm
 
 /* ── Edit these ── */
 const EVENT_NAME = 'One Day Crew';
-const AMOUNT = 0;                         // ticket price in rupees, e.g. 499
+const AMOUNT = 499;                         // ticket price in rupees, e.g. 499
 const UPI_ID = 'nazi4272m-2@okicici';
 const PAYEE_NAME = 'Nazim Mansuri';
 const QR_IMAGE = '/images/pay.jpeg';      // must be in public/images/, NOT public/images/home/
@@ -42,11 +42,11 @@ const DEVICE = [
   "No, I'd need to use what the crew has.",
 ];
 const TERMS = [
-  'Odyssey provides the curated crew, script, storyboard and filmmaking experience.',
+  '3 AM Ideas provides the curated crew, script, storyboard and filmmaking experience.',
   "We'll try to provide a microphone, subject to availability.",
   'Professional cameras, lenses, lighting, shooting locations and additional production expenses are not included.',
   'The crew must submit its film within one week.',
-  'All footage and photographs captured during ODC must be uploaded to Odyssey. Odyssey retains ownership and the agreed rights to edit, archive and use the material for promotional purposes, as covered by the participant release.',
+  'All footage and photographs captured during ODC must be uploaded to 3 AM Ideas. 3 AM Ideas retains ownership and the agreed rights to edit, archive and use the material for promotional purposes, as covered by the participant release.',
 ];
 
 const MAX_FILE_MB = 12;
@@ -54,7 +54,7 @@ const MAX_SIDE = 1600;
 const TARGET_BYTES = 1.5 * 1024 * 1024;
 
 const ORDER = ['name', 'whatsapp', 'social', 'birthday', 'city', 'explore', 'experience', 'energy',
-  'reason', 'reaction', 'device', 'why', 'consent', 'txn', 'shot'];
+  'reason', 'reaction', 'device', 'why', 'consent', 'shot'];
 const TOTAL = ORDER.length;
 const MESSAGES = {
   name: 'Tell us your name.',
@@ -70,7 +70,6 @@ const MESSAGES = {
   device: 'Pick one.',
   why: 'Tell us a little about why.',
   consent: 'Please agree to the participation terms.',
-  txn: 'Enter the transaction ID / UTR from your payment app.',
   shot: 'Upload your payment screenshot.',
 };
 
@@ -112,7 +111,7 @@ async function compressImage(file) {
 
 const EMPTY = {
   name: '', whatsapp: '', social: '', birthday: '', city: '', explore: [], experience: '', energy: '',
-  reason: '', reaction: '', device: '', why: '', consent: false, txn: '', company: '',
+  reason: '', reaction: '', device: '', why: '', consent: false, company: '',
 };
 
 export default function OdcJoinPage() {
@@ -126,7 +125,6 @@ export default function OdcJoinPage() {
 
   const today = new Date().toISOString().slice(0, 10);
   const digits = f.whatsapp.replace(/\D/g, '');
-  const txnClean = f.txn.replace(/\s/g, '');
   const done = {
     name: f.name.trim().length > 0,
     whatsapp: digits.length >= 10 && digits.length <= 13,
@@ -141,7 +139,6 @@ export default function OdcJoinPage() {
     device: !!f.device,
     why: f.why.trim().length > 0,
     consent: f.consent,
-    txn: /^[A-Za-z0-9]{8,30}$/.test(txnClean),
     shot: !!shot,
   };
   const answered = ORDER.filter(k => done[k]).length;
@@ -228,7 +225,6 @@ export default function OdcJoinPage() {
     params.set('device', f.device);
     params.set('why', f.why.trim());
     params.set('consent', 'Yes');
-    params.set('txn', txnClean);
     params.set('screenshot', shot.base64);
     params.set('screenshotType', 'image/jpeg');
     params.set('source', new URLSearchParams(window.location.search).get('event') || 'odc-join');
@@ -528,8 +524,6 @@ export default function OdcJoinPage() {
                     )}
                     {errors.shot && <p className="err" role="alert">{errors.shot}</p>}
                   </div>
-
-                  {textQ({ key: 'txn', num: 14, title: 'Transaction ID / UTR', autoComplete: 'off', autoCapitalize: 'characters', placeholder: 'From your payment app’s receipt', maxLength: 40 })}
                 </div>
 
                 <input className="hp" type="text" name="company" value={f.company} tabIndex={-1} autoComplete="off"
