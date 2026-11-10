@@ -10,7 +10,7 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw6vQH29lAXj_FtBrCkm
 
 /* ── Edit these ── */
 const EVENT_NAME = 'One Day Crew';
-const AMOUNT = 1;                         // ticket price in rupees, e.g. 499
+const AMOUNT = 499;                         // ticket price in rupees, e.g. 499
 const UPI_ID = 'nazi4272m-2@okicici';
 const PAYEE_NAME = 'Zimzim';
 const QR_IMAGE = '/images/pay.jpeg';      // must be in public/images/, NOT public/images/home/
