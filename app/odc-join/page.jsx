@@ -152,8 +152,7 @@ export default function OdcJoinPage() {
   };
 
   // Safe, stripped down base parameters
-  const baseParams = `pa=${UPI_ID}&pn=${encodeURIComponent(PAYEE_NAME)}&am=${Number(AMOUNT).toFixed(2)}&cu=INR&tr=ODC${Date.now()}`;
-  
+const baseParams = `pa=${UPI_ID}&pn=${encodeURIComponent(PAYEE_NAME)}&am=${Number(AMOUNT).toFixed(2)}&cu=INR`;  
   // App specific links for iOS bypass
   const genericUpi = `upi://pay?${baseParams}`;
   const gpayLink = `gpay://upi/pay?${baseParams}`;
