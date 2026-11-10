@@ -258,7 +258,7 @@ export default function WishlistPage() {
               <h2>You&apos;re on our radar now. See you at <span className="brand">3 AM</span>!</h2>
               <div className="btns">
                 <a className="btn pink" href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer">Join WhatsApp</a>
-                <Link className="btn" href="/event">See all eventssssssssss</Link>
+                <Link className="btn" href="/event">See all events</Link>
               </div>
             </div>
           </div>
