@@ -151,7 +151,15 @@ export default function OdcJoinPage() {
     clearErr(k);
   };
 
-const upiLink = `upi://pay?pa=${encodeURIComponent(UPI_ID)}&pn=${encodeURIComponent(PAYEE_NAME)}${AMOUNT ? `&am=${Number(AMOUNT).toFixed(2)}` : ''}&cu=INR&tn=${encodeURIComponent(EVENT_NAME)}`;
+  // Safe, stripped down base parameters
+  const baseParams = `pa=${UPI_ID}&pn=${encodeURIComponent(PAYEE_NAME)}&am=${Number(AMOUNT).toFixed(2)}&cu=INR&tr=ODC${Date.now()}`;
+  
+  // App specific links for iOS bypass
+  const genericUpi = `upi://pay?${baseParams}`;
+  const gpayLink = `gpay://upi/pay?${baseParams}`;
+  const phonepeLink = `phonepe://pay?${baseParams}`;
+  const paytmLink = `paytmmp://pay?${baseParams}`;
+
   const copyUpi = async () => {
     try {
       await navigator.clipboard.writeText(UPI_ID);
@@ -347,9 +355,14 @@ const upiLink = `upi://pay?pa=${encodeURIComponent(UPI_ID)}&pn=${encodeURICompon
         .tam .upi{margin-top:14px;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
         .tam .upi code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:15px;background:#161616;padding:8px 10px;word-break:break-all}
         .tam .smallbtn{font:inherit;font-weight:600;font-size:14px;padding:9px 14px;background:transparent;color:var(--white);border:2px solid var(--white);cursor:pointer;border-radius:0}
-        .tam .upibtn{display:block;text-align:center;margin-top:14px;padding:14px;font-weight:600;font-size:15.5px;text-decoration:none;
-          background:var(--pink);border:2px solid var(--pink);color:var(--white)}
-        @media (min-width:821px){ .tam .upibtn{display:none} }
+        
+        /* New App Specific Buttons CSS */
+        .tam .upi-apps { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+        .tam .upibtn { flex: 1 1 70px; display: block; text-align: center; padding: 12px 4px; font-weight: 600; font-size: 14.5px; text-decoration: none; transition: 0.2s; }
+        .tam .upibtn.app { background: transparent; border: 2px solid var(--white); color: var(--white); }
+        .tam .upibtn.app:active { background: #333; }
+        .tam .upibtn.generic { background: var(--pink); border: 2px solid var(--pink); color: var(--white); }
+        @media (min-width: 821px) { .tam .upi-apps { display: none; } }
 
         .tam .upload{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;
           border:2px dashed var(--white);padding:26px 16px;cursor:pointer;min-height:130px}
@@ -495,12 +508,19 @@ const upiLink = `upi://pay?pa=${encodeURIComponent(UPI_ID)}&pn=${encodeURICompon
                       <Image src={QR_IMAGE} alt={`UPI QR code to pay ${PAYEE_NAME}`} width={1152} height={1600}
                              sizes="280px" style={{ width: '100%', height: 'auto', display: 'block' }} />
                     </div>
-                    <p className="qrhint">Scan with any UPI app. On your phone? Use the button below, or screenshot the QR and open it from your UPI app&apos;s gallery.</p>
+                    <p className="qrhint">Scan with any UPI app. On your phone? Choose an app below to pay directly.</p>
                     <div className="upi">
                       <code>{UPI_ID}</code>
                       <button type="button" className="smallbtn" onClick={copyUpi}>{copied ? 'Copied' : 'Copy'}</button>
                     </div>
-                    <a className="upibtn" href={upiLink}>Pay in your UPI app</a>
+                    
+                    <div className="upi-apps">
+                      <a className="upibtn app" href={gpayLink}>GPay</a>
+                      <a className="upibtn app" href={phonepeLink}>PhonePe</a>
+                      <a className="upibtn app" href={paytmLink}>Paytm</a>
+                      <a className="upibtn generic" href={genericUpi}>Other</a>
+                    </div>
+
                   </div>
 
                   <div className="q" id="q-shot">
