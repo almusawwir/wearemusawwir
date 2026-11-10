@@ -12,7 +12,7 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw6vQH29lAXj_FtBrCkm
 const EVENT_NAME = 'One Day Crew';
 const AMOUNT = 1;                         // ticket price in rupees, e.g. 499
 const UPI_ID = 'malukutty1672005-1@okicici';
-const PAYEE_NAME = 'Geniee 🎀✨';
+const PAYEE_NAME = 'MALAVIKA RAJ';
 const QR_IMAGE = '/images/pay.jpeg';      // must be in public/images/, NOT public/images/home/
 
 const EXPLORE = [
@@ -151,8 +151,7 @@ export default function OdcJoinPage() {
     clearErr(k);
   };
 
-  const upiLink = `upi://pay?pa=${encodeURIComponent(UPI_ID)}&pn=${encodeURIComponent(PAYEE_NAME)}${AMOUNT ? `&am=${AMOUNT}` : ''}&cu=INR&tn=${encodeURIComponent(EVENT_NAME)}`;
-
+const upiLink = `upi://pay?pa=${encodeURIComponent(UPI_ID)}&pn=${encodeURIComponent(PAYEE_NAME)}${AMOUNT ? `&am=${Number(AMOUNT).toFixed(2)}` : ''}&cu=INR&tn=${encodeURIComponent(EVENT_NAME)}`;
   const copyUpi = async () => {
     try {
       await navigator.clipboard.writeText(UPI_ID);
