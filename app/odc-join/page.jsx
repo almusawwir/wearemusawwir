@@ -11,8 +11,8 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw6vQH29lAXj_FtBrCkm
 /* ── Edit these ── */
 const EVENT_NAME = 'One Day Crew';
 const AMOUNT = 1;                         // ticket price in rupees, e.g. 499
-const UPI_ID = 'malukutty1672005-1@okicici';
-const PAYEE_NAME = 'MALAVIKA RAJ';
+const UPI_ID = 'nazi4272m-2@okicici';
+const PAYEE_NAME = 'Zimzim';
 const QR_IMAGE = '/images/pay.jpeg';      // must be in public/images/, NOT public/images/home/
 
 const EXPLORE = [
@@ -150,14 +150,6 @@ export default function OdcJoinPage() {
     setF(prev => ({ ...prev, [k]: prev[k].includes(v) ? prev[k].filter(x => x !== v) : [...prev[k], v] }));
     clearErr(k);
   };
-
-  // Safe, stripped down base parameters
-const baseParams = `pa=${UPI_ID}&pn=${encodeURIComponent(PAYEE_NAME)}&am=${Number(AMOUNT).toFixed(2)}&cu=INR`;  
-  // App specific links for iOS bypass
-  const genericUpi = `upi://pay?${baseParams}`;
-  const gpayLink = `gpay://upi/pay?${baseParams}`;
-  const phonepeLink = `phonepe://pay?${baseParams}`;
-  const paytmLink = `paytmmp://pay?${baseParams}`;
 
   const copyUpi = async () => {
     try {
@@ -350,18 +342,11 @@ const baseParams = `pa=${UPI_ID}&pn=${encodeURIComponent(PAYEE_NAME)}&am=${Numbe
         .tam .paycard .amt{font-family:var(--display);font-weight:900;font-size:40px;line-height:1}
         .tam .warn{color:var(--pink);font-weight:600;font-size:14px;margin:8px 0 0}
         .tam .qr{max-width:280px;margin:16px auto 0;background:#fff}
-        .tam .qrhint{margin:12px 0 0;font-size:13.5px;color:var(--grey);text-align:center}
-        .tam .upi{margin-top:14px;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
-        .tam .upi code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:15px;background:#161616;padding:8px 10px;word-break:break-all}
-        .tam .smallbtn{font:inherit;font-weight:600;font-size:14px;padding:9px 14px;background:transparent;color:var(--white);border:2px solid var(--white);cursor:pointer;border-radius:0}
-        
-        /* New App Specific Buttons CSS */
-        .tam .upi-apps { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
-        .tam .upibtn { flex: 1 1 70px; display: block; text-align: center; padding: 12px 4px; font-weight: 600; font-size: 14.5px; text-decoration: none; transition: 0.2s; }
-        .tam .upibtn.app { background: transparent; border: 2px solid var(--white); color: var(--white); }
-        .tam .upibtn.app:active { background: #333; }
-        .tam .upibtn.generic { background: var(--pink); border: 2px solid var(--pink); color: var(--white); }
-        @media (min-width: 821px) { .tam .upi-apps { display: none; } }
+        .tam .qrhint{margin:12px 0 0;font-size:14px;color:var(--grey);text-align:center;line-height:1.4}
+        .tam .upi{margin-top:16px;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
+        .tam .upi code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:15px;background:#161616;padding:9px 12px;word-break:break-all}
+        .tam .smallbtn{display:inline-flex;align-items:center;justify-content:center;font:inherit;font-weight:600;font-size:14px;padding:9px 14px;background:transparent;color:var(--white);border:2px solid var(--white);cursor:pointer;border-radius:0;text-decoration:none}
+        .tam .smallbtn:hover{background:var(--white);color:var(--black)}
 
         .tam .upload{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;
           border:2px dashed var(--white);padding:26px 16px;cursor:pointer;min-height:130px}
@@ -507,19 +492,12 @@ const baseParams = `pa=${UPI_ID}&pn=${encodeURIComponent(PAYEE_NAME)}&am=${Numbe
                       <Image src={QR_IMAGE} alt={`UPI QR code to pay ${PAYEE_NAME}`} width={1152} height={1600}
                              sizes="280px" style={{ width: '100%', height: 'auto', display: 'block' }} />
                     </div>
-                    <p className="qrhint">Scan with any UPI app. On your phone? Choose an app below to pay directly.</p>
+                    <p className="qrhint">Scan with any UPI app. On your phone? Download the QR to your gallery or copy the UPI ID below to pay directly.</p>
                     <div className="upi">
                       <code>{UPI_ID}</code>
-                      <button type="button" className="smallbtn" onClick={copyUpi}>{copied ? 'Copied' : 'Copy'}</button>
+                      <button type="button" className="smallbtn" onClick={copyUpi}>{copied ? 'Copied ID' : 'Copy ID'}</button>
+                      <a href={QR_IMAGE} download="ODC_Payment_QR.jpg" className="smallbtn">Download QR</a>
                     </div>
-                    
-                    <div className="upi-apps">
-                      <a className="upibtn app" href={gpayLink}>GPay</a>
-                      <a className="upibtn app" href={phonepeLink}>PhonePe</a>
-                      <a className="upibtn app" href={paytmLink}>Paytm</a>
-                      <a className="upibtn generic" href={genericUpi}>Other</a>
-                    </div>
-
                   </div>
 
                   <div className="q" id="q-shot">
