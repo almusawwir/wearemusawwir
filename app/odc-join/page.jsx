@@ -9,7 +9,7 @@ import { parseEventDate, isPastEvent } from '../lib/eventHelpers';
 
 const WHATSAPP_URL = "https://chat.whatsapp.com/B68V6Q62HZPHHsGMG0t4jP";
 // Paste the Web app URL from your ODC form's Apps Script here (it ends in /exec)
-const SCRIPT_URL = 'PASTE_YOUR_ODC_WEB_APP_URL_HERE';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw6vQH29lAXj_FtBrCkmCpO46UJqJlhpAqpb7aRxr29pA3-W_2bW5oV-DtUYIe59xag/exec';
 // Your CMS sheet (same one the homepage reads)
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSSCmEDqxpPn1OEzXR3geUaynoeGhrswVO5xf8zKETC8xOq1oimP1SiapOAsSPY_nEMTHoDeacTgKC/pub?gid=0&single=true&output=csv";
 
