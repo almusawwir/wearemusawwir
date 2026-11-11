@@ -7,9 +7,9 @@ import Papa from 'papaparse';
 import { parseStatus } from '../lib/eventStyles';
 import { parseEventDate, isPastEvent } from '../lib/eventHelpers';
 
-const WHATSAPP_URL = "https://chat.whatsapp.com/B68V6Q62HZPHHsGMG0t4jP";
+const WHATSAPP_URL = "https://chat.whatsapp.com/BCJSRhlPN3E1JNk4OCzPlc";
 // Paste the Web app URL from your ODC form's Apps Script here (it ends in /exec)
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw6vQH29lAXj_FtBrCkmCpO46UJqJlhpAqpb7aRxr29pA3-W_2bW5oV-DtUYIe59xag/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw6vQH29lAXj_FtBrCkmCpO46UJqJlhpAqpb7aRxr29pA3-W_2bW5oV-DtUYIe59xag/execxv';
 // Your CMS sheet (same one the homepage reads)
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSSCmEDqxpPn1OEzXR3geUaynoeGhrswVO5xf8zKETC8xOq1oimP1SiapOAsSPY_nEMTHoDeacTgKC/pub?gid=0&single=true&output=csv";
 
