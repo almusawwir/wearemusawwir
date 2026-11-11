@@ -1,19 +1,28 @@
 "use client";
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import Papa from 'papaparse';
+import { parseStatus } from '../lib/eventStyles';
+import { parseEventDate, isPastEvent } from '../lib/eventHelpers';
 
 const WHATSAPP_URL = "https://chat.whatsapp.com/B68V6Q62HZPHHsGMG0t4jP";
-// Paste the Web app URL from Google Apps Script here (it ends in /exec)
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw6vQH29lAXj_FtBrCkmCpO46UJqJlhpAqpb7aRxr29pA3-W_2bW5oV-DtUYIe59xag/exec';
+// Paste the Web app URL from your ODC form's Apps Script here (it ends in /exec)
+const SCRIPT_URL = 'PASTE_YOUR_ODC_WEB_APP_URL_HERE';
+// Your CMS sheet (same one the homepage reads)
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSSCmEDqxpPn1OEzXR3geUaynoeGhrswVO5xf8zKETC8xOq1oimP1SiapOAsSPY_nEMTHoDeacTgKC/pub?gid=0&single=true&output=csv";
 
 /* ── Edit these ── */
 const EVENT_NAME = 'One Day Crew';
-const AMOUNT = 499;                         // ticket price in rupees, e.g. 499
+const AMOUNT = 0;                         // fallback price when no ODC is listed in the sheet
 const UPI_ID = 'nazi4272m-2@okicici';
-const PAYEE_NAME = 'Zimzim';
+const PAYEE_NAME = 'Nazim Mansuri';
 const QR_IMAGE = '/images/pay.jpeg';      // must be in public/images/, NOT public/images/home/
+
+// An event counts as ODC only if its ID STARTS with "ODC" (any capitals):
+// ODC, ODC-4, ODC-78, ODCvol67 → yes.  podcast-night, BCC-ODC-collab → no.
+const ODC_ID = /^odc/i;
 
 const EXPLORE = [
   'Acting', 'Directing', 'Cinematography / Camera', 'Photography', 'Editing', 'Writing',
@@ -53,9 +62,8 @@ const MAX_FILE_MB = 12;
 const MAX_SIDE = 1600;
 const TARGET_BYTES = 1.5 * 1024 * 1024;
 
-const ORDER = ['name', 'whatsapp', 'social', 'birthday', 'city', 'explore', 'experience', 'energy',
-  'reason', 'reaction', 'device', 'why', 'consent', 'shot'];
-const TOTAL = ORDER.length;
+const BASE_ORDER = ['name', 'whatsapp', 'social', 'birthday', 'city', 'explore', 'experience', 'energy',
+  'reason', 'reaction', 'device', 'why', 'consent'];
 const MESSAGES = {
   name: 'Tell us your name.',
   whatsapp: 'Enter a valid WhatsApp number.',
@@ -69,9 +77,30 @@ const MESSAGES = {
   reaction: 'Pick one.',
   device: 'Pick one.',
   why: 'Tell us a little about why.',
-  consent: 'Please agree to the participation terms.',
+  consent: 'Please agree to the terms to continue.',
+  event: 'Pick the ODC you are joining.',
   shot: 'Upload your payment screenshot.',
 };
+
+/* ── Reading ODC dates from the CMS sheet ── */
+function ordinal(n) {
+  const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+function dateLabel(raw) {
+  const d = parseEventDate(raw);
+  if (!d) return (raw || '').toString().trim() || 'Date TBA';
+  const weekday = d.toLocaleDateString('en-IN', { weekday: 'long' });
+  const month = d.toLocaleDateString('en-IN', { month: 'short' });
+  return `${weekday} ${ordinal(d.getDate())} ${month}`;   // e.g. Sunday 15th Nov
+}
+function isOdc(e) {
+  return ODC_ID.test((e.id || '').trim());
+}
+function priceNumber(p) {
+  const n = parseInt(String(p || '').replace(/[^\d]/g, ''), 10);
+  return isNaN(n) ? 0 : n;
+}
 
 /* Shrinks a photo or screenshot to a small JPEG so it uploads fast on mobile data */
 async function compressImage(file) {
@@ -111,7 +140,7 @@ async function compressImage(file) {
 
 const EMPTY = {
   name: '', whatsapp: '', social: '', birthday: '', city: '', explore: [], experience: '', energy: '',
-  reason: '', reaction: '', device: '', why: '', consent: false, company: '',
+  reason: '', reaction: '', device: '', why: '', consent: false, event: '', company: '',
 };
 
 export default function OdcJoinPage() {
@@ -121,7 +150,59 @@ export default function OdcJoinPage() {
   const [errors, setErrors] = useState({});
   const [status, setStatus] = useState('idle'); // idle | loading | success | error
   const [copied, setCopied] = useState(false);
+  const [events, setEvents] = useState([]);     // upcoming ODC dates from the CMS sheet
+  const [eventsLoading, setEventsLoading] = useState(true);
   const fileRef = useRef(null);
+
+  // Load upcoming ODC dates from the CMS sheet
+  useEffect(() => {
+    fetch(`${CSV_URL}&cb=${Date.now()}`, { cache: 'no-store' })
+      .then(res => res.text())
+      .then(text => {
+        const { data } = Papa.parse(text, {
+          header: true,
+          skipEmptyLines: true,
+          transformHeader: (h) => h.trim().toLowerCase().replace(/^\uFEFF/, ''),
+        });
+        const list = data
+          .filter(e => e.id && e.id.trim() && e.title && e.title.trim())
+          .filter(e => isOdc(e) && !isPastEvent(e))
+          .map(e => {
+            const time = (e.time || '').trim();
+            const where = (e.location_main || '').trim();
+            return {
+              id: e.id.trim(),
+              title: e.title.trim(),
+              date: dateLabel(e.date),
+              when: `${dateLabel(e.date)}${time ? `, ${time}` : ''}${where ? ` at ${where}` : ''}`,
+              priceNum: priceNumber(e.price),
+              soldOut: parseStatus(e.status).code === 'SOLDOUT',
+              sortDate: (parseEventDate(e.date) || new Date(8640000000000000)).getTime(),
+            };
+          })
+          .sort((a, b) => a.sortDate - b.sortDate);
+
+        setEvents(list);
+
+        // Pre-select: ?event=ID from the link, or the only open date
+        const open = list.filter(e => !e.soldOut);
+        const wanted = (new URLSearchParams(window.location.search).get('event') || '').toLowerCase();
+        const fromLink = open.find(e => e.id.toLowerCase() === wanted);
+        if (fromLink) setF(prev => ({ ...prev, event: fromLink.id }));
+        else if (open.length === 1) setF(prev => ({ ...prev, event: open[0].id }));
+      })
+      .catch(() => setEvents([]))
+      .finally(() => setEventsLoading(false));
+  }, []);
+
+  const hasEvents = events.length > 0;
+  const selected = events.find(e => e.id === f.event && !e.soldOut) || null;
+  const ORDER = useMemo(() => [...BASE_ORDER, ...(hasEvents ? ['event'] : []), 'shot'], [hasEvents]);
+  const TOTAL = ORDER.length;
+
+  // Fee: the chosen date's price, otherwise the fallback AMOUNT
+  const amount = selected ? (selected.priceNum || AMOUNT) : (hasEvents ? 0 : AMOUNT);
+  const payFor = selected ? selected.title : EVENT_NAME;
 
   const today = new Date().toISOString().slice(0, 10);
   const digits = f.whatsapp.replace(/\D/g, '');
@@ -139,6 +220,7 @@ export default function OdcJoinPage() {
     device: !!f.device,
     why: f.why.trim().length > 0,
     consent: f.consent,
+    event: !!selected,
     shot: !!shot,
   };
   const answered = ORDER.filter(k => done[k]).length;
@@ -150,6 +232,8 @@ export default function OdcJoinPage() {
     setF(prev => ({ ...prev, [k]: prev[k].includes(v) ? prev[k].filter(x => x !== v) : [...prev[k], v] }));
     clearErr(k);
   };
+
+  const upiLink = `upi://pay?pa=${encodeURIComponent(UPI_ID)}&pn=${encodeURIComponent(PAYEE_NAME)}${amount ? `&am=${amount}` : ''}&cu=INR&tn=${encodeURIComponent(payFor)}`;
 
   const copyUpi = async () => {
     try {
@@ -185,7 +269,7 @@ export default function OdcJoinPage() {
 
   const submit = async (e) => {
     e.preventDefault();
-    if (status === 'loading' || shotBusy) return;
+    if (status === 'loading' || shotBusy || eventsLoading) return;
 
     const errs = {};
     ORDER.forEach(k => { if (!done[k]) errs[k] = MESSAGES[k]; });
@@ -223,9 +307,11 @@ export default function OdcJoinPage() {
     params.set('device', f.device);
     params.set('why', f.why.trim());
     params.set('consent', 'Yes');
+    params.set('event', selected ? `${selected.title} · ${selected.date}` : EVENT_NAME);
+    params.set('amount', amount ? String(amount) : '');
     params.set('screenshot', shot.base64);
     params.set('screenshotType', 'image/jpeg');
-    params.set('source', new URLSearchParams(window.location.search).get('event') || 'odc-join');
+    params.set('source', selected ? selected.id : (new URLSearchParams(window.location.search).get('event') || 'odc-join'));
     params.set('company', f.company); // honeypot
 
     try {
@@ -264,6 +350,8 @@ export default function OdcJoinPage() {
       {errors[key] && <p className="err" role="alert">{errors[key]}</p>}
     </div>
   );
+
+  const shotNum = hasEvents ? 14 : 13;
 
   return (
     <div className="tam">
@@ -334,19 +422,40 @@ export default function OdcJoinPage() {
         .tam .terms li:last-child{margin-bottom:0}
         .tam .consent{display:flex;align-items:flex-start;gap:12px;cursor:pointer;font-size:15.5px;font-weight:500}
         .tam .consent input{width:24px;height:24px;flex:0 0 auto;margin:1px 0 0;accent-color:var(--pink)}
+        .tam .consent a{color:var(--pink);font-weight:600;text-decoration:underline;text-underline-offset:3px}
+
+        /* ODC date picker */
+        .tam .evs{display:flex;flex-direction:column;gap:10px}
+        .tam .ev{position:relative;cursor:pointer;display:block}
+        .tam .ev input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+        .tam .evbox{display:flex;flex-direction:column;gap:3px;padding:14px 16px;border:2px solid var(--white);transition:background .15s ease,border-color .15s ease}
+        .tam .evtop{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+        .tam .evtop b{font-weight:600;font-size:16.5px}
+        .tam .evprice{font-family:var(--display);font-weight:900;font-size:26px;line-height:1;white-space:nowrap}
+        .tam .evwhen{font-size:14.5px;color:#d6d6d6}
+        .tam .evsold{align-self:flex-start;margin-top:4px;font-size:12px;font-weight:600;padding:1px 7px;border:2px solid currentColor}
+        .tam .ev input:checked + .evbox{background:var(--pink);border-color:var(--pink)}
+        .tam .ev input:checked + .evbox .evwhen{color:#fff}
+        .tam .ev input:focus-visible + .evbox{outline:3px solid var(--white);outline-offset:3px}
+        .tam .ev.off{cursor:not-allowed;opacity:.45}
+        @media (hover:hover){ .tam .ev:not(.off) .evbox:hover{border-color:var(--pink)} }
 
         /* Payment */
         .tam .paycard{border:2px solid var(--pink);padding:18px}
         .tam .paycard .row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
         .tam .paycard .lbl{font-size:12.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--grey);font-weight:600}
         .tam .paycard .amt{font-family:var(--display);font-weight:900;font-size:40px;line-height:1}
+        .tam .payfor{margin:6px 0 0;font-size:14px;color:#d6d6d6}
         .tam .warn{color:var(--pink);font-weight:600;font-size:14px;margin:8px 0 0}
+        .tam .hintline{color:var(--grey);font-size:14px;margin:8px 0 0}
         .tam .qr{max-width:280px;margin:16px auto 0;background:#fff}
-        .tam .qrhint{margin:12px 0 0;font-size:14px;color:var(--grey);text-align:center;line-height:1.4}
-        .tam .upi{margin-top:16px;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
-        .tam .upi code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:15px;background:#161616;padding:9px 12px;word-break:break-all}
-        .tam .smallbtn{display:inline-flex;align-items:center;justify-content:center;font:inherit;font-weight:600;font-size:14px;padding:9px 14px;background:transparent;color:var(--white);border:2px solid var(--white);cursor:pointer;border-radius:0;text-decoration:none}
-        .tam .smallbtn:hover{background:var(--white);color:var(--black)}
+        .tam .qrhint{margin:12px 0 0;font-size:13.5px;color:var(--grey);text-align:center}
+        .tam .upi{margin-top:14px;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
+        .tam .upi code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:15px;background:#161616;padding:8px 10px;word-break:break-all}
+        .tam .smallbtn{font:inherit;font-weight:600;font-size:14px;padding:9px 14px;background:transparent;color:var(--white);border:2px solid var(--white);cursor:pointer;border-radius:0}
+        .tam .upibtn{display:block;text-align:center;margin-top:14px;padding:14px;font-weight:600;font-size:15.5px;text-decoration:none;
+          background:var(--pink);border:2px solid var(--pink);color:var(--white)}
+        @media (min-width:821px){ .tam .upibtn{display:none} }
 
         .tam .upload{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;
           border:2px dashed var(--white);padding:26px 16px;cursor:pointer;min-height:130px}
@@ -391,7 +500,7 @@ export default function OdcJoinPage() {
           .tam .btns{flex-direction:column}
         }
         @media (max-width:360px){ .tam .col{padding:0 16px} }
-        @media (prefers-reduced-motion:reduce){ html{scroll-behavior:auto} .tam .prog i,.tam .chip span{transition:none} }
+        @media (prefers-reduced-motion:reduce){ html{scroll-behavior:auto} .tam .prog i,.tam .chip span,.tam .evbox{transition:none} }
       `}} />
 
       <header className="top">
@@ -414,7 +523,10 @@ export default function OdcJoinPage() {
           <div className="done donewrap">
             <div className="col">
               <h2>We&apos;ve got your registration.</h2>
-              <p>Registration is confirmed after payment verification. We&apos;ll confirm your spot on WhatsApp.</p>
+              <p>
+                {selected ? <>You picked <b>{selected.title}</b>, {selected.when}. </> : null}
+                Registration is confirmed after payment verification. We&apos;ll confirm your spot on WhatsApp.
+              </p>
               <div className="btns">
                 <a className="btn pink" href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer">Join WhatsApp</a>
                 <Link className="btn" href="/event">See all events</Link>
@@ -473,7 +585,10 @@ export default function OdcJoinPage() {
                     </ul>
                     <label className="consent">
                       <input type="checkbox" checked={f.consent} onChange={(e) => setField('consent', e.target.checked)} />
-                      <span>I have read and understood the above and agree to the ODC participation terms.</span>
+                      <span>
+                        I have read and understood the above, and I agree to the ODC participation terms and
+                        the <Link href="/terms" target="_blank" rel="noopener noreferrer">Terms &amp; Conditions</Link>.
+                      </span>
                     </label>
                     {errors.consent && <p className="err" role="alert">{errors.consent}</p>}
                   </fieldset>
@@ -482,26 +597,55 @@ export default function OdcJoinPage() {
                 <div className="sec">
                   <h2 className="sech"><em>05</em>Payment</h2>
 
+                  {eventsLoading && <p className="hintline">Loading ODC dates…</p>}
+
+                  {!eventsLoading && hasEvents && (
+                    <fieldset className="q" id="q-event">
+                      <legend><em>13</em>Which ODC are you joining?</legend>
+                      <div className="evs">
+                        {events.map(ev => (
+                          <label key={ev.id} className={`ev ${ev.soldOut ? 'off' : ''}`}>
+                            <input type="radio" name="event" value={ev.id} checked={f.event === ev.id}
+                                   disabled={ev.soldOut} onChange={() => setField('event', ev.id)} />
+                            <span className="evbox">
+                              <span className="evtop">
+                                <b>{ev.title}</b>
+                                {ev.priceNum > 0 && <span className="evprice">₹{ev.priceNum}</span>}
+                              </span>
+                              <span className="evwhen">{ev.when}</span>
+                              {ev.soldOut && <span className="evsold">Sold out</span>}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                      {errors.event && <p className="err" role="alert">{errors.event}</p>}
+                    </fieldset>
+                  )}
+
                   <div className="paycard">
                     <div className="row">
                       <span className="lbl">Participation fee</span>
-                      {AMOUNT > 0 && <span className="amt">₹{AMOUNT}</span>}
+                      {amount > 0 && <span className="amt">₹{amount}</span>}
                     </div>
-                    {!(AMOUNT > 0) && <p className="warn">Ticket price not set (edit AMOUNT at the top of this file).</p>}
+                    {selected && <p className="payfor">{selected.title} · {selected.date}</p>}
+                    {hasEvents && !selected && <p className="hintline">Pick your ODC above to see the fee.</p>}
+                    {!(amount > 0) && (!hasEvents || selected) && !eventsLoading && (
+                      <p className="warn">Ticket price not set (add a price to the event in your sheet, or set AMOUNT in this file).</p>
+                    )}
                     <div className="qr">
                       <Image src={QR_IMAGE} alt={`UPI QR code to pay ${PAYEE_NAME}`} width={1152} height={1600}
                              sizes="280px" style={{ width: '100%', height: 'auto', display: 'block' }} />
                     </div>
-                    <p className="qrhint">Scan with any UPI app. On your phone? Download the QR to your gallery or copy the UPI ID below to pay directly.</p>
+                    <p className="qrhint">Scan with any UPI app. On your phone? Use the button below, or screenshot the QR and open it from your UPI app&apos;s gallery.</p>
                     <div className="upi">
                       <code>{UPI_ID}</code>
-                      <button type="button" className="smallbtn" onClick={copyUpi}>{copied ? 'Copied ID' : 'Copy ID'}</button>
-                      <a href={QR_IMAGE} download="ODC_Payment_QR.jpg" className="smallbtn">Download QR</a>
+                      <button type="button" className="smallbtn" onClick={copyUpi}>{copied ? 'Copied' : 'Copy'}</button>
                     </div>
+                    <a className="upibtn" href={upiLink}>Pay{amount > 0 ? ` ₹${amount}` : ''} in your UPI app</a>
                   </div>
 
                   <div className="q" id="q-shot">
-                    <label className="ql" htmlFor="shotfile"><em>13</em>Upload payment screenshot</label>
+                    <label className="ql" htmlFor="shotfile"><em>{shotNum}</em>Upload payment screenshot</label>
                     <input id="shotfile" ref={fileRef} className="fileinput" type="file" accept="image/*" onChange={onPick} />
                     {!shot ? (
                       <label htmlFor="shotfile" className={`upload ${shotBusy ? 'busy' : ''}`}>
@@ -526,7 +670,7 @@ export default function OdcJoinPage() {
                        aria-hidden="true" onChange={(e) => setF(prev => ({ ...prev, company: e.target.value }))} />
 
                 <div>
-                  <button className="submit" type="submit" disabled={status === 'loading' || shotBusy}>
+                  <button className="submit" type="submit" disabled={status === 'loading' || shotBusy || eventsLoading}>
                     {status === 'loading' ? 'Sending…' : 'Submit registration'}
                   </button>
                   {status === 'error' && (
