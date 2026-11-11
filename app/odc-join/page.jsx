@@ -8,10 +8,10 @@ import { parseStatus } from '../lib/eventStyles';
 import { parseEventDate, isPastEvent } from '../lib/eventHelpers';
 
 const WHATSAPP_URL = "https://chat.whatsapp.com/BCJSRhlPN3E1JNk4OCzPlc";
-// Paste the Web app URL from your ODC form's Apps Script here (it ends in /exec)
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw6vQH29lAXj_FtBrCkmCpO46UJqJlhpAqpb7aRxr29pA3-W_2bW5oV-DtUYIe59xag/execxv';
 // Your CMS sheet (same one the homepage reads)
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSSCmEDqxpPn1OEzXR3geUaynoeGhrswVO5xf8zKETC8xOq1oimP1SiapOAsSPY_nEMTHoDeacTgKC/pub?gid=0&single=true&output=csv";
+// Registrations are sent to /api/odc/submit. The Google script URL lives ONLY in
+// app/api/odc/submit/route.js, so there's one place to keep it correct.
 
 /* ── Edit these ── */
 const EVENT_NAME = 'One Day Crew';
@@ -286,12 +286,6 @@ export default function OdcJoinPage() {
       return;
     }
 
-    if (SCRIPT_URL.includes('PASTE_')) {
-      console.error('ODC form: SCRIPT_URL is not set yet.');
-      setStatus('error');
-      return;
-    }
-
     setStatus('loading');
     const params = new URLSearchParams();
     params.set('name', f.name.trim());
@@ -314,8 +308,15 @@ export default function OdcJoinPage() {
     params.set('source', selected ? selected.id : (new URLSearchParams(window.location.search).get('event') || 'odc-join'));
     params.set('company', f.company); // honeypot
 
+    // Sent to our own server, which only says "ok" once Google confirms the row is saved
     try {
-      await fetch(SCRIPT_URL, { method: 'POST', body: params, mode: 'no-cors' });
+      const res = await fetch('/api/odc/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+        body: params.toString(),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.ok) throw new Error(json.error || 'Could not save');
       setStatus('success');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
@@ -674,7 +675,10 @@ export default function OdcJoinPage() {
                     {status === 'loading' ? 'Sending…' : 'Submit registration'}
                   </button>
                   {status === 'error' && (
-                    <p className="formerr" role="alert">That didn&apos;t go through. Check your connection and try again.</p>
+                    <p className="formerr" role="alert">
+                      Your registration wasn&apos;t saved. Please try again. If it keeps failing, don&apos;t pay again:
+                      message us on WhatsApp and we&apos;ll sort it out.
+                    </p>
                   )}
                   <p className="tiny">Registration is confirmed after payment verification.</p>
                 </div>
