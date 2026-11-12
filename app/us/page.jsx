@@ -2,9 +2,11 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-const NEW_DAYS = 7;            // "New sign-up" tag and "this week" filter
-const PHOTO_SIDE = 256;        // profile photos are saved as small squares
-const PHOTO_MAX_CHARS = 44000; // must stay under the sheet's cell limit
+const NEW_DAYS = 7;
+const PHOTO_SIDE = 256;
+const PHOTO_MAX_CHARS = 44000;
+const CACHE_KEY = 'us-snapshot-v3';   // last data, kept only for this browser tab
+const HOME = { screen: 'home', eventKey: null, openId: null };
 
 const SORTS = [
   { id: 'latest', label: 'Latest sign-up' },
@@ -30,16 +32,23 @@ const EVENT_SORTS = [
 ];
 const EVENT_FILTERS = [
   { id: 'all', label: 'All' },
-  { id: 'unpaid', label: 'Not paid' },
+  { id: 'review', label: 'Needs review' },
   { id: 'paid', label: 'Paid' },
+  { id: 'later', label: 'Pays on day' },
+  { id: 'unpaid', label: 'Not paid' },
   { id: 'in', label: 'Checked in' },
   { id: 'out', label: 'Not checked in' },
+  { id: 'rejected', label: 'Rejected' },
 ];
+const EXPENSE_CATEGORIES = ['Marketing', 'Travel', 'Food', 'Venue', 'Other'];
+const PAY_TEXT = { paid: 'Paid', later: 'Pays on day', unpaid: 'Not paid', rejected: 'Rejected' };
 
 /* ── Helpers ── */
 const displayName = (p) => p.nickname || p.name;
 const cls = (s) => String(s).replace(/[^A-Za-z]/g, '');
 const isRecent = (ms) => Date.now() - ms <= NEW_DAYS * 864e5;
+const inr = (n) => `${n < 0 ? '−' : ''}₹${Math.abs(Math.round(n || 0)).toLocaleString('en-IN')}`;
+const shownAmount = (r) => (r.amount ?? r.defaultAmount ?? 0);
 
 function initials(s) {
   return String(s || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0] || '').join('').toUpperCase() || '?';
@@ -103,6 +112,10 @@ const byAge = (dir, get) => (a, b) => {
   if (y == null) return -1;
   return dir * (x - y);
 };
+function payLabel(r) {
+  if (r.pay === 'paid') { const a = shownAmount(r); return a ? `Paid ${inr(a)}` : 'Paid'; }
+  return PAY_TEXT[r.pay] || 'Payment?';
+}
 
 /* Turns whatever people typed into clickable links.
    "@name", "name", "Ig: name", "insta- name" → instagram.com/name; URLs stay as they are. */
@@ -114,8 +127,8 @@ function socialLinks(socials) {
   const add = (kind, href, label) => { if (!seen[href]) { seen[href] = 1; out.push({ kind, href, label }); } };
 
   (socials || []).forEach(raw => {
-    let text = String(raw || '');
-    (text.match(URL_RE) || []).forEach(u => {
+    let txt = String(raw || '');
+    (txt.match(URL_RE) || []).forEach(u => {
       const href = /^https?:\/\//i.test(u) ? u : 'https://' + u;
       try {
         const url = new URL(href);
@@ -132,8 +145,8 @@ function socialLinks(socials) {
       } catch {}
     });
 
-    text = text.replace(URL_RE, ' ').replace(/\b(instagram|insta|ig|linkedin)\b\s*[:\-–]?/gi, ' ');
-    const tokens = text.split(/[\s,/|]+/).map(t => t.trim()).filter(Boolean);
+    txt = txt.replace(URL_RE, ' ').replace(/\b(instagram|insta|ig|linkedin)\b\s*[:\-–]?/gi, ' ');
+    const tokens = txt.split(/[\s,/|]+/).map(t => t.trim()).filter(Boolean);
     tokens.forEach(t => {
       if (!HANDLE_RE.test(t) || /^\d+$/.test(t.replace('@', ''))) return;
       const looksLikeHandle = t.startsWith('@') || /[._\d]/.test(t);
@@ -146,36 +159,27 @@ function socialLinks(socials) {
   return out;
 }
 
-/* Contacts file (.vcf): "First Last ODC 1126" */
-function vcfEscape(s) {
-  return String(s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, ' ');
+/* Contacts: the server builds the .vcf so iPhone opens "Add All Contacts" */
+function isIOS() {
+  if (typeof navigator === 'undefined') return false;
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
-function buildVcf(people, tag) {
-  return people.filter(p => p.phone).map(p => {
-    const full = p.name.trim();
-    const parts = full.split(/\s+/);
-    const first = parts[0] || full;
-    const family = [parts.slice(1).join(' '), tag].filter(Boolean).join(' ');
-    return [
-      'BEGIN:VCARD',
-      'VERSION:3.0',
-      `N:${vcfEscape(family)};${vcfEscape(first)};;;`,
-      `FN:${vcfEscape([full, tag].filter(Boolean).join(' '))}`,
-      `TEL;TYPE=CELL:+91${p.phone}`,
-      'END:VCARD',
-    ].join('\r\n');
-  }).join('\r\n') + '\r\n';
-}
-function downloadText(text, filename, type) {
-  const blob = new Blob([text], { type });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 3000);
+function exportContacts(people, tag) {
+  const ios = isIOS();
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = '/api/us/vcf';
+  form.target = ios ? '_blank' : '_self';
+  const add = (name, value) => {
+    const i = document.createElement('input');
+    i.type = 'hidden'; i.name = name; i.value = value;
+    form.appendChild(i);
+  };
+  add('payload', JSON.stringify({ tag, people: people.map(p => ({ name: p.name, phone: p.phone })) }));
+  add('mode', ios ? 'inline' : 'attachment');
+  document.body.appendChild(form);
+  form.submit();
+  form.remove();
 }
 
 /* Crops to a square and shrinks to a small JPEG so it fits in one sheet cell */
@@ -231,8 +235,16 @@ function Loader({ label }) {
   );
 }
 
+function useEscape(handler) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') handler(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [handler]);
+}
+
 /* ── One person: details + your edits ── */
-function PersonDrawer({ p, tiers, onClose, onSaved, onLocked }) {
+function PersonDrawer({ p, tiers, onClose, onSaved, onLocked, onDirty }) {
   const [draft, setDraft] = useState({
     nickname: p.nickname, tier: p.tierOverride, extra: p.extra, starred: p.starred, notes: p.notes,
   });
@@ -251,16 +263,14 @@ function PersonDrawer({ p, tiers, onClose, onSaved, onLocked }) {
   const links = socialLinks(p.socials);
   const set = (k, v) => { setDraft(d => ({ ...d, [k]: v })); setMsg(''); };
 
+  useEffect(() => { onDirty(dirty); }, [dirty, onDirty]);
+  useEffect(() => () => onDirty(false), [onDirty]);
+
   const tryClose = useCallback(() => {
     if (dirty && !window.confirm('You have unsaved changes. Close anyway?')) return;
     onClose();
   }, [dirty, onClose]);
-
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') tryClose(); };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [tryClose]);
+  useEscape(tryClose);
 
   const pickPhoto = async (e) => {
     const file = e.target.files && e.target.files[0];
@@ -404,7 +414,7 @@ function PersonDrawer({ p, tiers, onClose, onSaved, onLocked }) {
                 <span>
                   {fmtDate(h.time)}
                   {h.pass ? ` · ${h.pass}` : ''}
-                  {h.paid === true ? ' · Paid ✓' : ''}
+                  {h.pay === 'paid' ? ` · Paid${h.amount ? ` ${inr(h.amount)}` : ''}` : h.pay ? ` · ${PAY_TEXT[h.pay]}` : ''}
                   {h.attended === true ? ' · Checked in ✓' : ''}
                 </span>
                 {h.why && <q>{h.why}</q>}
@@ -420,12 +430,7 @@ function PersonDrawer({ p, tiers, onClose, onSaved, onLocked }) {
 /* ── Pick a producer from your people ── */
 function ProducerPicker({ people, exclude, onPick, onClose }) {
   const [q, setQ] = useState('');
-
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  useEscape(onClose);
 
   const list = useMemo(() => {
     const t = q.trim().toLowerCase();
@@ -466,29 +471,188 @@ function ProducerPicker({ people, exclude, onPick, onClose }) {
   );
 }
 
-/* ── One event: producers, registrations, ticks, export ── */
+/* ── Payment for one registration ── */
+function PayModal({ row, price, onSave, onClose }) {
+  const def = row.defaultAmount || price || 0;
+  const current = row.amount;
+  const [other, setOther] = useState(row.pay === 'paid' && current != null && current !== def ? String(current) : '');
+  const [busy, setBusy] = useState(false);
+  useEscape(onClose);
+
+  const choose = async (patch) => {
+    setBusy(true);
+    await onSave(patch);
+    setBusy(false);
+    onClose();
+  };
+  const otherNum = other === '' ? NaN : parseInt(other, 10);
+  const proof = /^https?:\/\//i.test(row.screenshot || '') ? row.screenshot : '';
+
+  return (
+    <div className="modalwrap" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal" role="dialog" aria-modal="true" aria-label="Payment">
+        <div className="mhead">
+          <h3>Payment</h3>
+          <button type="button" className="mini ghost" onClick={onClose}>Close</button>
+        </div>
+        <div className="mbody">
+          <p className="who">
+            <b>{displayName(row.p)}</b>
+            {row.payment ? <span className="muted"> · Sheet says: {row.payment}</span> : null}
+          </p>
+          {proof && <a className="mini linkbtn" href={proof} target="_blank" rel="noopener noreferrer">Open payment screenshot ↗</a>}
+
+          <div className="payopts">
+            {def > 0 && (
+              <button type="button" className={`payopt good ${row.pay === 'paid' && (current == null || current === def) ? 'on' : ''}`}
+                      disabled={busy} onClick={() => choose({ pay: 'paid', amount: def })}>
+                Paid {inr(def)}
+              </button>
+            )}
+            <div className="payother">
+              <input type="number" inputMode="numeric" min="0" placeholder="Other amount (discount)"
+                     value={other} onChange={(e) => setOther(e.target.value)} aria-label="Other amount" />
+              <button type="button" className="payopt good" disabled={busy || !(otherNum >= 0)}
+                      onClick={() => choose({ pay: 'paid', amount: otherNum })}>
+                Paid this
+              </button>
+            </div>
+            <button type="button" className={`payopt later ${row.pay === 'later' ? 'on' : ''}`}
+                    disabled={busy} onClick={() => choose({ pay: 'later', amount: null })}>
+              Will pay on event day
+            </button>
+            <button type="button" className={`payopt ${row.pay === 'unpaid' ? 'on' : ''}`}
+                    disabled={busy} onClick={() => choose({ pay: 'unpaid', amount: null })}>
+              Not paid yet
+            </button>
+            <button type="button" className={`payopt reject ${row.pay === 'rejected' ? 'on' : ''}`} disabled={busy}
+                    onClick={() => { if (window.confirm(`Reject ${displayName(row.p)}'s registration? They won't count anywhere.`)) choose({ pay: 'rejected', amount: null }); }}>
+              Reject registration
+            </button>
+            {row.pay && (
+              <button type="button" className="link" disabled={busy} onClick={() => choose({ pay: '', amount: null })}>
+                Clear (back to needs review)
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Expenses for one event ── */
+function ExpenseModal({ ev, onAdd, onDelete, onClose }) {
+  const [cat, setCat] = useState(EXPENSE_CATEGORIES[0]);
+  const [note, setNote] = useState('');
+  const [amt, setAmt] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEscape(onClose);
+
+  const total = ev.expenses.reduce((s, x) => s + (x.amount || 0), 0);
+  const n = parseInt(amt, 10);
+
+  const add = async () => {
+    if (!(n > 0) || busy) return;
+    setBusy(true);
+    const ok = await onAdd({ category: cat, note: note.trim(), amount: n });
+    setBusy(false);
+    if (ok) { setNote(''); setAmt(''); }
+  };
+
+  return (
+    <div className="modalwrap" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal" role="dialog" aria-modal="true" aria-label="Expenses">
+        <div className="mhead">
+          <h3>Expenses · {inr(total)}</h3>
+          <button type="button" className="mini ghost" onClick={onClose}>Done</button>
+        </div>
+        <div className="mbody">
+          <div className="chips" role="group" aria-label="Category">
+            {EXPENSE_CATEGORIES.map(c => (
+              <button key={c} type="button" className={`chip ${cat === c ? 'on' : ''}`} onClick={() => setCat(c)}>{c}</button>
+            ))}
+          </div>
+          <div className="expadd">
+            <input type="text" value={note} maxLength={120} placeholder="What for? (optional)" onChange={(e) => setNote(e.target.value)} aria-label="Note" />
+            <input type="number" inputMode="numeric" min="1" value={amt} placeholder="₹ Amount" onChange={(e) => setAmt(e.target.value)} aria-label="Amount" />
+            <button type="button" className="save" onClick={add} disabled={!(n > 0) || busy}>{busy ? 'Adding…' : 'Add'}</button>
+          </div>
+
+          {ev.expenses.length === 0 ? (
+            <p className="muted">No expenses yet.</p>
+          ) : (
+            <ul className="explist">
+              {ev.expenses.map(x => (
+                <li key={x.id}>
+                  <span className="expcat">{x.category}</span>
+                  <span className="expnote">{x.note || '—'}</span>
+                  <b>{inr(x.amount)}</b>
+                  <button type="button" className="slotx" aria-label={`Delete ${x.category} expense`}
+                          onClick={() => { if (window.confirm(`Delete this ${x.category} expense of ${inr(x.amount)}?`)) onDelete(x.id); }}>✕</button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── One event ── */
 function EventView({ ev, people, peopleById, maxProducers, readOnly, onBack, onOpen, onLocked, onEventUpdate }) {
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState('all');
   const [sort, setSort] = useState('latest');
   const [picking, setPicking] = useState(false);
+  const [payFor, setPayFor] = useState(null);     // personId
+  const [expOpen, setExpOpen] = useState(false);
   const [msg, setMsg] = useState('');
 
-  const all = useMemo(() => ev.regs.map(r => ({ ...r, p: peopleById[r.personId] })).filter(r => r.p), [ev.regs, peopleById]);
-  const stats = useMemo(() => ({
-    total: all.length,
-    paid: all.filter(r => r.paid).length,
-    inn: all.filter(r => r.attended).length,
-  }), [all]);
+  // Registrations + producers (producers show up even if they didn't register)
+  const roster = useMemo(() => {
+    const list = ev.regs
+      .map(r => ({ ...r, p: peopleById[r.personId], producer: ev.producers.includes(r.personId) }))
+      .filter(r => r.p);
+    const seen = new Set(list.map(r => r.personId));
+    ev.producers.forEach(pid => {
+      if (!seen.has(pid) && peopleById[pid]) {
+        list.push({ personId: pid, p: peopleById[pid], producer: true, producerOnly: true, time: 0, pay: '', amount: null, defaultAmount: 0, attended: false });
+      }
+    });
+    return list;
+  }, [ev.regs, ev.producers, peopleById]);
+
+  const money = useMemo(() => {
+    let collected = 0, paidN = 0, due = 0, dueN = 0, rejected = 0, review = 0, inn = 0, active = 0;
+    roster.forEach(r => {
+      if (r.producerOnly) return;
+      if (r.pay === 'rejected') { rejected++; return; }
+      active++;
+      if (r.pay === 'paid') { collected += shownAmount(r); paidN++; }
+      else if (r.pay === 'later') { due += shownAmount(r); dueN++; }
+      else if (!r.pay) review++;
+      if (r.attended) inn++;
+    });
+    const spent = (ev.expenses || []).reduce((s, x) => s + (x.amount || 0), 0);
+    return { collected, paidN, due, dueN, rejected, review, inn, active, spent, net: collected - spent };
+  }, [roster, ev.expenses]);
 
   const rows = useMemo(() => {
     const t = q.trim().toLowerCase();
     const d = t.replace(/\D/g, '');
-    const arr = all.filter(r => {
-      if (filter === 'paid' && !r.paid) return false;
-      if (filter === 'unpaid' && r.paid) return false;
-      if (filter === 'in' && !r.attended) return false;
-      if (filter === 'out' && r.attended) return false;
+    const arr = roster.filter(r => {
+      if (filter === 'rejected') { if (r.pay !== 'rejected') return false; }
+      else {
+        if (r.pay === 'rejected') return false;
+        if (filter === 'review' && (r.producerOnly || r.pay)) return false;
+        if (filter === 'paid' && r.pay !== 'paid') return false;
+        if (filter === 'later' && r.pay !== 'later') return false;
+        if (filter === 'unpaid' && r.pay !== 'unpaid') return false;
+        if (filter === 'in' && !r.attended) return false;
+        if (filter === 'out' && (r.attended || r.producerOnly)) return false;
+      }
       if (t) {
         const hay = [r.p.name, r.p.nickname, ...r.p.otherNames, ...r.p.socials].join(' ').toLowerCase();
         if (!hay.includes(t) && !(d.length >= 3 && r.p.phone.includes(d))) return false;
@@ -501,8 +665,9 @@ function EventView({ ev, people, peopleById, maxProducers, readOnly, onBack, onO
       young: byAge(1, r => r.p),
       old: byAge(-1, r => r.p),
     };
-    return arr.sort(by[sort] || by.latest);
-  }, [all, q, filter, sort]);
+    const base = by[sort] || by.latest;
+    return arr.sort((a, b) => (b.producer ? 1 : 0) - (a.producer ? 1 : 0) || base(a, b));
+  }, [roster, q, filter, sort]);
 
   const post = async (body) => {
     const res = await fetch('/api/us/event', {
@@ -516,14 +681,24 @@ function EventView({ ev, people, peopleById, maxProducers, readOnly, onBack, onO
     return json;
   };
 
-  const toggle = async (r, field) => {
-    const next = !r[field];
-    const setTo = (val) => onEventUpdate(ev.key, e => ({
-      ...e, regs: e.regs.map(x => (x.personId === r.personId ? { ...x, [field]: val } : x)),
-    }));
-    setTo(next); setMsg('');
-    try { await post({ kind: 'mark', eventId: ev.key, personId: r.personId, patch: { [field]: next } }); }
-    catch (err) { setTo(!next); setMsg(`Not saved: ${err.message}`); }
+  const updateRow = (pid, patch) => onEventUpdate(ev.key, e => ({
+    ...e, regs: e.regs.map(x => (x.personId === pid ? { ...x, ...patch } : x)),
+  }));
+
+  const savePay = async (row, patch) => {
+    const prev = { pay: row.pay, amount: row.amount };
+    updateRow(row.personId, { pay: patch.pay, amount: patch.amount ?? null });
+    setMsg('');
+    try { await post({ kind: 'mark', eventId: ev.key, personId: row.personId, patch }); }
+    catch (err) { updateRow(row.personId, prev); setMsg(`Not saved: ${err.message}`); }
+  };
+
+  const toggleIn = async (row) => {
+    const next = !row.attended;
+    updateRow(row.personId, { attended: next });
+    setMsg('');
+    try { await post({ kind: 'mark', eventId: ev.key, personId: row.personId, patch: { attended: next } }); }
+    catch (err) { updateRow(row.personId, { attended: !next }); setMsg(`Not saved: ${err.message}`); }
   };
 
   const saveProducers = async (ids) => {
@@ -534,28 +709,46 @@ function EventView({ ev, people, peopleById, maxProducers, readOnly, onBack, onO
     catch (err) { onEventUpdate(ev.key, e => ({ ...e, producers: prev })); setMsg(`Not saved: ${err.message}`); }
   };
 
-  const exportContacts = () => {
+  const addExpense = async (x) => {
+    try {
+      const res = await post({ kind: 'expense', eventId: ev.key, op: 'add', ...x });
+      onEventUpdate(ev.key, e => ({ ...e, expenses: res.expenses }));
+      return true;
+    } catch (err) { setMsg(`Not saved: ${err.message}`); return false; }
+  };
+  const deleteExpense = async (id) => {
+    const prev = ev.expenses;
+    onEventUpdate(ev.key, e => ({ ...e, expenses: e.expenses.filter(x => x.id !== id) }));
+    try {
+      const res = await post({ kind: 'expense', eventId: ev.key, op: 'delete', id });
+      onEventUpdate(ev.key, e => ({ ...e, expenses: res.expenses }));
+    } catch (err) {
+      onEventUpdate(ev.key, e => ({ ...e, expenses: prev }));
+      setMsg(`Not saved: ${err.message}`);
+    }
+  };
+
+  const doExport = () => {
     const list = rows.map(r => r.p).filter(p => p.phone);
     if (!list.length) { setMsg('No phone numbers to export.'); return; }
-    const tag = ev.tag || ev.form || '';
-    const file = `${(tag || ev.title).replace(/[^\w-]+/g, '-')}.vcf`;
-    downloadText(buildVcf(list, tag), file, 'text/vcard;charset=utf-8');
-    setMsg(`Exported ${list.length} contacts. Delete the file after importing.`);
+    exportContacts(list, ev.tag || ev.form || '');
+    setMsg(`Exporting ${list.length} contacts…`);
   };
 
   const slots = Math.min(maxProducers, Math.max(2, ev.producers.length + 1));
   const where = [ev.date ? shortDate(ev.date) : (readOnly ? '' : 'Date TBA'), ev.time, ev.location].filter(Boolean).join(' · ');
+  const payRow = payFor ? roster.find(r => r.personId === payFor) : null;
 
   return (
     <div className="evview">
       <div className="evhead">
-        <button type="button" className="back" onClick={onBack}>← All</button>
+        <button type="button" className="back" onClick={onBack}>← Back</button>
         {ev.tag && <span className="evtag">{ev.tag}</span>}
         <h2>{ev.title}</h2>
         {where && <p className="meta">{where}</p>}
         <p className="evstats">
-          <b>{stats.total}</b>{ev.capacity ? ` / ${ev.capacity}` : ''} registered
-          {!readOnly && <> · <b>{stats.paid}</b> paid · <b>{stats.inn}</b> checked in</>}
+          <b>{readOnly ? roster.length : money.active}</b>{ev.capacity ? ` / ${ev.capacity}` : ''} registered
+          {!readOnly && <> · <b>{money.inn}</b> checked in{money.review ? <> · <b>{money.review}</b> to review</> : null}{money.rejected ? <> · {money.rejected} rejected</> : null}</>}
         </p>
         {readOnly && (
           <p className="muted">
@@ -563,6 +756,26 @@ function EventView({ ev, people, peopleById, maxProducers, readOnly, onBack, onO
           </p>
         )}
       </div>
+
+      {!readOnly && (
+        <div className="money">
+          <div className="mbox">
+            <span>Collection</span>
+            <b>{inr(money.collected)}</b>
+            <small>{money.paidN} paid{money.due ? ` · ${inr(money.due)} due on the day` : ''}</small>
+          </div>
+          <button type="button" className="mbox exp" onClick={() => setExpOpen(true)}>
+            <span>Expenses</span>
+            <b>{inr(money.spent)}</b>
+            <small>{ev.expenses.length ? `${ev.expenses.length} items · tap to edit` : '+ Add expense'}</small>
+          </button>
+          <div className={`mbox net ${money.net < 0 ? 'neg' : ''}`}>
+            <span>Net profit</span>
+            <b>{inr(money.net)}</b>
+            <small>{money.due ? `${inr(money.net + money.due)} if day-of payments come in` : 'Collection minus expenses'}</small>
+          </div>
+        </div>
+      )}
 
       {!readOnly && (
         <section className="prods">
@@ -574,15 +787,16 @@ function EventView({ ev, people, peopleById, maxProducers, readOnly, onBack, onO
               return p ? (
                 <div className="slot filled" key={pid}>
                   <button type="button" className="slotmain" onClick={() => onOpen(pid)}>
-                    <Avatar p={p} size={40} />
-                    <span>{displayName(p)}</span>
+                    <Avatar p={p} size={72} />
+                    <span className="slotname">{displayName(p)}</span>
                   </button>
-                  <button type="button" className="slotx" aria-label={`Remove ${displayName(p)}`}
+                  <button type="button" className="slotx corner" aria-label={`Remove ${displayName(p)}`}
                           onClick={() => saveProducers(ev.producers.filter(x => x !== pid))}>✕</button>
                 </div>
               ) : (
                 <button type="button" className="slot empty" key={`empty-${i}`} onClick={() => setPicking(true)}>
-                  + Add producer
+                  <span className="plus">+</span>
+                  <span>Add producer</span>
                 </button>
               );
             })}
@@ -594,7 +808,7 @@ function EventView({ ev, people, peopleById, maxProducers, readOnly, onBack, onO
         <input className="search" type="search" value={q} onChange={(e) => setQ(e.target.value)}
                placeholder="Search name, phone or handle" aria-label="Search registrations" />
         {!readOnly && (
-          <div className="chips" role="group" aria-label="Filter">
+          <div className="chips scroll" role="group" aria-label="Filter">
             {EVENT_FILTERS.map(f => (
               <button key={f.id} type="button" className={`chip soft ${filter === f.id ? 'on' : ''}`} onClick={() => setFilter(f.id)}>
                 {f.label}
@@ -609,32 +823,33 @@ function EventView({ ev, people, peopleById, maxProducers, readOnly, onBack, onO
             </select>
           </label>
           {!readOnly && (
-            <button type="button" className="export" onClick={exportContacts}>
-              Export {rows.filter(r => r.p.phone).length} contacts (.vcf)
+            <button type="button" className="export" onClick={doExport}>
+              Export {rows.filter(r => r.p.phone).length} contacts
             </button>
           )}
         </div>
-        <p className="muted">Showing {rows.length} of {all.length}</p>
+        <p className="muted">Showing {rows.length}</p>
         {msg && <p className={msg.startsWith('Not saved') || msg.startsWith('No ') ? 'bad' : 'ok'} role="status">{msg}</p>}
       </div>
 
       {rows.length === 0 ? (
-        <p className="empty">{all.length ? 'No one matches that.' : 'No registrations yet.'}</p>
+        <p className="empty">{roster.length ? 'No one matches that.' : 'No registrations yet.'}</p>
       ) : (
         <div className="rows">
           {rows.map(r => {
             const ig = socialLinks(r.p.socials).find(l => l.kind === 'ig');
             const proof = /^https?:\/\//i.test(r.screenshot || '') ? r.screenshot : '';
             return (
-              <div className="row" key={r.personId}>
+              <div className={`row ${r.pay === 'rejected' ? 'rejected' : ''}`} key={r.personId}>
                 <button type="button" className="rowmain" onClick={() => onOpen(r.personId)}>
                   <Avatar p={r.p} size={44} />
                   <span className="rowtext">
                     <span className="rowname">
                       {r.p.starred && <span className="star">★ </span>}{displayName(r.p)}
+                      {r.producer && <span className="prodtag">Producer</span>}
                     </span>
                     <span className="meta">
-                      {[yearsText(r.p), r.p.tier, readOnly ? r.form : null, `signed up ${ago(r.time)}`].filter(Boolean).join(' · ')}
+                      {[yearsText(r.p), r.p.tier, readOnly ? r.form : null, r.producerOnly ? 'Team' : `signed up ${ago(r.time)}`].filter(Boolean).join(' · ')}
                     </span>
                   </span>
                 </button>
@@ -642,14 +857,16 @@ function EventView({ ev, people, peopleById, maxProducers, readOnly, onBack, onO
                   {ig && <a className="ico" href={ig.href} target="_blank" rel="noopener noreferrer" aria-label={ig.label}>IG</a>}
                   {r.p.phone && <a className="ico" href={`https://wa.me/91${r.p.phone}`} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp">WA</a>}
                   {proof && <a className="ico" href={proof} target="_blank" rel="noopener noreferrer" aria-label="Payment screenshot">Proof</a>}
-                  {!readOnly && (
+                  {!readOnly && !r.producerOnly && (
                     <>
-                      <button type="button" className={`tick ${r.paid ? 'on' : ''}`} aria-pressed={r.paid} onClick={() => toggle(r, 'paid')}>
-                        {r.paid ? 'Paid ✓' : 'Paid?'}
+                      <button type="button" className={`tick pay ${r.pay || 'none'}`} onClick={() => setPayFor(r.personId)}>
+                        {payLabel(r)}
                       </button>
-                      <button type="button" className={`tick in ${r.attended ? 'on' : ''}`} aria-pressed={r.attended} onClick={() => toggle(r, 'attended')}>
-                        {r.attended ? 'Here ✓' : 'Check in'}
-                      </button>
+                      {r.pay !== 'rejected' && (
+                        <button type="button" className={`tick in ${r.attended ? 'on' : ''}`} aria-pressed={r.attended} onClick={() => toggleIn(r)}>
+                          {r.attended ? 'Here ✓' : 'Check in'}
+                        </button>
+                      )}
                     </>
                   )}
                 </div>
@@ -663,6 +880,13 @@ function EventView({ ev, people, peopleById, maxProducers, readOnly, onBack, onO
         <ProducerPicker people={people} exclude={ev.producers}
                         onPick={(id) => { setPicking(false); saveProducers([...ev.producers, id]); }}
                         onClose={() => setPicking(false)} />
+      )}
+      {payRow && (
+        <PayModal row={payRow} price={ev.price} onClose={() => setPayFor(null)}
+                  onSave={(patch) => savePay(payRow, patch)} />
+      )}
+      {expOpen && (
+        <ExpenseModal ev={ev} onClose={() => setExpOpen(false)} onAdd={addExpense} onDelete={deleteExpense} />
       )}
     </div>
   );
@@ -679,16 +903,14 @@ function EveryoneView({ data, onBack, onOpen }) {
 
   const stats = useMemo(() => {
     const now = new Date();
-    const m = now.getMonth(), y = now.getFullYear();
-    let joined = 0, returning = 0, bdays = 0, week = 0;
+    const m = now.getMonth();
+    let returning = 0, bdays = 0, week = 0;
     data.people.forEach(p => {
-      const f = new Date(p.first);
-      if (f.getMonth() === m && f.getFullYear() === y) joined++;
       if (p.count >= 2) returning++;
       if (p.bm === m + 1) bdays++;
       if (isRecent(p.last)) week++;
     });
-    return { total: data.people.length, joined, returning, bdays, week };
+    return { total: data.people.length, returning, bdays, week };
   }, [data]);
 
   const tierCounts = useMemo(() => {
@@ -735,7 +957,7 @@ function EveryoneView({ data, onBack, onOpen }) {
   return (
     <div>
       <div className="evhead">
-        <button type="button" className="back" onClick={onBack}>← All</button>
+        <button type="button" className="back" onClick={onBack}>← Back</button>
         <h2>Everyone</h2>
       </div>
 
@@ -757,7 +979,6 @@ function EveryoneView({ data, onBack, onOpen }) {
       <div className="tools">
         <input className="search" type="search" value={q} onChange={(e) => setQ(e.target.value)}
                placeholder="Search name, nickname, phone, handle, area or notes" aria-label="Search" />
-
         <div className="chips" role="group" aria-label="Tier">
           {['All', ...data.tiers.map(t => t.label)].map(t => (
             <button key={t} type="button" className={`chip ${tier === t ? 'on' : ''}`} onClick={() => setTier(t)}>
@@ -765,15 +986,13 @@ function EveryoneView({ data, onBack, onOpen }) {
             </button>
           ))}
         </div>
-
-        <div className="chips" role="group" aria-label="Quick filters">
+        <div className="chips scroll" role="group" aria-label="Quick filters">
           {VIEWS.map(v => (
             <button key={v.id} type="button" className={`chip soft ${view === v.id ? 'on' : ''}`} onClick={() => setView(v.id)}>
               {v.label}
             </button>
           ))}
         </div>
-
         <div className="selects">
           <label><span>Form</span>
             <select value={form} onChange={(e) => setForm(e.target.value)}>
@@ -793,7 +1012,6 @@ function EveryoneView({ data, onBack, onOpen }) {
             </select>
           </label>
         </div>
-
         <div className="count">
           Showing {list.length} of {data.people.length}
           {filtersOn && <button type="button" className="link" onClick={resetFilters}>Clear filters</button>}
@@ -828,11 +1046,44 @@ function EveryoneView({ data, onBack, onOpen }) {
   );
 }
 
+/* ── Producers across all events ── */
+function ProducersView({ data, peopleById, onBack, onOpen }) {
+  const list = (data.producerBoard || []).map(x => ({ ...x, p: peopleById[x.personId] })).filter(x => x.p);
+  return (
+    <div>
+      <div className="evhead">
+        <button type="button" className="back" onClick={onBack}>← Back</button>
+        <h2>Producers</h2>
+        <p className="meta">Everyone you&apos;ve made a producer on any event.</p>
+      </div>
+      {list.length === 0 ? (
+        <p className="empty">No producers yet. Add them from an event.</p>
+      ) : (
+        <div className="grid">
+          {list.map(x => (
+            <button key={x.personId} type="button" className="card" onClick={() => onOpen(x.personId)}>
+              <Avatar p={x.p} size={56} />
+              <span className="cbody">
+                <span className="name">{displayName(x.p)}</span>
+                <span className="meta">Produced {x.events.length} {x.events.length === 1 ? 'event' : 'events'}</span>
+                <span className="evchips">
+                  {x.events.slice(0, 6).map(e => <span key={e.key} className="evchip">{e.tag || e.title}</span>)}
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Home: tiles ── */
 function EventTile({ ev, featured, onClick }) {
-  const n = ev.regs.length;
-  const paid = ev.regs.filter(r => r.paid).length;
-  const inn = ev.regs.filter(r => r.attended).length;
+  const active = ev.regs.filter(r => r.pay !== 'rejected');
+  const paid = active.filter(r => r.pay === 'paid');
+  const collected = paid.reduce((s, r) => s + shownAmount(r), 0);
+  const inn = active.filter(r => r.attended).length;
   const when = relDay(ev.date);
   return (
     <button type="button" className={`tile ${featured ? 'featured' : ''}`} onClick={onClick}>
@@ -842,27 +1093,34 @@ function EventTile({ ev, featured, onClick }) {
       </span>
       <span className="ttitle">{ev.title}</span>
       <span className="tdate">{ev.date ? shortDate(ev.date) : 'Date TBA'}{ev.time ? ` · ${ev.time}` : ''}</span>
-      <span className="tcount"><b>{n}</b>{ev.capacity ? ` / ${ev.capacity}` : ''} registered</span>
-      <span className="tsub">{paid} paid · {inn} checked in</span>
+      <span className="tcount"><b>{active.length}</b>{ev.capacity ? ` / ${ev.capacity}` : ''} registered</span>
+      <span className="tsub">{paid.length} paid · {inr(collected)} collected · {inn} in</span>
     </button>
   );
 }
 
-function HomeView({ data, onEvent, onEveryone, onUnassigned }) {
+function HomeView({ data, onEvent, onScreen }) {
   const [first, ...rest] = data.events;
+  const producers = (data.producerBoard || []).length;
   return (
     <div>
       <div className="tiles">
         {first && <EventTile ev={first} featured onClick={() => onEvent(first.key)} />}
-        <button type="button" className="tile everyone" onClick={onEveryone}>
+        <button type="button" className="tile everyone" onClick={() => onScreen('everyone')}>
           <span className="ttop"><span className="ttag">Directory</span></span>
           <span className="ttitle">Everyone</span>
           <span className="tcount"><b>{data.people.length}</b> people</span>
           <span className="tsub">Search, tiers, birthdays, notes</span>
         </button>
+        <button type="button" className="tile" onClick={() => onScreen('producers')}>
+          <span className="ttop"><span className="ttag">Team</span></span>
+          <span className="ttitle">Producers</span>
+          <span className="tcount"><b>{producers}</b> {producers === 1 ? 'producer' : 'producers'}</span>
+          <span className="tsub">Who produced which event</span>
+        </button>
         {rest.map(ev => <EventTile key={ev.key} ev={ev} onClick={() => onEvent(ev.key)} />)}
         {data.unassigned.length > 0 && (
-          <button type="button" className="tile unassigned" onClick={onUnassigned}>
+          <button type="button" className="tile unassigned" onClick={() => onScreen('unassigned')}>
             <span className="ttop"><span className="ttag">Check these</span></span>
             <span className="ttitle">Unassigned</span>
             <span className="tcount"><b>{data.unassigned.length}</b> sign-ups</span>
@@ -888,16 +1146,80 @@ export default function UsPage() {
   const [pin, setPin] = useState('');
   const [pinErr, setPinErr] = useState('');
   const [unlocking, setUnlocking] = useState(false);
+  const [leaveAsk, setLeaveAsk] = useState(false);
 
-  const [screen, setScreen] = useState('home');   // home | event | everyone | unassigned
+  const [screen, setScreen] = useState('home');   // home | event | everyone | producers | unassigned
   const [eventKey, setEventKey] = useState(null);
   const [openId, setOpenId] = useState(null);
+  const navRef = useRef(HOME);
+  const navReady = useRef(false);
+  const dirtyRef = useRef(false);
 
+  /* Navigation that works with the phone's back swipe and the browser back button */
+  const apply = useCallback((s) => {
+    navRef.current = s;
+    setScreen(s.screen); setEventKey(s.eventKey); setOpenId(s.openId);
+  }, []);
+  const push = useCallback((patch) => {
+    const s = { ...navRef.current, ...patch };
+    window.history.pushState({ us: true, ...s }, '');
+    apply(s);
+  }, [apply]);
+  const goScreen = useCallback((screenName, key = null) => {
+    push({ screen: screenName, eventKey: key, openId: null });
+    window.scrollTo({ top: 0 });
+  }, [push]);
+  const openPerson = useCallback((id) => push({ openId: id }), [push]);
+  const back = useCallback(() => { dirtyRef.current = false; window.history.back(); }, []);
+  const setDirty = useCallback((v) => { dirtyRef.current = v; }, []);
+
+  useEffect(() => {
+    const onPop = (e) => {
+      const s = e.state;
+      if (s && s.us === true) {
+        const cur = navRef.current;
+        if (cur.openId && !s.openId && dirtyRef.current &&
+            !window.confirm('You have unsaved changes. Discard them?')) {
+          window.history.pushState({ us: true, ...cur }, '');
+          return;
+        }
+        dirtyRef.current = false;
+        apply({ screen: s.screen || 'home', eventKey: s.eventKey || null, openId: s.openId || null });
+        return;
+      }
+      if (s && s.us === 'root') {   // back pressed on the home screen
+        window.history.pushState({ us: true, ...HOME }, '');
+        apply(HOME);
+        setLeaveAsk(true);
+      }
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [apply]);
+
+  useEffect(() => {
+    if (phase !== 'ready' || navReady.current) return;
+    navReady.current = true;
+    const st = window.history.state;
+    if (st && st.us === true) {
+      apply({ screen: st.screen || 'home', eventKey: st.eventKey || null, openId: st.openId || null });
+    } else {
+      window.history.replaceState({ us: 'root' }, '');
+      window.history.pushState({ us: true, ...HOME }, '');
+      apply(HOME);
+    }
+  }, [phase, apply]);
+
+  /* Data: show the last copy instantly, then refresh in the background */
   const load = useCallback(async () => {
     setLoading(true); setLoadErr('');
     try {
       const res = await fetch('/api/us/people', { cache: 'no-store' });
-      if (res.status === 401) { setData(null); setPhase('locked'); return; }
+      if (res.status === 401) {
+        try { sessionStorage.removeItem(CACHE_KEY); } catch {}
+        setData(null); setPhase('locked');
+        return;
+      }
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Could not load');
       setData(json);
@@ -910,7 +1232,18 @@ export default function UsPage() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(CACHE_KEY);
+      if (raw) { setData(JSON.parse(raw)); setPhase('ready'); }
+    } catch {}
+    load();
+  }, [load]);
+
+  useEffect(() => {
+    if (!data) return;
+    try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(data)); } catch {}
+  }, [data]);
 
   const unlock = async (e) => {
     e.preventDefault();
@@ -928,6 +1261,7 @@ export default function UsPage() {
         return;
       }
       setPin('');
+      setPhase('checking');
       await load();
     } catch {
       setPinErr('Network problem. Try again.');
@@ -938,8 +1272,11 @@ export default function UsPage() {
 
   const lock = useCallback(async () => {
     await fetch('/api/us/login', { method: 'DELETE' }).catch(() => {});
-    setData(null); setOpenId(null); setScreen('home'); setPhase('locked');
-  }, []);
+    try { sessionStorage.removeItem(CACHE_KEY); } catch {}
+    setData(null);
+    apply(HOME);
+    setPhase('locked');
+  }, [apply]);
 
   const onSaved = useCallback((id, override) => {
     setData(d => d && ({ ...d, people: d.people.map(p => (p.id === id ? applyOverride(p, override, d.tiers) : p)) }));
@@ -948,12 +1285,6 @@ export default function UsPage() {
   const onEventUpdate = useCallback((key, fn) => {
     setData(d => d && ({ ...d, events: d.events.map(e => (e.key === key ? fn(e) : e)) }));
   }, []);
-
-  const go = (next, key = null) => {
-    setScreen(next);
-    setEventKey(key);
-    window.scrollTo({ top: 0 });
-  };
 
   useEffect(() => {
     if (!openId) return;
@@ -971,16 +1302,16 @@ export default function UsPage() {
   const currentEvent = data && screen === 'event' ? data.events.find(e => e.key === eventKey) : null;
   const unassignedEvent = useMemo(() => (data ? {
     key: '__unassigned', title: 'Unassigned sign-ups', tag: '', form: '', date: null, time: '', location: '',
-    capacity: 0, producers: [],
-    regs: data.unassigned.map(r => ({ ...r, paid: false, attended: false })),
+    capacity: 0, price: 0, producers: [], expenses: [],
+    regs: data.unassigned.map(r => ({ ...r, pay: '', amount: null, defaultAmount: 0, attended: false })),
   } : null), [data]);
-  const openPerson = data && openId ? peopleById[openId] : null;
+  const personOpen = data && openId ? peopleById[openId] : null;
 
   return (
     <div className="us">
       <style dangerouslySetInnerHTML={{ __html: css }} />
 
-      {phase === 'checking' && <div className="center"><Loader label="Checking…" /></div>}
+      {phase === 'checking' && <div className="center"><Loader label="Loading your people…" /></div>}
 
       {phase === 'locked' && (
         <div className="center">
@@ -1000,7 +1331,7 @@ export default function UsPage() {
         <>
           <header className="top">
             <div className="wrap bar">
-              <button type="button" className="homelink" onClick={() => go('home')} aria-label="Home">
+              <button type="button" className="homelink" onClick={() => { if (screen !== 'home' || openId) goScreen('home'); }} aria-label="Home">
                 <h1><span>3 AM</span> Us</h1>
               </button>
               <div className="actions">
@@ -1008,6 +1339,7 @@ export default function UsPage() {
                 <button type="button" className="mini ghost" onClick={lock}>Lock</button>
               </div>
             </div>
+            <div className={`loadbar ${loading ? 'on' : ''}`} aria-hidden="true"><i /></div>
           </header>
 
           <main className="wrap">
@@ -1018,33 +1350,47 @@ export default function UsPage() {
             </p>
 
             {screen === 'home' && (
-              <HomeView data={data}
-                        onEvent={(key) => go('event', key)}
-                        onEveryone={() => go('everyone')}
-                        onUnassigned={() => go('unassigned')} />
+              <HomeView data={data} onEvent={(key) => goScreen('event', key)} onScreen={(s) => goScreen(s)} />
             )}
 
-            {screen === 'everyone' && <EveryoneView data={data} onBack={() => go('home')} onOpen={setOpenId} />}
+            {screen === 'everyone' && <EveryoneView data={data} onBack={back} onOpen={openPerson} />}
+
+            {screen === 'producers' && <ProducersView data={data} peopleById={peopleById} onBack={back} onOpen={openPerson} />}
 
             {screen === 'event' && currentEvent && (
               <EventView key={currentEvent.key} ev={currentEvent} people={data.people} peopleById={peopleById}
-                         maxProducers={data.maxProducers || 4} onBack={() => go('home')} onOpen={setOpenId}
+                         maxProducers={data.maxProducers || 4} onBack={back} onOpen={openPerson}
                          onLocked={lock} onEventUpdate={onEventUpdate} />
             )}
             {screen === 'event' && !currentEvent && (
-              <p className="empty">This event isn&apos;t on the board any more. <button type="button" className="link" onClick={() => go('home')}>Back home</button></p>
+              <p className="empty">This event isn&apos;t on the board any more. <button type="button" className="link" onClick={() => goScreen('home')}>Back home</button></p>
             )}
 
             {screen === 'unassigned' && unassignedEvent && (
               <EventView key="__unassigned" ev={unassignedEvent} people={data.people} peopleById={peopleById}
-                         maxProducers={0} readOnly onBack={() => go('home')} onOpen={setOpenId}
+                         maxProducers={0} readOnly onBack={back} onOpen={openPerson}
                          onLocked={lock} onEventUpdate={() => {}} />
             )}
           </main>
 
-          {openPerson && (
-            <PersonDrawer key={openPerson.id} p={openPerson} tiers={data.tiers}
-                          onClose={() => setOpenId(null)} onSaved={onSaved} onLocked={lock} />
+          {personOpen && (
+            <PersonDrawer key={personOpen.id} p={personOpen} tiers={data.tiers}
+                          onClose={back} onSaved={onSaved} onLocked={lock} onDirty={setDirty} />
+          )}
+
+          {leaveAsk && (
+            <div className="modalwrap" onClick={(e) => { if (e.target === e.currentTarget) setLeaveAsk(false); }}>
+              <div className="modal small" role="alertdialog" aria-modal="true" aria-label="Leave 3 AM Us?">
+                <div className="mbody">
+                  <h3 className="leaveh">Leave 3 AM Us?</h3>
+                  <p className="muted">You&apos;ll go back to the previous page.</p>
+                  <div className="leavebtns">
+                    <button type="button" className="save" onClick={() => setLeaveAsk(false)} autoFocus>Stay</button>
+                    <button type="button" className="mini ghost" onClick={() => { setLeaveAsk(false); window.history.go(-2); }}>Leave</button>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
         </>
       )}
@@ -1055,7 +1401,7 @@ export default function UsPage() {
 const css = `
 @import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Instrument+Sans:wght@400;500;600&display=swap');
 html,body{margin:0;padding:0;background:#000}
-.us{--pink:#FF0065;--fg:#fff;--grey:#9a9a9a;--line:#262626;--card:#0d0d0d;--green:#3DDC84;
+.us{--pink:#FF0065;--fg:#fff;--grey:#9a9a9a;--line:#262626;--card:#0d0d0d;--green:#3DDC84;--amber:#FFC53D;
   --display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
   --body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   font-family:var(--body);background:#000;color:var(--fg);min-height:100vh;font-size:16px;line-height:1.5;
@@ -1068,7 +1414,7 @@ html,body{margin:0;padding:0;background:#000}
 .us h1 span{color:var(--pink)}
 .us .bad{color:var(--pink);font-weight:600;font-size:14px;margin:10px 0 0}
 .us .ok{color:var(--green);font-weight:600;font-size:14px;margin:10px 0 0}
-.us .muted{color:var(--grey);font-size:14px}
+.us .muted{color:var(--grey);font-size:14px;margin:6px 0 0}
 .us .pad{padding:12px}
 .us .status{margin:14px 0 0;font-size:13px;color:var(--grey)}
 
@@ -1093,15 +1439,19 @@ html,body{margin:0;padding:0;background:#000}
 .us .bar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-top:12px;padding-bottom:12px}
 .us .homelink{background:none;border:0;padding:0;cursor:pointer;color:#fff;text-align:left}
 .us .actions{display:flex;gap:8px}
-.us .mini{font:inherit;font-size:14px;font-weight:600;padding:8px 14px;background:transparent;color:#fff;border:2px solid #fff;cursor:pointer}
+.us .mini{font:inherit;font-size:14px;font-weight:600;padding:8px 14px;background:transparent;color:#fff;border:2px solid #fff;cursor:pointer;text-decoration:none;display:inline-block}
 .us .mini.ghost{border-color:#555;color:#ccc}
 .us .mini:disabled{opacity:.6;cursor:default}
 .us .link{font:inherit;font-size:13.5px;font-weight:600;background:none;border:0;color:var(--pink);cursor:pointer;padding:0;text-decoration:underline}
+.us .loadbar{height:3px;overflow:hidden;opacity:0;transition:opacity .2s ease}
+.us .loadbar.on{opacity:1}
+.us .loadbar i{display:block;width:40%;height:100%;background:var(--pink);animation:usload 1.1s ease-in-out infinite}
+@keyframes usload{0%{transform:translateX(-100%)}100%{transform:translateX(250%)}}
 
-/* Home tiles */
-.us .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;padding-top:16px;padding-bottom:30px}
-.us .tile{aspect-ratio:1/1;display:flex;flex-direction:column;gap:6px;text-align:left;font:inherit;color:#fff;background:var(--card);
-  border:2px solid #fff;padding:16px;cursor:pointer;overflow:hidden;min-width:0;transition:border-color .15s ease,transform .15s ease}
+/* Home tiles: rectangles that grow with their content */
+.us .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;padding-top:16px;padding-bottom:30px}
+.us .tile{min-height:150px;display:flex;flex-direction:column;gap:6px;text-align:left;font:inherit;color:#fff;background:var(--card);
+  border:2px solid #fff;padding:16px;cursor:pointer;min-width:0;transition:border-color .15s ease,transform .15s ease}
 .us .tile:hover{border-color:var(--pink);transform:translate(-2px,-2px)}
 .us .tile.featured{background:var(--pink);border-color:var(--pink)}
 .us .tile.featured:hover{border-color:#fff}
@@ -1115,17 +1465,16 @@ html,body{margin:0;padding:0;background:#000}
 .us .twhen.soon{color:#ddd}
 .us .tile.featured .twhen{color:#fff}
 .us .tile.featured .twhen.now{color:var(--pink);background:#fff}
-.us .ttitle{font-family:var(--display);font-weight:900;font-size:28px;line-height:1.05;margin-top:auto;word-break:break-word;
-  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.us .ttitle{font-family:var(--display);font-weight:900;font-size:28px;line-height:1.05;margin-top:6px;word-break:break-word}
 .us .tdate{font-size:13.5px;opacity:.85}
-.us .tcount{font-size:14.5px}
+.us .tcount{font-size:14.5px;margin-top:auto}
 .us .tcount b{font-family:var(--display);font-weight:900;font-size:30px;line-height:1}
 .us .tsub{font-size:12.5px;color:var(--grey)}
 .us .tile.featured .tsub{color:#fff}
 
 /* Event + directory headers */
-.us .evhead{padding-top:16px}
-.us .back{font:inherit;font-size:14px;font-weight:600;background:none;border:0;color:var(--grey);cursor:pointer;padding:4px 0;margin-bottom:6px;display:block}
+.us .evhead{padding-top:14px}
+.us .back{font:inherit;font-size:15px;font-weight:600;background:none;border:0;color:var(--grey);cursor:pointer;padding:6px 0;margin-bottom:6px;display:block}
 .us .back:hover{color:#fff}
 .us .evtag{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border:2px solid var(--pink);color:var(--pink)}
 .us .evhead h2{font-family:var(--display);font-weight:900;font-size:clamp(34px,7vw,56px);line-height:1;margin:8px 0 6px;word-break:break-word}
@@ -1133,18 +1482,33 @@ html,body{margin:0;padding:0;background:#000}
 .us .evstats{margin:10px 0 0;font-size:15px;color:#ccc}
 .us .evstats b{color:#fff;font-family:var(--display);font-weight:900;font-size:22px}
 
-/* Producers */
+/* Money */
+.us .money{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px}
+.us .mbox{display:flex;flex-direction:column;gap:2px;text-align:left;font:inherit;color:#fff;background:var(--card);border:2px solid #fff;padding:14px;min-width:0}
+.us .mbox span{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--grey);font-weight:600}
+.us .mbox b{font-family:var(--display);font-weight:900;font-size:32px;line-height:1.05}
+.us .mbox small{font-size:12.5px;color:var(--grey)}
+.us .mbox.exp{cursor:pointer;border-style:dashed}
+.us .mbox.exp:hover{border-color:var(--pink);border-style:solid}
+.us .mbox.net{border-color:var(--green)}
+.us .mbox.net b{color:var(--green)}
+.us .mbox.net.neg{border-color:var(--pink)}
+.us .mbox.net.neg b{color:var(--pink)}
+
+/* Producers: squares */
 .us .prods{margin-top:22px}
 .us .prods h3,.us .edit h3,.us .sect h3{font-size:12px;text-transform:uppercase;letter-spacing:.14em;color:var(--grey);margin:0 0 8px;font-weight:600}
-.us .slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
-.us .slot{min-height:62px;border:2px solid #fff;display:flex;align-items:center;min-width:0}
-.us .slot.empty{border-style:dashed;border-color:#666;color:#bbb;justify-content:center;font:inherit;font-weight:600;background:transparent;cursor:pointer}
+.us .slots{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;max-width:720px}
+.us .slot{position:relative;aspect-ratio:1/1;border:2px solid #fff;display:flex;align-items:center;justify-content:center;min-width:0}
+.us .slot.empty{flex-direction:column;gap:4px;border-style:dashed;border-color:#666;color:#bbb;font:inherit;font-weight:600;font-size:14px;background:transparent;cursor:pointer}
+.us .slot.empty .plus{font-size:30px;line-height:1;font-weight:400}
 .us .slot.empty:hover{border-color:var(--pink);color:#fff}
-.us .slot.filled{background:var(--card);padding:8px 8px 8px 10px;gap:8px}
-.us .slotmain{flex:1;display:flex;align-items:center;gap:10px;background:none;border:0;color:#fff;font:inherit;font-weight:600;text-align:left;cursor:pointer;min-width:0;padding:0}
-.us .slotmain span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.us .slotx{flex:0 0 auto;width:34px;height:34px;background:transparent;border:2px solid #555;color:#ccc;cursor:pointer}
+.us .slot.filled{background:var(--card)}
+.us .slotmain{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:none;border:0;color:#fff;font:inherit;font-weight:600;cursor:pointer;padding:10px;min-width:0}
+.us .slotname{max-width:100%;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14.5px}
+.us .slotx{flex:0 0 auto;width:34px;height:34px;background:#000;border:2px solid #555;color:#ccc;cursor:pointer}
 .us .slotx:hover{border-color:var(--pink);color:#fff}
+.us .slotx.corner{position:absolute;top:6px;right:6px;width:30px;height:30px;font-size:13px}
 
 /* Event tools + rows */
 .us .evtools{display:flex;flex-direction:column;gap:10px;margin-top:22px}
@@ -1153,15 +1517,20 @@ html,body{margin:0;padding:0;background:#000}
 .us .export{font:inherit;font-weight:600;font-size:14.5px;padding:11px 16px;background:var(--pink);color:#fff;border:2px solid var(--pink);cursor:pointer}
 .us .rows{display:flex;flex-direction:column;gap:8px;padding-top:6px;padding-bottom:60px}
 .us .row{display:flex;align-items:center;gap:10px;border:2px solid #333;background:var(--card);padding:8px 10px;flex-wrap:wrap}
+.us .row.rejected{opacity:.55}
 .us .rowmain{flex:1 1 240px;display:flex;align-items:center;gap:12px;background:none;border:0;color:#fff;font:inherit;text-align:left;cursor:pointer;min-width:0;padding:0}
 .us .rowtext{display:flex;flex-direction:column;min-width:0}
 .us .rowname{font-weight:600;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.us .prodtag{display:inline-block;margin-left:8px;font-size:11px;font-weight:600;padding:1px 6px;background:var(--pink);color:#fff;vertical-align:2px}
 .us .rowacts{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-.us .ico{min-width:40px;height:36px;padding:0 8px;display:inline-flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;border:2px solid #555;text-decoration:none;color:#fff}
+.us .ico{min-width:40px;height:38px;padding:0 8px;display:inline-flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;border:2px solid #555;text-decoration:none;color:#fff}
 .us .ico:hover{border-color:var(--pink)}
-.us .tick{height:36px;padding:0 10px;font:inherit;font-size:13px;font-weight:600;background:transparent;color:#ccc;border:2px solid #555;cursor:pointer;white-space:nowrap}
+.us .tick{height:38px;padding:0 10px;font:inherit;font-size:13px;font-weight:600;background:transparent;color:#ccc;border:2px solid #555;cursor:pointer;white-space:nowrap}
 .us .tick:hover{border-color:#fff;color:#fff}
-.us .tick.on{background:var(--green);border-color:var(--green);color:#000}
+.us .tick.pay.paid{background:var(--green);border-color:var(--green);color:#000}
+.us .tick.pay.later{background:var(--amber);border-color:var(--amber);color:#000}
+.us .tick.pay.unpaid{border-color:var(--pink);color:var(--pink)}
+.us .tick.pay.rejected{border-color:#777;color:#999;text-decoration:line-through}
 .us .tick.in.on{background:var(--pink);border-color:var(--pink);color:#fff}
 
 /* Directory */
@@ -1174,7 +1543,7 @@ html,body{margin:0;padding:0;background:#000}
 .us .search{font:inherit;font-size:16px;padding:13px 14px;background:#0b0b0b;color:#fff;border:2px solid #fff;width:100%;border-radius:0}
 .us .search:focus{outline:none;border-color:var(--pink)}
 .us .chips{display:flex;gap:8px;flex-wrap:wrap}
-.us .chip{font:inherit;font-size:14px;font-weight:600;padding:7px 12px;background:transparent;color:#fff;border:2px solid #555;cursor:pointer}
+.us .chip{font:inherit;font-size:14px;font-weight:600;padding:7px 12px;background:transparent;color:#fff;border:2px solid #555;cursor:pointer;white-space:nowrap}
 .us .chip b{color:var(--grey);font-weight:600;margin-left:6px}
 .us .chip.soft{border-style:dashed}
 .us .chip.on{background:var(--pink);border-color:var(--pink);border-style:solid}
@@ -1195,6 +1564,8 @@ html,body{margin:0;padding:0;background:#000}
 .us .star{color:var(--pink)}
 .us .newtag{font-size:11px;font-weight:600;padding:1px 6px;background:#fff;color:#000}
 .us .empty{color:var(--grey);padding:40px 0}
+.us .evchips{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.us .evchip{font-size:11.5px;font-weight:600;padding:1px 6px;border:1px solid #555}
 
 .us .av{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;overflow:hidden;
   background:#1d1d1d;border:2px solid #333;color:#fff;font-weight:600;font-family:var(--body)}
@@ -1206,19 +1577,40 @@ html,body{margin:0;padding:0;background:#000}
 .us .b-Special{color:#fff}
 .us .b-New{color:var(--grey)}
 
-/* Producer picker */
+/* Modals */
 .us .modalwrap{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.78);display:flex;align-items:flex-start;justify-content:center;padding:60px 16px}
-.us .modal{width:min(520px,100%);max-height:80vh;display:flex;flex-direction:column;background:#0b0b0b;border:2px solid var(--pink)}
-.us .modal .mhead{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid #222}
+.us .modal{width:min(520px,100%);max-height:84vh;display:flex;flex-direction:column;background:#0b0b0b;border:2px solid var(--pink)}
+.us .modal.small{width:min(380px,100%)}
+.us .modal .mhead{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #222}
 .us .modal .mhead h3{margin:0;font-family:var(--display);font-weight:900;font-size:26px}
+.us .mbody{padding:14px;overflow-y:auto;display:flex;flex-direction:column;gap:12px}
 .us .msearch{padding:12px 14px}
-.us .msearch input{font:inherit;font-size:16px;padding:12px;background:#000;color:#fff;border:2px solid #555;width:100%;border-radius:0}
-.us .msearch input:focus{outline:none;border-color:var(--pink)}
+.us .msearch input,.us .payother input,.us .expadd input{font:inherit;font-size:16px;padding:12px;background:#000;color:#fff;border:2px solid #555;width:100%;border-radius:0;min-width:0}
+.us .msearch input:focus,.us .payother input:focus,.us .expadd input:focus{outline:none;border-color:var(--pink)}
 .us .plist{overflow-y:auto;padding:0 8px 10px}
 .us .pitem{width:100%;display:flex;gap:10px;align-items:center;padding:8px;background:none;border:0;color:#fff;font:inherit;text-align:left;cursor:pointer}
 .us .pitem:hover{background:#161616}
 .us .ptext{display:flex;flex-direction:column;min-width:0}
 .us .ptext b{font-weight:600}
+.us .who{margin:0}
+.us .linkbtn{align-self:flex-start}
+.us .payopts{display:flex;flex-direction:column;gap:8px}
+.us .payopt{font:inherit;font-weight:600;font-size:15px;padding:13px 14px;text-align:left;background:transparent;color:#fff;border:2px solid #555;cursor:pointer}
+.us .payopt:hover{border-color:#fff}
+.us .payopt.on{outline:3px solid #fff;outline-offset:-6px}
+.us .payopt.good{background:var(--green);border-color:var(--green);color:#000}
+.us .payopt.later{border-color:var(--amber);color:var(--amber)}
+.us .payopt.reject{border-color:var(--pink);color:var(--pink)}
+.us .payopt:disabled{opacity:.5;cursor:default}
+.us .payother{display:grid;grid-template-columns:1fr auto;gap:8px}
+.us .expadd{display:grid;grid-template-columns:1fr 130px auto;gap:8px}
+.us .explist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.us .explist li{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;border:1px solid #333;padding:8px 10px}
+.us .expcat{font-size:12px;font-weight:600;padding:1px 6px;border:1px solid #666}
+.us .expnote{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ccc;font-size:14px}
+.us .leaveh{margin:0;font-family:var(--display);font-weight:900;font-size:30px}
+.us .leavebtns{display:flex;gap:10px;margin-top:6px}
+.us .leavebtns .save{flex:1}
 
 /* Person drawer */
 .us .drawer{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.72);display:flex;justify-content:flex-end}
@@ -1266,15 +1658,18 @@ html,body{margin:0;padding:0;background:#000}
   .us .stats{grid-template-columns:repeat(2,1fr)}
   .us .selects{grid-template-columns:1fr 1fr}
   .us .facts{grid-template-columns:repeat(2,1fr)}
+  .us .slots{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .us .money{grid-template-columns:1fr 1fr}
+  .us .mbox.net{grid-column:1 / -1}
 }
 @media (max-width:520px){
   .us .wrap{padding:0 14px}
   .us h1{font-size:28px}
-  .us .tiles{grid-template-columns:1fr 1fr;gap:10px}
-  .us .tile{padding:12px;gap:4px}
-  .us .ttitle{font-size:21px}
-  .us .tcount b{font-size:24px}
-  .us .tdate,.us .tsub{font-size:12px}
+  .us .tiles{grid-template-columns:1fr;gap:10px}
+  .us .tile{min-height:0;padding:14px}
+  .us .ttitle{font-size:26px}
+  .us .chips.scroll{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -14px;padding:0 14px}
+  .us .chips.scroll::-webkit-scrollbar{display:none}
   .us .selects{grid-template-columns:1fr}
   .us .row2{grid-template-columns:1fr}
   .us .phead{flex-direction:column}
@@ -1283,9 +1678,13 @@ html,body{margin:0;padding:0;background:#000}
   .us .rowacts{width:100%}
   .us .tick{flex:1 1 auto}
   .us .export{width:100%}
+  .us .mbox b{font-size:26px}
+  .us .expadd{grid-template-columns:1fr 1fr}
+  .us .expadd .save{grid-column:1 / -1}
+  .us .modalwrap{padding:24px 10px}
 }
 @media (prefers-reduced-motion:reduce){
-  .us .tri path{animation:none;stroke-dashoffset:0}
+  .us .tri path,.us .loadbar i{animation:none;stroke-dashoffset:0}
   .us .card,.us .tile{transition:none}
 }
 `;
