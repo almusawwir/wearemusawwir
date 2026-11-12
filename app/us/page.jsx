@@ -11,6 +11,8 @@ const SORTS = [
   { id: 'newest', label: 'Newest members' },
   { id: 'events', label: 'Most events' },
   { id: 'name', label: 'Name A–Z' },
+  { id: 'young', label: 'Youngest first' },
+  { id: 'old', label: 'Oldest first' },
   { id: 'oldest', label: 'Longest with us' },
 ];
 const VIEWS = [
@@ -19,6 +21,19 @@ const VIEWS = [
   { id: 'starred', label: '★ Starred' },
   { id: 'bday', label: 'Birthdays this month' },
   { id: 'pending', label: 'Payment pending' },
+];
+const EVENT_SORTS = [
+  { id: 'latest', label: 'Latest sign-up' },
+  { id: 'name', label: 'Name A–Z' },
+  { id: 'young', label: 'Youngest first' },
+  { id: 'old', label: 'Oldest first' },
+];
+const EVENT_FILTERS = [
+  { id: 'all', label: 'All' },
+  { id: 'unpaid', label: 'Not paid' },
+  { id: 'paid', label: 'Paid' },
+  { id: 'in', label: 'Checked in' },
+  { id: 'out', label: 'Not checked in' },
 ];
 
 /* ── Helpers ── */
@@ -31,6 +46,9 @@ function initials(s) {
 }
 function fmtDate(ms) {
   return new Date(ms).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+function shortDate(ms) {
+  return new Date(ms).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
 }
 function ago(ms) {
   const d = Math.floor((Date.now() - ms) / 864e5);
@@ -50,13 +68,19 @@ function ageText(days) {
   const y = Math.floor(m / 12), r = m % 12;
   return `${y} ${y > 1 ? 'years' : 'year'}${r ? ` ${r} mo` : ''}`;
 }
-function safeUrl(s) {
-  let t = String(s).trim();
-  if (/^(www\.)?(instagram|linkedin)\.com/i.test(t)) t = 'https://' + t;
-  try {
-    const u = new URL(t);
-    return u.protocol === 'https:' || u.protocol === 'http:' ? u.href : '';
-  } catch { return ''; }
+function yearsText(p) {
+  if (p.age == null) return '';
+  return `${p.ageApprox ? '~' : ''}${p.age} yrs`;
+}
+function relDay(ms) {
+  if (!ms) return null;
+  const now = new Date();
+  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const days = Math.round((ms - midnight) / 864e5);
+  if (days === 0) return { text: 'Today', cls: 'now' };
+  if (days === 1) return { text: 'Tomorrow', cls: 'soon' };
+  if (days > 1) return { text: `In ${days} days`, cls: 'soon' };
+  return { text: 'Just happened', cls: 'past' };
 }
 function tierFor(n, tiers) {
   for (const t of tiers) if (n >= t.min) return t.label;
@@ -71,6 +95,87 @@ function applyOverride(p, o, tiers) {
     ...p, nickname: o.nickname || '', extra, count, autoTier, tierOverride,
     tier: tierOverride || autoTier, starred: !!o.starred, notes: o.notes || '', photo: o.photo || '',
   };
+}
+const byAge = (dir, get) => (a, b) => {
+  const x = get(a).age, y = get(b).age;
+  if (x == null && y == null) return 0;
+  if (x == null) return 1;
+  if (y == null) return -1;
+  return dir * (x - y);
+};
+
+/* Turns whatever people typed into clickable links.
+   "@name", "name", "Ig: name", "insta- name" → instagram.com/name; URLs stay as they are. */
+const URL_RE = /(https?:\/\/[^\s,]+|(?:www\.)?(?:instagram\.com|linkedin\.com)\/[^\s,]+)/gi;
+const HANDLE_RE = /^@?[A-Za-z0-9._]{2,30}$/;
+function socialLinks(socials) {
+  const out = [];
+  const seen = {};
+  const add = (kind, href, label) => { if (!seen[href]) { seen[href] = 1; out.push({ kind, href, label }); } };
+
+  (socials || []).forEach(raw => {
+    let text = String(raw || '');
+    (text.match(URL_RE) || []).forEach(u => {
+      const href = /^https?:\/\//i.test(u) ? u : 'https://' + u;
+      try {
+        const url = new URL(href);
+        if (url.protocol !== 'https:' && url.protocol !== 'http:') return;
+        const host = url.hostname.replace(/^www\./, '');
+        if (host.endsWith('instagram.com')) {
+          const h = url.pathname.split('/').filter(Boolean)[0];
+          add('ig', h ? `https://instagram.com/${h}` : url.href, h ? `Instagram @${h}` : 'Instagram');
+        } else if (host.endsWith('linkedin.com')) {
+          add('li', url.href, 'LinkedIn');
+        } else {
+          add('link', url.href, host);
+        }
+      } catch {}
+    });
+
+    text = text.replace(URL_RE, ' ').replace(/\b(instagram|insta|ig|linkedin)\b\s*[:\-–]?/gi, ' ');
+    const tokens = text.split(/[\s,/|]+/).map(t => t.trim()).filter(Boolean);
+    tokens.forEach(t => {
+      if (!HANDLE_RE.test(t) || /^\d+$/.test(t.replace('@', ''))) return;
+      const looksLikeHandle = t.startsWith('@') || /[._\d]/.test(t);
+      if (!looksLikeHandle && tokens.length > 1) return;   // skip loose words like "Already shared"
+      const h = t.replace(/^@/, '').replace(/\.$/, '');
+      if (h.length < 2) return;
+      add('ig', `https://instagram.com/${h}`, `Instagram @${h}`);
+    });
+  });
+  return out;
+}
+
+/* Contacts file (.vcf): "First Last ODC 1126" */
+function vcfEscape(s) {
+  return String(s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, ' ');
+}
+function buildVcf(people, tag) {
+  return people.filter(p => p.phone).map(p => {
+    const full = p.name.trim();
+    const parts = full.split(/\s+/);
+    const first = parts[0] || full;
+    const family = [parts.slice(1).join(' '), tag].filter(Boolean).join(' ');
+    return [
+      'BEGIN:VCARD',
+      'VERSION:3.0',
+      `N:${vcfEscape(family)};${vcfEscape(first)};;;`,
+      `FN:${vcfEscape([full, tag].filter(Boolean).join(' '))}`,
+      `TEL;TYPE=CELL:+91${p.phone}`,
+      'END:VCARD',
+    ].join('\r\n');
+  }).join('\r\n') + '\r\n';
+}
+function downloadText(text, filename, type) {
+  const blob = new Blob([text], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
 }
 
 /* Crops to a square and shrinks to a small JPEG so it fits in one sheet cell */
@@ -143,6 +248,7 @@ function PersonDrawer({ p, tiers, onClose, onSaved, onLocked }) {
   const autoTier = tierFor(count, tiers);
   const shownTier = draft.tier || autoTier;
   const shownPhoto = photo !== undefined ? photo : p.photo;
+  const links = socialLinks(p.socials);
   const set = (k, v) => { setDraft(d => ({ ...d, [k]: v })); setMsg(''); };
 
   const tryClose = useCallback(() => {
@@ -222,10 +328,21 @@ function PersonDrawer({ p, tiers, onClose, onSaved, onLocked }) {
           <div className="fact"><span>Events</span><b>{count}</b></div>
           <div className="fact"><span>Forms</span><b>{p.forms.join(', ')}</b></div>
           <div className="fact"><span>With 3 AM for</span><b>{ageText(p.ageDays)}</b></div>
-          <div className="fact"><span>Last sign-up</span><b>{fmtDate(p.last)}</b></div>
+          <div className="fact"><span>Age</span><b>{yearsText(p) || '—'}</b></div>
           <div className="fact"><span>Birthday</span><b>{p.birthday || '—'}</b></div>
           <div className="fact"><span>Based in</span><b>{p.city || '—'}</b></div>
         </div>
+
+        <section className="sect first">
+          <h3>Contact</h3>
+          {p.phone && (
+            <p>+91 {p.phone} · <a href={`https://wa.me/91${p.phone}`} target="_blank" rel="noopener noreferrer">WhatsApp ↗</a></p>
+          )}
+          {links.map(l => (
+            <p key={l.href}><a href={l.href} target="_blank" rel="noopener noreferrer">{l.label} ↗</a></p>
+          ))}
+          {links.length === 0 && p.socials.map(s => <p key={s} className="muted">{s}</p>)}
+        </section>
 
         <section className="edit">
           <h3>Your notes on {firstName}</h3>
@@ -269,21 +386,6 @@ function PersonDrawer({ p, tiers, onClose, onSaved, onLocked }) {
           </div>
         </section>
 
-        {(p.phone || p.socials.length > 0) && (
-          <section className="sect">
-            <h3>Contact</h3>
-            {p.phone && (
-              <p>
-                +91 {p.phone} · <a href={`https://wa.me/91${p.phone}`} target="_blank" rel="noopener noreferrer">WhatsApp ↗</a>
-              </p>
-            )}
-            {p.socials.map(s => {
-              const u = safeUrl(s);
-              return <p key={s}>{u ? <a href={u} target="_blank" rel="noopener noreferrer">{s} ↗</a> : s}</p>;
-            })}
-          </section>
-        )}
-
         {(p.vibe || p.experience || p.roles) && (
           <section className="sect">
             <h3>About</h3>
@@ -298,14 +400,481 @@ function PersonDrawer({ p, tiers, onClose, onSaved, onLocked }) {
           <ol className="hist">
             {p.history.slice().reverse().map((h, i) => (
               <li key={i}>
-                <b>{h.edition}</b>
-                <span>{fmtDate(h.time)}{h.pass ? ` · ${h.pass}` : ''}{h.payment ? ` · Payment ${h.payment}` : ''}</span>
+                <b>{h.label}</b>
+                <span>
+                  {fmtDate(h.time)}
+                  {h.pass ? ` · ${h.pass}` : ''}
+                  {h.paid === true ? ' · Paid ✓' : ''}
+                  {h.attended === true ? ' · Checked in ✓' : ''}
+                </span>
                 {h.why && <q>{h.why}</q>}
               </li>
             ))}
           </ol>
         </section>
       </div>
+    </div>
+  );
+}
+
+/* ── Pick a producer from your people ── */
+function ProducerPicker({ people, exclude, onPick, onClose }) {
+  const [q, setQ] = useState('');
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const list = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    const d = t.replace(/\D/g, '');
+    return people
+      .filter(p => !exclude.includes(p.id))
+      .filter(p => !t || [p.name, p.nickname, ...p.otherNames].join(' ').toLowerCase().includes(t) ||
+        (d.length >= 3 && p.phone.includes(d)))
+      .sort((a, b) => b.count - a.count || b.last - a.last)
+      .slice(0, 40);
+  }, [q, people, exclude]);
+
+  return (
+    <div className="modalwrap" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal" role="dialog" aria-modal="true" aria-label="Add producer">
+        <div className="mhead">
+          <h3>Add producer</h3>
+          <button type="button" className="mini ghost" onClick={onClose}>Close</button>
+        </div>
+        <div className="msearch">
+          <input type="search" value={q} onChange={(e) => setQ(e.target.value)} autoFocus
+                 placeholder="Search name or phone" aria-label="Search people" />
+        </div>
+        <div className="plist">
+          {list.length === 0 && <p className="muted pad">No one matches that.</p>}
+          {list.map(p => (
+            <button key={p.id} type="button" className="pitem" onClick={() => onPick(p.id)}>
+              <Avatar p={p} size={38} />
+              <span className="ptext">
+                <b>{displayName(p)}</b>
+                <span className="meta">{p.tier} · {p.count} {p.count === 1 ? 'event' : 'events'}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── One event: producers, registrations, ticks, export ── */
+function EventView({ ev, people, peopleById, maxProducers, readOnly, onBack, onOpen, onLocked, onEventUpdate }) {
+  const [q, setQ] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [sort, setSort] = useState('latest');
+  const [picking, setPicking] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  const all = useMemo(() => ev.regs.map(r => ({ ...r, p: peopleById[r.personId] })).filter(r => r.p), [ev.regs, peopleById]);
+  const stats = useMemo(() => ({
+    total: all.length,
+    paid: all.filter(r => r.paid).length,
+    inn: all.filter(r => r.attended).length,
+  }), [all]);
+
+  const rows = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    const d = t.replace(/\D/g, '');
+    const arr = all.filter(r => {
+      if (filter === 'paid' && !r.paid) return false;
+      if (filter === 'unpaid' && r.paid) return false;
+      if (filter === 'in' && !r.attended) return false;
+      if (filter === 'out' && r.attended) return false;
+      if (t) {
+        const hay = [r.p.name, r.p.nickname, ...r.p.otherNames, ...r.p.socials].join(' ').toLowerCase();
+        if (!hay.includes(t) && !(d.length >= 3 && r.p.phone.includes(d))) return false;
+      }
+      return true;
+    });
+    const by = {
+      latest: (a, b) => b.time - a.time,
+      name: (a, b) => displayName(a.p).localeCompare(displayName(b.p)),
+      young: byAge(1, r => r.p),
+      old: byAge(-1, r => r.p),
+    };
+    return arr.sort(by[sort] || by.latest);
+  }, [all, q, filter, sort]);
+
+  const post = async (body) => {
+    const res = await fetch('/api/us/event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (res.status === 401) { onLocked(); throw new Error('Locked'); }
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.error || 'Could not save');
+    return json;
+  };
+
+  const toggle = async (r, field) => {
+    const next = !r[field];
+    const setTo = (val) => onEventUpdate(ev.key, e => ({
+      ...e, regs: e.regs.map(x => (x.personId === r.personId ? { ...x, [field]: val } : x)),
+    }));
+    setTo(next); setMsg('');
+    try { await post({ kind: 'mark', eventId: ev.key, personId: r.personId, patch: { [field]: next } }); }
+    catch (err) { setTo(!next); setMsg(`Not saved: ${err.message}`); }
+  };
+
+  const saveProducers = async (ids) => {
+    const prev = ev.producers;
+    onEventUpdate(ev.key, e => ({ ...e, producers: ids }));
+    setMsg('');
+    try { await post({ kind: 'producers', eventId: ev.key, producers: ids }); }
+    catch (err) { onEventUpdate(ev.key, e => ({ ...e, producers: prev })); setMsg(`Not saved: ${err.message}`); }
+  };
+
+  const exportContacts = () => {
+    const list = rows.map(r => r.p).filter(p => p.phone);
+    if (!list.length) { setMsg('No phone numbers to export.'); return; }
+    const tag = ev.tag || ev.form || '';
+    const file = `${(tag || ev.title).replace(/[^\w-]+/g, '-')}.vcf`;
+    downloadText(buildVcf(list, tag), file, 'text/vcard;charset=utf-8');
+    setMsg(`Exported ${list.length} contacts. Delete the file after importing.`);
+  };
+
+  const slots = Math.min(maxProducers, Math.max(2, ev.producers.length + 1));
+  const where = [ev.date ? shortDate(ev.date) : (readOnly ? '' : 'Date TBA'), ev.time, ev.location].filter(Boolean).join(' · ');
+
+  return (
+    <div className="evview">
+      <div className="evhead">
+        <button type="button" className="back" onClick={onBack}>← All</button>
+        {ev.tag && <span className="evtag">{ev.tag}</span>}
+        <h2>{ev.title}</h2>
+        {where && <p className="meta">{where}</p>}
+        <p className="evstats">
+          <b>{stats.total}</b>{ev.capacity ? ` / ${ev.capacity}` : ''} registered
+          {!readOnly && <> · <b>{stats.paid}</b> paid · <b>{stats.inn}</b> checked in</>}
+        </p>
+        {readOnly && (
+          <p className="muted">
+            Recent sign-ups that couldn&apos;t be matched to an event. Check that the event is in your CMS sheet and its ID starts with the form name (ODC, BCC).
+          </p>
+        )}
+      </div>
+
+      {!readOnly && (
+        <section className="prods">
+          <h3>Producers</h3>
+          <div className="slots">
+            {Array.from({ length: slots }).map((_, i) => {
+              const pid = ev.producers[i];
+              const p = pid && peopleById[pid];
+              return p ? (
+                <div className="slot filled" key={pid}>
+                  <button type="button" className="slotmain" onClick={() => onOpen(pid)}>
+                    <Avatar p={p} size={40} />
+                    <span>{displayName(p)}</span>
+                  </button>
+                  <button type="button" className="slotx" aria-label={`Remove ${displayName(p)}`}
+                          onClick={() => saveProducers(ev.producers.filter(x => x !== pid))}>✕</button>
+                </div>
+              ) : (
+                <button type="button" className="slot empty" key={`empty-${i}`} onClick={() => setPicking(true)}>
+                  + Add producer
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      <div className="evtools">
+        <input className="search" type="search" value={q} onChange={(e) => setQ(e.target.value)}
+               placeholder="Search name, phone or handle" aria-label="Search registrations" />
+        {!readOnly && (
+          <div className="chips" role="group" aria-label="Filter">
+            {EVENT_FILTERS.map(f => (
+              <button key={f.id} type="button" className={`chip soft ${filter === f.id ? 'on' : ''}`} onClick={() => setFilter(f.id)}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="line">
+          <label className="inline-sel"><span>Sort</span>
+            <select value={sort} onChange={(e) => setSort(e.target.value)}>
+              {EVENT_SORTS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+            </select>
+          </label>
+          {!readOnly && (
+            <button type="button" className="export" onClick={exportContacts}>
+              Export {rows.filter(r => r.p.phone).length} contacts (.vcf)
+            </button>
+          )}
+        </div>
+        <p className="muted">Showing {rows.length} of {all.length}</p>
+        {msg && <p className={msg.startsWith('Not saved') || msg.startsWith('No ') ? 'bad' : 'ok'} role="status">{msg}</p>}
+      </div>
+
+      {rows.length === 0 ? (
+        <p className="empty">{all.length ? 'No one matches that.' : 'No registrations yet.'}</p>
+      ) : (
+        <div className="rows">
+          {rows.map(r => {
+            const ig = socialLinks(r.p.socials).find(l => l.kind === 'ig');
+            const proof = /^https?:\/\//i.test(r.screenshot || '') ? r.screenshot : '';
+            return (
+              <div className="row" key={r.personId}>
+                <button type="button" className="rowmain" onClick={() => onOpen(r.personId)}>
+                  <Avatar p={r.p} size={44} />
+                  <span className="rowtext">
+                    <span className="rowname">
+                      {r.p.starred && <span className="star">★ </span>}{displayName(r.p)}
+                    </span>
+                    <span className="meta">
+                      {[yearsText(r.p), r.p.tier, readOnly ? r.form : null, `signed up ${ago(r.time)}`].filter(Boolean).join(' · ')}
+                    </span>
+                  </span>
+                </button>
+                <div className="rowacts">
+                  {ig && <a className="ico" href={ig.href} target="_blank" rel="noopener noreferrer" aria-label={ig.label}>IG</a>}
+                  {r.p.phone && <a className="ico" href={`https://wa.me/91${r.p.phone}`} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp">WA</a>}
+                  {proof && <a className="ico" href={proof} target="_blank" rel="noopener noreferrer" aria-label="Payment screenshot">Proof</a>}
+                  {!readOnly && (
+                    <>
+                      <button type="button" className={`tick ${r.paid ? 'on' : ''}`} aria-pressed={r.paid} onClick={() => toggle(r, 'paid')}>
+                        {r.paid ? 'Paid ✓' : 'Paid?'}
+                      </button>
+                      <button type="button" className={`tick in ${r.attended ? 'on' : ''}`} aria-pressed={r.attended} onClick={() => toggle(r, 'attended')}>
+                        {r.attended ? 'Here ✓' : 'Check in'}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {picking && (
+        <ProducerPicker people={people} exclude={ev.producers}
+                        onPick={(id) => { setPicking(false); saveProducers([...ev.producers, id]); }}
+                        onClose={() => setPicking(false)} />
+      )}
+    </div>
+  );
+}
+
+/* ── Everyone: the full directory ── */
+function EveryoneView({ data, onBack, onOpen }) {
+  const [q, setQ] = useState('');
+  const [view, setView] = useState('all');
+  const [tier, setTier] = useState('All');
+  const [form, setForm] = useState('All');
+  const [label, setLabel] = useState('All');
+  const [sort, setSort] = useState('latest');
+
+  const stats = useMemo(() => {
+    const now = new Date();
+    const m = now.getMonth(), y = now.getFullYear();
+    let joined = 0, returning = 0, bdays = 0, week = 0;
+    data.people.forEach(p => {
+      const f = new Date(p.first);
+      if (f.getMonth() === m && f.getFullYear() === y) joined++;
+      if (p.count >= 2) returning++;
+      if (p.bm === m + 1) bdays++;
+      if (isRecent(p.last)) week++;
+    });
+    return { total: data.people.length, joined, returning, bdays, week };
+  }, [data]);
+
+  const tierCounts = useMemo(() => {
+    const c = { All: data.people.length };
+    data.people.forEach(p => { c[p.tier] = (c[p.tier] || 0) + 1; });
+    return c;
+  }, [data]);
+
+  const list = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    const digits = term.replace(/\D/g, '');
+    const month = new Date().getMonth() + 1;
+    const arr = data.people.filter(p => {
+      if (tier !== 'All' && p.tier !== tier) return false;
+      if (form !== 'All' && !p.forms.includes(form)) return false;
+      if (label !== 'All' && !p.labels.includes(label)) return false;
+      if (view === 'week' && !isRecent(p.last)) return false;
+      if (view === 'starred' && !p.starred) return false;
+      if (view === 'bday' && p.bm !== month) return false;
+      if (view === 'pending' && !/pending/i.test(p.lastPayment || '')) return false;
+      if (term) {
+        const hay = [p.name, p.nickname, ...p.otherNames, ...p.socials, p.city, p.notes].join(' ').toLowerCase();
+        if (!hay.includes(term) && !(digits.length >= 3 && p.phone.includes(digits))) return false;
+      }
+      return true;
+    });
+    const by = {
+      latest: (a, b) => b.last - a.last,
+      newest: (a, b) => b.first - a.first,
+      events: (a, b) => b.count - a.count || b.last - a.last,
+      name: (a, b) => displayName(a).localeCompare(displayName(b)),
+      young: byAge(1, p => p),
+      old: byAge(-1, p => p),
+      oldest: (a, b) => a.first - b.first,
+    };
+    if (view === 'bday') arr.sort((a, b) => a.bd - b.bd);
+    else arr.sort(by[sort] || by.latest);
+    return arr;
+  }, [data, q, view, tier, form, label, sort]);
+
+  const filtersOn = q || view !== 'all' || tier !== 'All' || form !== 'All' || label !== 'All';
+  const resetFilters = () => { setQ(''); setView('all'); setTier('All'); setForm('All'); setLabel('All'); };
+
+  return (
+    <div>
+      <div className="evhead">
+        <button type="button" className="back" onClick={onBack}>← All</button>
+        <h2>Everyone</h2>
+      </div>
+
+      <div className="stats">
+        <button type="button" className={`stat ${view === 'all' && !filtersOn ? 'on' : ''}`} onClick={resetFilters}>
+          <b>{stats.total}</b><span>People</span>
+        </button>
+        <button type="button" className={`stat ${view === 'week' ? 'on' : ''}`} onClick={() => { setView('week'); setSort('latest'); }}>
+          <b>{stats.week}</b><span>Signed up this week</span>
+        </button>
+        <button type="button" className={`stat ${sort === 'events' && view === 'all' ? 'on' : ''}`} onClick={() => { setView('all'); setSort('events'); }}>
+          <b>{stats.returning}</b><span>Came back 2+ times</span>
+        </button>
+        <button type="button" className={`stat ${view === 'bday' ? 'on' : ''}`} onClick={() => setView('bday')}>
+          <b>{stats.bdays}</b><span>Birthdays this month</span>
+        </button>
+      </div>
+
+      <div className="tools">
+        <input className="search" type="search" value={q} onChange={(e) => setQ(e.target.value)}
+               placeholder="Search name, nickname, phone, handle, area or notes" aria-label="Search" />
+
+        <div className="chips" role="group" aria-label="Tier">
+          {['All', ...data.tiers.map(t => t.label)].map(t => (
+            <button key={t} type="button" className={`chip ${tier === t ? 'on' : ''}`} onClick={() => setTier(t)}>
+              {t}<b>{tierCounts[t] || 0}</b>
+            </button>
+          ))}
+        </div>
+
+        <div className="chips" role="group" aria-label="Quick filters">
+          {VIEWS.map(v => (
+            <button key={v.id} type="button" className={`chip soft ${view === v.id ? 'on' : ''}`} onClick={() => setView(v.id)}>
+              {v.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="selects">
+          <label><span>Form</span>
+            <select value={form} onChange={(e) => setForm(e.target.value)}>
+              <option value="All">All forms</option>
+              {data.forms.map(f => <option key={f} value={f}>{f}</option>)}
+            </select>
+          </label>
+          <label><span>Event</span>
+            <select value={label} onChange={(e) => setLabel(e.target.value)}>
+              <option value="All">All events</option>
+              {data.labels.map(l => <option key={l} value={l}>{l}</option>)}
+            </select>
+          </label>
+          <label><span>Sort</span>
+            <select value={sort} onChange={(e) => setSort(e.target.value)} disabled={view === 'bday'}>
+              {SORTS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+            </select>
+          </label>
+        </div>
+
+        <div className="count">
+          Showing {list.length} of {data.people.length}
+          {filtersOn && <button type="button" className="link" onClick={resetFilters}>Clear filters</button>}
+        </div>
+      </div>
+
+      {list.length === 0 ? (
+        <p className="empty">No one matches that.</p>
+      ) : (
+        <div className="grid">
+          {list.map(p => (
+            <button key={p.id} type="button" className="card" onClick={() => onOpen(p.id)}>
+              <Avatar p={p} size={52} />
+              <span className="cbody">
+                <span className="ctop">
+                  <span className={`badge b-${cls(p.tier)}`}>{p.tier}</span>
+                  {p.starred && <span className="star" aria-label="Starred">★</span>}
+                  {isRecent(p.last) && <span className="newtag">New sign-up</span>}
+                </span>
+                <span className="name">{displayName(p)}</span>
+                {p.nickname && <span className="real">{p.name}</span>}
+                <span className="meta">
+                  {[yearsText(p), `${p.count} ${p.count === 1 ? 'event' : 'events'}`, `signed up ${ago(p.last)}`].filter(Boolean).join(' · ')}
+                  {view === 'bday' && p.birthday ? ` · 🎂 ${p.birthday}` : ''}
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Home: tiles ── */
+function EventTile({ ev, featured, onClick }) {
+  const n = ev.regs.length;
+  const paid = ev.regs.filter(r => r.paid).length;
+  const inn = ev.regs.filter(r => r.attended).length;
+  const when = relDay(ev.date);
+  return (
+    <button type="button" className={`tile ${featured ? 'featured' : ''}`} onClick={onClick}>
+      <span className="ttop">
+        <span className="ttag">{ev.tag || ev.form}</span>
+        {when && <span className={`twhen ${when.cls}`}>{when.text}</span>}
+      </span>
+      <span className="ttitle">{ev.title}</span>
+      <span className="tdate">{ev.date ? shortDate(ev.date) : 'Date TBA'}{ev.time ? ` · ${ev.time}` : ''}</span>
+      <span className="tcount"><b>{n}</b>{ev.capacity ? ` / ${ev.capacity}` : ''} registered</span>
+      <span className="tsub">{paid} paid · {inn} checked in</span>
+    </button>
+  );
+}
+
+function HomeView({ data, onEvent, onEveryone, onUnassigned }) {
+  const [first, ...rest] = data.events;
+  return (
+    <div>
+      <div className="tiles">
+        {first && <EventTile ev={first} featured onClick={() => onEvent(first.key)} />}
+        <button type="button" className="tile everyone" onClick={onEveryone}>
+          <span className="ttop"><span className="ttag">Directory</span></span>
+          <span className="ttitle">Everyone</span>
+          <span className="tcount"><b>{data.people.length}</b> people</span>
+          <span className="tsub">Search, tiers, birthdays, notes</span>
+        </button>
+        {rest.map(ev => <EventTile key={ev.key} ev={ev} onClick={() => onEvent(ev.key)} />)}
+        {data.unassigned.length > 0 && (
+          <button type="button" className="tile unassigned" onClick={onUnassigned}>
+            <span className="ttop"><span className="ttag">Check these</span></span>
+            <span className="ttitle">Unassigned</span>
+            <span className="tcount"><b>{data.unassigned.length}</b> sign-ups</span>
+            <span className="tsub">Couldn&apos;t be matched to an event</span>
+          </button>
+        )}
+      </div>
+      {data.events.length === 0 && (
+        <p className="muted">
+          No upcoming events found. Events appear here when they&apos;re in your CMS sheet with an ID starting with ODC or BCC.
+        </p>
+      )}
     </div>
   );
 }
@@ -320,12 +889,8 @@ export default function UsPage() {
   const [pinErr, setPinErr] = useState('');
   const [unlocking, setUnlocking] = useState(false);
 
-  const [q, setQ] = useState('');
-  const [view, setView] = useState('all');
-  const [tier, setTier] = useState('All');
-  const [form, setForm] = useState('All');
-  const [edition, setEdition] = useState('All');
-  const [sort, setSort] = useState('latest');
+  const [screen, setScreen] = useState('home');   // home | event | everyone | unassigned
+  const [eventKey, setEventKey] = useState(null);
   const [openId, setOpenId] = useState(null);
 
   const load = useCallback(async () => {
@@ -373,14 +938,23 @@ export default function UsPage() {
 
   const lock = useCallback(async () => {
     await fetch('/api/us/login', { method: 'DELETE' }).catch(() => {});
-    setData(null); setOpenId(null); setPhase('locked');
+    setData(null); setOpenId(null); setScreen('home'); setPhase('locked');
   }, []);
 
   const onSaved = useCallback((id, override) => {
     setData(d => d && ({ ...d, people: d.people.map(p => (p.id === id ? applyOverride(p, override, d.tiers) : p)) }));
   }, []);
 
-  // Page doesn't scroll behind the open person
+  const onEventUpdate = useCallback((key, fn) => {
+    setData(d => d && ({ ...d, events: d.events.map(e => (e.key === key ? fn(e) : e)) }));
+  }, []);
+
+  const go = (next, key = null) => {
+    setScreen(next);
+    setEventKey(key);
+    window.scrollTo({ top: 0 });
+  };
+
   useEffect(() => {
     if (!openId) return;
     const prev = document.body.style.overflow;
@@ -388,63 +962,19 @@ export default function UsPage() {
     return () => { document.body.style.overflow = prev; };
   }, [openId]);
 
-  const stats = useMemo(() => {
-    if (!data) return null;
-    const now = new Date();
-    const m = now.getMonth(), y = now.getFullYear();
-    let joined = 0, returning = 0, bdays = 0, week = 0;
-    data.people.forEach(p => {
-      const f = new Date(p.first);
-      if (f.getMonth() === m && f.getFullYear() === y) joined++;
-      if (p.count >= 2) returning++;
-      if (p.bm === m + 1) bdays++;
-      if (isRecent(p.last)) week++;
-    });
-    return { total: data.people.length, joined, returning, bdays, week };
+  const peopleById = useMemo(() => {
+    const m = {};
+    if (data) data.people.forEach(p => { m[p.id] = p; });
+    return m;
   }, [data]);
 
-  const tierCounts = useMemo(() => {
-    const c = { All: data ? data.people.length : 0 };
-    if (data) data.people.forEach(p => { c[p.tier] = (c[p.tier] || 0) + 1; });
-    return c;
-  }, [data]);
-
-  const list = useMemo(() => {
-    if (!data) return [];
-    const term = q.trim().toLowerCase();
-    const digits = term.replace(/\D/g, '');
-    const month = new Date().getMonth() + 1;
-
-    const arr = data.people.filter(p => {
-      if (tier !== 'All' && p.tier !== tier) return false;
-      if (form !== 'All' && !p.forms.includes(form)) return false;
-      if (edition !== 'All' && !p.editions.includes(edition)) return false;
-      if (view === 'week' && !isRecent(p.last)) return false;
-      if (view === 'starred' && !p.starred) return false;
-      if (view === 'bday' && p.bm !== month) return false;
-      if (view === 'pending' && !/pending/i.test(p.lastPayment || '')) return false;
-      if (term) {
-        const hay = [p.name, p.nickname, ...p.otherNames, ...p.socials, p.city, p.notes].join(' ').toLowerCase();
-        if (!hay.includes(term) && !(digits.length >= 3 && p.phone.includes(digits))) return false;
-      }
-      return true;
-    });
-
-    const by = {
-      latest: (a, b) => b.last - a.last,
-      newest: (a, b) => b.first - a.first,
-      events: (a, b) => b.count - a.count || b.last - a.last,
-      name: (a, b) => displayName(a).localeCompare(displayName(b)),
-      oldest: (a, b) => a.first - b.first,
-    };
-    if (view === 'bday') arr.sort((a, b) => a.bd - b.bd);
-    else arr.sort(by[sort] || by.latest);
-    return arr;
-  }, [data, q, view, tier, form, edition, sort]);
-
-  const filtersOn = q || view !== 'all' || tier !== 'All' || form !== 'All' || edition !== 'All';
-  const resetFilters = () => { setQ(''); setView('all'); setTier('All'); setForm('All'); setEdition('All'); };
-  const openPerson = data && openId ? data.people.find(p => p.id === openId) : null;
+  const currentEvent = data && screen === 'event' ? data.events.find(e => e.key === eventKey) : null;
+  const unassignedEvent = useMemo(() => (data ? {
+    key: '__unassigned', title: 'Unassigned sign-ups', tag: '', form: '', date: null, time: '', location: '',
+    capacity: 0, producers: [],
+    regs: data.unassigned.map(r => ({ ...r, paid: false, attended: false })),
+  } : null), [data]);
+  const openPerson = data && openId ? peopleById[openId] : null;
 
   return (
     <div className="us">
@@ -470,7 +1000,9 @@ export default function UsPage() {
         <>
           <header className="top">
             <div className="wrap bar">
-              <h1><span>3 AM</span> Us</h1>
+              <button type="button" className="homelink" onClick={() => go('home')} aria-label="Home">
+                <h1><span>3 AM</span> Us</h1>
+              </button>
               <div className="actions">
                 <button type="button" className="mini" onClick={load} disabled={loading}>{loading ? 'Refreshing…' : 'Refresh'}</button>
                 <button type="button" className="mini ghost" onClick={lock}>Lock</button>
@@ -480,91 +1012,33 @@ export default function UsPage() {
 
           <main className="wrap">
             {loadErr && <p className="bad">Couldn&apos;t refresh: {loadErr}</p>}
+            <p className="status">
+              {data.people.length} people · {data.events.length} {data.events.length === 1 ? 'event' : 'events'} · updated{' '}
+              {new Date(data.generated).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })}
+            </p>
 
-            <div className="stats">
-              <button type="button" className={`stat ${view === 'all' && !filtersOn ? 'on' : ''}`} onClick={resetFilters}>
-                <b>{stats.total}</b><span>People</span>
-              </button>
-              <button type="button" className={`stat ${view === 'week' ? 'on' : ''}`} onClick={() => { setView('week'); setSort('latest'); }}>
-                <b>{stats.week}</b><span>Signed up this week</span>
-              </button>
-              <button type="button" className={`stat ${tier === 'All' && view === 'all' && sort === 'events' ? 'on' : ''}`} onClick={() => { setView('all'); setSort('events'); }}>
-                <b>{stats.returning}</b><span>Came back 2+ times</span>
-              </button>
-              <button type="button" className={`stat ${view === 'bday' ? 'on' : ''}`} onClick={() => setView('bday')}>
-                <b>{stats.bdays}</b><span>Birthdays this month</span>
-              </button>
-            </div>
+            {screen === 'home' && (
+              <HomeView data={data}
+                        onEvent={(key) => go('event', key)}
+                        onEveryone={() => go('everyone')}
+                        onUnassigned={() => go('unassigned')} />
+            )}
 
-            <div className="tools">
-              <input className="search" type="search" value={q} onChange={(e) => setQ(e.target.value)}
-                     placeholder="Search name, nickname, phone, handle, area or notes" aria-label="Search" />
+            {screen === 'everyone' && <EveryoneView data={data} onBack={() => go('home')} onOpen={setOpenId} />}
 
-              <div className="chips" role="group" aria-label="Tier">
-                {['All', ...data.tiers.map(t => t.label)].map(t => (
-                  <button key={t} type="button" className={`chip ${tier === t ? 'on' : ''}`} onClick={() => setTier(t)}>
-                    {t}<b>{tierCounts[t] || 0}</b>
-                  </button>
-                ))}
-              </div>
+            {screen === 'event' && currentEvent && (
+              <EventView key={currentEvent.key} ev={currentEvent} people={data.people} peopleById={peopleById}
+                         maxProducers={data.maxProducers || 4} onBack={() => go('home')} onOpen={setOpenId}
+                         onLocked={lock} onEventUpdate={onEventUpdate} />
+            )}
+            {screen === 'event' && !currentEvent && (
+              <p className="empty">This event isn&apos;t on the board any more. <button type="button" className="link" onClick={() => go('home')}>Back home</button></p>
+            )}
 
-              <div className="chips" role="group" aria-label="Quick filters">
-                {VIEWS.map(v => (
-                  <button key={v.id} type="button" className={`chip soft ${view === v.id ? 'on' : ''}`} onClick={() => setView(v.id)}>
-                    {v.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="selects">
-                <label><span>Form</span>
-                  <select value={form} onChange={(e) => setForm(e.target.value)}>
-                    <option value="All">All forms</option>
-                    {data.forms.map(f => <option key={f} value={f}>{f}</option>)}
-                  </select>
-                </label>
-                <label><span>Edition</span>
-                  <select value={edition} onChange={(e) => setEdition(e.target.value)}>
-                    <option value="All">All editions</option>
-                    {data.editions.map(ed => <option key={ed} value={ed}>{ed}</option>)}
-                  </select>
-                </label>
-                <label><span>Sort</span>
-                  <select value={sort} onChange={(e) => setSort(e.target.value)} disabled={view === 'bday'}>
-                    {SORTS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-                  </select>
-                </label>
-              </div>
-
-              <div className="count">
-                Showing {list.length} of {data.people.length}
-                {filtersOn && <button type="button" className="link" onClick={resetFilters}>Clear filters</button>}
-              </div>
-            </div>
-
-            {list.length === 0 ? (
-              <p className="empty">No one matches that.</p>
-            ) : (
-              <div className="grid">
-                {list.map(p => (
-                  <button key={p.id} type="button" className="card" onClick={() => setOpenId(p.id)}>
-                    <Avatar p={p} size={52} />
-                    <span className="cbody">
-                      <span className="ctop">
-                        <span className={`badge b-${cls(p.tier)}`}>{p.tier}</span>
-                        {p.starred && <span className="star" aria-label="Starred">★</span>}
-                        {isRecent(p.last) && <span className="newtag">New sign-up</span>}
-                      </span>
-                      <span className="name">{displayName(p)}</span>
-                      {p.nickname && <span className="real">{p.name}</span>}
-                      <span className="meta">
-                        {p.count} {p.count === 1 ? 'event' : 'events'} · signed up {ago(p.last)}
-                        {view === 'bday' && p.birthday ? ` · 🎂 ${p.birthday}` : ''}
-                      </span>
-                    </span>
-                  </button>
-                ))}
-              </div>
+            {screen === 'unassigned' && unassignedEvent && (
+              <EventView key="__unassigned" ev={unassignedEvent} people={data.people} peopleById={peopleById}
+                         maxProducers={0} readOnly onBack={() => go('home')} onOpen={setOpenId}
+                         onLocked={lock} onEventUpdate={() => {}} />
             )}
           </main>
 
@@ -581,7 +1055,7 @@ export default function UsPage() {
 const css = `
 @import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Instrument+Sans:wght@400;500;600&display=swap');
 html,body{margin:0;padding:0;background:#000}
-.us{--pink:#FF0065;--fg:#fff;--grey:#9a9a9a;--line:#262626;--card:#0d0d0d;
+.us{--pink:#FF0065;--fg:#fff;--grey:#9a9a9a;--line:#262626;--card:#0d0d0d;--green:#3DDC84;
   --display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
   --body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   font-family:var(--body);background:#000;color:var(--fg);min-height:100vh;font-size:16px;line-height:1.5;
@@ -593,7 +1067,10 @@ html,body{margin:0;padding:0;background:#000}
 .us h1{font-family:var(--display);font-weight:900;font-size:34px;line-height:1;margin:0}
 .us h1 span{color:var(--pink)}
 .us .bad{color:var(--pink);font-weight:600;font-size:14px;margin:10px 0 0}
-.us .ok{color:#3DDC84;font-weight:600;font-size:14px}
+.us .ok{color:var(--green);font-weight:600;font-size:14px;margin:10px 0 0}
+.us .muted{color:var(--grey);font-size:14px}
+.us .pad{padding:12px}
+.us .status{margin:14px 0 0;font-size:13px;color:var(--grey)}
 
 /* Lock screen */
 .us .center{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
@@ -613,20 +1090,86 @@ html,body{margin:0;padding:0;background:#000}
 
 /* Header */
 .us .top{position:sticky;top:0;z-index:10;background:#000;border-bottom:1px solid var(--line)}
-.us .bar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-top:14px;padding-bottom:14px}
+.us .bar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-top:12px;padding-bottom:12px}
+.us .homelink{background:none;border:0;padding:0;cursor:pointer;color:#fff;text-align:left}
 .us .actions{display:flex;gap:8px}
 .us .mini{font:inherit;font-size:14px;font-weight:600;padding:8px 14px;background:transparent;color:#fff;border:2px solid #fff;cursor:pointer}
 .us .mini.ghost{border-color:#555;color:#ccc}
 .us .mini:disabled{opacity:.6;cursor:default}
+.us .link{font:inherit;font-size:13.5px;font-weight:600;background:none;border:0;color:var(--pink);cursor:pointer;padding:0;text-decoration:underline}
 
-/* Stats */
+/* Home tiles */
+.us .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;padding-top:16px;padding-bottom:30px}
+.us .tile{aspect-ratio:1/1;display:flex;flex-direction:column;gap:6px;text-align:left;font:inherit;color:#fff;background:var(--card);
+  border:2px solid #fff;padding:16px;cursor:pointer;overflow:hidden;min-width:0;transition:border-color .15s ease,transform .15s ease}
+.us .tile:hover{border-color:var(--pink);transform:translate(-2px,-2px)}
+.us .tile.featured{background:var(--pink);border-color:var(--pink)}
+.us .tile.featured:hover{border-color:#fff}
+.us .tile.everyone{background:#fff;color:#000;border-color:#fff}
+.us .tile.everyone .tsub{color:#555}
+.us .tile.unassigned{border-style:dashed;border-color:#888}
+.us .ttop{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+.us .ttag{font-size:12px;font-weight:600;padding:2px 8px;border:2px solid currentColor;white-space:nowrap}
+.us .twhen{font-size:12px;font-weight:600;color:var(--grey)}
+.us .twhen.now{color:#000;background:#fff;padding:2px 6px}
+.us .twhen.soon{color:#ddd}
+.us .tile.featured .twhen{color:#fff}
+.us .tile.featured .twhen.now{color:var(--pink);background:#fff}
+.us .ttitle{font-family:var(--display);font-weight:900;font-size:28px;line-height:1.05;margin-top:auto;word-break:break-word;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.us .tdate{font-size:13.5px;opacity:.85}
+.us .tcount{font-size:14.5px}
+.us .tcount b{font-family:var(--display);font-weight:900;font-size:30px;line-height:1}
+.us .tsub{font-size:12.5px;color:var(--grey)}
+.us .tile.featured .tsub{color:#fff}
+
+/* Event + directory headers */
+.us .evhead{padding-top:16px}
+.us .back{font:inherit;font-size:14px;font-weight:600;background:none;border:0;color:var(--grey);cursor:pointer;padding:4px 0;margin-bottom:6px;display:block}
+.us .back:hover{color:#fff}
+.us .evtag{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border:2px solid var(--pink);color:var(--pink)}
+.us .evhead h2{font-family:var(--display);font-weight:900;font-size:clamp(34px,7vw,56px);line-height:1;margin:8px 0 6px;word-break:break-word}
+.us .evhead .meta{font-size:14.5px;color:#ccc}
+.us .evstats{margin:10px 0 0;font-size:15px;color:#ccc}
+.us .evstats b{color:#fff;font-family:var(--display);font-weight:900;font-size:22px}
+
+/* Producers */
+.us .prods{margin-top:22px}
+.us .prods h3,.us .edit h3,.us .sect h3{font-size:12px;text-transform:uppercase;letter-spacing:.14em;color:var(--grey);margin:0 0 8px;font-weight:600}
+.us .slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.us .slot{min-height:62px;border:2px solid #fff;display:flex;align-items:center;min-width:0}
+.us .slot.empty{border-style:dashed;border-color:#666;color:#bbb;justify-content:center;font:inherit;font-weight:600;background:transparent;cursor:pointer}
+.us .slot.empty:hover{border-color:var(--pink);color:#fff}
+.us .slot.filled{background:var(--card);padding:8px 8px 8px 10px;gap:8px}
+.us .slotmain{flex:1;display:flex;align-items:center;gap:10px;background:none;border:0;color:#fff;font:inherit;font-weight:600;text-align:left;cursor:pointer;min-width:0;padding:0}
+.us .slotmain span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.us .slotx{flex:0 0 auto;width:34px;height:34px;background:transparent;border:2px solid #555;color:#ccc;cursor:pointer}
+.us .slotx:hover{border-color:var(--pink);color:#fff}
+
+/* Event tools + rows */
+.us .evtools{display:flex;flex-direction:column;gap:10px;margin-top:22px}
+.us .evtools .line{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;justify-content:space-between}
+.us .inline-sel{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--grey);text-transform:uppercase;letter-spacing:.1em}
+.us .export{font:inherit;font-weight:600;font-size:14.5px;padding:11px 16px;background:var(--pink);color:#fff;border:2px solid var(--pink);cursor:pointer}
+.us .rows{display:flex;flex-direction:column;gap:8px;padding-top:6px;padding-bottom:60px}
+.us .row{display:flex;align-items:center;gap:10px;border:2px solid #333;background:var(--card);padding:8px 10px;flex-wrap:wrap}
+.us .rowmain{flex:1 1 240px;display:flex;align-items:center;gap:12px;background:none;border:0;color:#fff;font:inherit;text-align:left;cursor:pointer;min-width:0;padding:0}
+.us .rowtext{display:flex;flex-direction:column;min-width:0}
+.us .rowname{font-weight:600;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.us .rowacts{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.us .ico{min-width:40px;height:36px;padding:0 8px;display:inline-flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;border:2px solid #555;text-decoration:none;color:#fff}
+.us .ico:hover{border-color:var(--pink)}
+.us .tick{height:36px;padding:0 10px;font:inherit;font-size:13px;font-weight:600;background:transparent;color:#ccc;border:2px solid #555;cursor:pointer;white-space:nowrap}
+.us .tick:hover{border-color:#fff;color:#fff}
+.us .tick.on{background:var(--green);border-color:var(--green);color:#000}
+.us .tick.in.on{background:var(--pink);border-color:var(--pink);color:#fff}
+
+/* Directory */
 .us .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding-top:18px}
 .us .stat{text-align:left;font:inherit;color:#fff;background:var(--card);border:2px solid var(--line);padding:12px 14px;cursor:pointer}
 .us .stat b{display:block;font-family:var(--display);font-weight:900;font-size:34px;line-height:1}
 .us .stat span{font-size:13px;color:var(--grey)}
 .us .stat.on,.us .stat:hover{border-color:var(--pink)}
-
-/* Tools */
 .us .tools{display:flex;flex-direction:column;gap:12px;padding-top:16px}
 .us .search{font:inherit;font-size:16px;padding:13px 14px;background:#0b0b0b;color:#fff;border:2px solid #fff;width:100%;border-radius:0}
 .us .search:focus{outline:none;border-color:var(--pink)}
@@ -641,9 +1184,6 @@ html,body{margin:0;padding:0;background:#000}
 .us select{font:inherit;font-size:15px;text-transform:none;letter-spacing:0;padding:10px 12px;background:#0b0b0b;color:#fff;border:2px solid #555;border-radius:0}
 .us select:focus{outline:none;border-color:var(--pink)}
 .us .count{font-size:13.5px;color:var(--grey);display:flex;gap:12px;align-items:center}
-.us .link{font:inherit;font-size:13.5px;font-weight:600;background:none;border:0;color:var(--pink);cursor:pointer;padding:0;text-decoration:underline}
-
-/* Cards */
 .us .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px;padding-top:14px;padding-bottom:60px}
 .us .card{display:flex;gap:12px;align-items:flex-start;text-align:left;font:inherit;color:#fff;background:var(--card);border:2px solid #fff;padding:12px;cursor:pointer;transition:border-color .15s ease,transform .15s ease}
 .us .card:hover{border-color:var(--pink);transform:translate(-2px,-2px)}
@@ -666,7 +1206,21 @@ html,body{margin:0;padding:0;background:#000}
 .us .b-Special{color:#fff}
 .us .b-New{color:var(--grey)}
 
-/* Drawer */
+/* Producer picker */
+.us .modalwrap{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.78);display:flex;align-items:flex-start;justify-content:center;padding:60px 16px}
+.us .modal{width:min(520px,100%);max-height:80vh;display:flex;flex-direction:column;background:#0b0b0b;border:2px solid var(--pink)}
+.us .modal .mhead{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid #222}
+.us .modal .mhead h3{margin:0;font-family:var(--display);font-weight:900;font-size:26px}
+.us .msearch{padding:12px 14px}
+.us .msearch input{font:inherit;font-size:16px;padding:12px;background:#000;color:#fff;border:2px solid #555;width:100%;border-radius:0}
+.us .msearch input:focus{outline:none;border-color:var(--pink)}
+.us .plist{overflow-y:auto;padding:0 8px 10px}
+.us .pitem{width:100%;display:flex;gap:10px;align-items:center;padding:8px;background:none;border:0;color:#fff;font:inherit;text-align:left;cursor:pointer}
+.us .pitem:hover{background:#161616}
+.us .ptext{display:flex;flex-direction:column;min-width:0}
+.us .ptext b{font-weight:600}
+
+/* Person drawer */
 .us .drawer{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.72);display:flex;justify-content:flex-end}
 .us .panel{position:relative;width:min(560px,100%);height:100%;overflow-y:auto;background:#0b0b0b;border-left:2px solid var(--pink);
   padding:22px 22px calc(40px + env(safe-area-inset-bottom,0px))}
@@ -683,9 +1237,7 @@ html,body{margin:0;padding:0;background:#000}
 .us .fact{border:1px solid var(--line);padding:9px 11px;min-width:0}
 .us .fact span{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--grey)}
 .us .fact b{font-weight:600;word-break:break-word}
-
-.us .edit{border:2px solid var(--pink);padding:16px;display:flex;flex-direction:column;gap:12px}
-.us .edit h3,.us .sect h3{font-size:12px;text-transform:uppercase;letter-spacing:.14em;color:var(--grey);margin:0;font-weight:600}
+.us .edit{border:2px solid var(--pink);padding:16px;display:flex;flex-direction:column;gap:12px;margin-top:20px}
 .us .fld{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--grey);min-width:0}
 .us .fld input,.us .fld textarea{font:inherit;font-size:16px;padding:11px 12px;background:#000;color:#fff;border:2px solid #555;border-radius:0;width:100%}
 .us .fld input:focus,.us .fld textarea:focus{outline:none;border-color:var(--pink)}
@@ -697,11 +1249,12 @@ html,body{margin:0;padding:0;background:#000}
 .us .check{display:flex;gap:10px;align-items:center;cursor:pointer;font-weight:500}
 .us .check input{width:22px;height:22px;accent-color:var(--pink)}
 .us .saverow{display:flex;align-items:center;gap:14px}
+.us .saverow .ok,.us .saverow .bad{margin:0}
 .us .save{font:inherit;font-weight:600;font-size:15px;padding:12px 20px;background:var(--pink);color:#fff;border:2px solid var(--pink);cursor:pointer}
 .us .save:disabled{opacity:.45;cursor:default}
-
 .us .sect{margin-top:22px}
-.us .sect p{margin:6px 0 0}
+.us .sect.first{margin-top:0}
+.us .sect p{margin:6px 0 0;word-break:break-word}
 .us .sect em{font-style:normal;color:var(--grey)}
 .us .hist{list-style:none;margin:8px 0 0;padding:0}
 .us .hist li{border-left:3px solid var(--pink);padding:6px 0 6px 12px;margin-bottom:10px}
@@ -714,16 +1267,25 @@ html,body{margin:0;padding:0;background:#000}
   .us .selects{grid-template-columns:1fr 1fr}
   .us .facts{grid-template-columns:repeat(2,1fr)}
 }
-@media (max-width:480px){
-  .us .wrap{padding:0 16px}
+@media (max-width:520px){
+  .us .wrap{padding:0 14px}
+  .us h1{font-size:28px}
+  .us .tiles{grid-template-columns:1fr 1fr;gap:10px}
+  .us .tile{padding:12px;gap:4px}
+  .us .ttitle{font-size:21px}
+  .us .tcount b{font-size:24px}
+  .us .tdate,.us .tsub{font-size:12px}
   .us .selects{grid-template-columns:1fr}
   .us .row2{grid-template-columns:1fr}
   .us .phead{flex-direction:column}
   .us .pav{flex-direction:row;align-items:center}
   .us .pname h2{font-size:32px}
+  .us .rowacts{width:100%}
+  .us .tick{flex:1 1 auto}
+  .us .export{width:100%}
 }
 @media (prefers-reduced-motion:reduce){
   .us .tri path{animation:none;stroke-dashoffset:0}
-  .us .card{transition:none}
+  .us .card,.us .tile{transition:none}
 }
 `;
