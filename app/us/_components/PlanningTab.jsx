@@ -3,7 +3,14 @@
 import React, { useMemo, useState } from 'react';
 import { Avatar } from './Common';
 import { ProducerPicker, PeopleListModal } from './Modals';
+import { Donut, Bars } from './Charts';
 import { ROLE_GROUPS, DEVICE_ORDER, displayName, isExcluded, splitMulti, cleanOption } from '../_lib/helpers';
+
+const CAMERA_COLORS = ['#FF0065', '#FFC53D', '#8a8a8a', '#4a4a4a'];   // yes · maybe · prefer not · no
+const camRank = (label) => {
+  const i = DEVICE_ORDER.indexOf(String(label).toLowerCase());
+  return i === -1 ? 99 : i;
+};
 
 /* Groups registrations by a single-choice answer; options nobody picked never appear */
 function bucket(rows, key) {
@@ -24,11 +31,13 @@ export default function PlanningTab({ ev, roster, people, peopleById, maxProduce
 
   const active = useMemo(() => roster.filter(r => !r.producerOnly && !isExcluded(r)), [roster]);
 
-  const cameras = useMemo(() => {
-    const rank = (l) => { const i = DEVICE_ORDER.indexOf(l.toLowerCase()); return i === -1 ? 99 : i; };
-    return bucket(active, 'device').sort((a, b) => rank(a.label) - rank(b.label) || b.list.length - a.list.length);
-  }, [active]);
+  const cameras = useMemo(
+    () => bucket(active, 'device').sort((a, b) => camRank(a.label) - camRank(b.label) || b.list.length - a.list.length),
+    [active],
+  );
   const noCameraAnswer = active.filter(r => !cleanOption((r.answers || {}).device)).length;
+  const camSegs = cameras.map(c => ({ label: c.label, value: c.list.length, color: CAMERA_COLORS[Math.min(camRank(c.label), 3)] }));
+  const sure = cameras.filter(c => /^yes/i.test(c.label)).reduce((s, c) => s + c.list.length, 0);
 
   const roles = useMemo(() => {
     const groups = ROLE_GROUPS.map(g => ({ ...g, list: [] }));
@@ -142,6 +151,42 @@ export default function PlanningTab({ ev, roster, people, peopleById, maxProduce
           </div>
         </section>
       ))}
+
+      {(cameras.length > 0 || roles.length > 0 || more.length > 0) && (
+        <section className="psec">
+          <h3>Snapshot</h3>
+          <div className="snap">
+            {cameras.length > 0 && (
+              <div className="snapcard">
+                <p className="snapt">Cameras</p>
+                <Donut segments={camSegs} label={String(sure)} sub="for sure" />
+                <ul className="legend">
+                  {camSegs.map(s => (
+                    <li key={s.label}><i style={{ background: s.color }} />{s.label}<b>{s.value}</b></li>
+                  ))}
+                </ul>
+                <p className="muted">
+                  {sure > 0
+                    ? `${active.length} people · one sure camera for every ${Math.ceil(active.length / sure)}`
+                    : 'No sure cameras yet. Plan crew gear.'}
+                </p>
+              </div>
+            )}
+            {roles.length > 0 && (
+              <div className="snapcard">
+                <p className="snapt">Roles</p>
+                <Bars items={roles.map(g => ({ label: g.label, value: g.list.length }))} />
+              </div>
+            )}
+            {more.map(s => (
+              <div className="snapcard" key={`chart-${s.key}`}>
+                <p className="snapt">{s.title}</p>
+                <Bars items={s.buckets.map((b, i) => ({ label: b.label, value: b.list.length, color: i === 0 ? '#FF0065' : '#ffffff' }))} />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {picking && (
         <ProducerPicker people={people} exclude={ev.producers}

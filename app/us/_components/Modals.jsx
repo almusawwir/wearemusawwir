@@ -123,6 +123,11 @@ export function PayModal({ row, price, onSave, onClose }) {
                 Paid this
               </button>
             </div>
+            <button type="button" className={`payopt free ${row.pay === 'free' ? 'on' : ''}`}
+                    disabled={busy} onClick={() => choose({ pay: 'free', amount: null })}>
+              Wildcard (free entry)
+              <small>Joining for free. Counts as a confirmed spot.</small>
+            </button>
             <button type="button" className={`payopt later ${row.pay === 'later' ? 'on' : ''}`}
                     disabled={busy} onClick={() => choose({ pay: 'later', amount: null })}>
               Will pay on event day

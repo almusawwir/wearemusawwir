@@ -5,7 +5,7 @@ import { Avatar } from './Common';
 import { PayModal } from './Modals';
 import PlanningTab from './PlanningTab';
 import {
-  EVENT_FILTERS, EVENT_SORTS, EXPENSE_CATEGORIES,
+  EVENT_FILTERS, EVENT_SORTS, EXPENSE_CATEGORIES, PAY_TEXT,
   displayName, isExcluded, inr, shownAmount, shortDate, ago, yearsText, byAge,
   payLabel, socialLinks, isFirstTime, openContacts,
 } from '../_lib/helpers';
@@ -32,21 +32,23 @@ export default function EventView({ ev, people, peopleById, maxProducers, readOn
     return list;
   }, [ev.regs, ev.producers, peopleById]);
 
+  // Producers are the team: no payments, and they don't count as guests
   const money = useMemo(() => {
-    let collected = 0, paidN = 0, due = 0, dueN = 0, unpaidN = 0, rejected = 0, away = 0, review = 0, inn = 0, active = 0;
+    let collected = 0, paidN = 0, freeN = 0, due = 0, dueN = 0, unpaidN = 0, rejected = 0, away = 0, review = 0, inn = 0, active = 0;
     roster.forEach(r => {
-      if (r.producerOnly) return;
+      if (r.producer) return;
       if (r.pay === 'rejected') { rejected++; return; }
       if (r.pay === 'out') { away++; return; }
       active++;
       if (r.pay === 'paid') { collected += shownAmount(r); paidN++; }
+      else if (r.pay === 'free') freeN++;
       else if (r.pay === 'later') { due += shownAmount(r); dueN++; }
       else if (r.pay === 'unpaid') unpaidN++;
       else review++;
       if (r.attended) inn++;
     });
     const spent = (ev.expenses || []).reduce((s, x) => s + (x.amount || 0), 0);
-    return { collected, paidN, due, dueN, unpaidN, rejected, away, review, inn, active, spent, net: collected - spent };
+    return { collected, paidN, freeN, due, dueN, unpaidN, rejected, away, review, inn, active, spent, net: collected - spent };
   }, [roster, ev.expenses]);
 
   const camYes = useMemo(
@@ -62,10 +64,11 @@ export default function EventView({ ev, people, peopleById, maxProducers, readOn
       else if (filter === 'away') { if (r.pay !== 'out') return false; }
       else {
         if (isExcluded(r)) return false;
-        if (filter === 'review' && (r.producerOnly || r.pay)) return false;
-        if (filter === 'paid' && r.pay !== 'paid') return false;
-        if (filter === 'later' && r.pay !== 'later') return false;
-        if (filter === 'unpaid' && r.pay !== 'unpaid') return false;
+        if (filter === 'review' && (r.producer || r.pay)) return false;
+        if (filter === 'paid' && (r.producer || r.pay !== 'paid')) return false;
+        if (filter === 'free' && (r.producer || r.pay !== 'free')) return false;
+        if (filter === 'later' && (r.producer || r.pay !== 'later')) return false;
+        if (filter === 'unpaid' && (r.producer || r.pay !== 'unpaid')) return false;
         if (filter === 'in' && !r.attended) return false;
         if (filter === 'notin' && (r.attended || r.producerOnly)) return false;
       }
@@ -118,11 +121,17 @@ export default function EventView({ ev, people, peopleById, maxProducers, readOn
     catch (err) { updateRow(row.personId, { attended: !next }); setMsg(`Not saved: ${err.message}`); }
   };
 
+  // Only says "saved" once the sheet has read the producers back and they match
   const saveProducers = async (ids) => {
     const prev = ev.producers;
     onEventUpdate(ev.key, e => ({ ...e, producers: ids }));
     try {
-      await post({ kind: 'producers', eventId: ev.key, producers: ids });
+      const res = await post({ kind: 'producers', eventId: ev.key, producers: ids });
+      const stored = Array.isArray(res.producers) ? res.producers : null;
+      if (!stored || stored.join(',') !== ids.join(',')) {
+        onEventUpdate(ev.key, e => ({ ...e, producers: stored || prev }));
+        return { ok: false, error: "the sheet didn't keep it. Check the Producers tab in your Edits sheet." };
+      }
       return { ok: true };
     } catch (err) {
       onEventUpdate(ev.key, e => ({ ...e, producers: prev }));
@@ -152,7 +161,7 @@ export default function EventView({ ev, people, peopleById, maxProducers, readOn
 
   /* Contacts: never producers, rejected or not coming. "New" = first time with 3 AM. */
   const evLabel = ev.title + (ev.tag ? ' · ' + ev.tag : '');
-  const saveable = roster.filter(r => !r.producer && !r.producerOnly && !isExcluded(r) && r.p.phone);
+  const saveable = roster.filter(r => !r.producer && !isExcluded(r) && r.p.phone);
   const newCount = saveable.filter(r => isFirstTime(r.p, evLabel, r.time)).length;
   const doExport = (who) => {
     const n = who === 'new' ? newCount : saveable.length;
@@ -208,6 +217,7 @@ export default function EventView({ ev, people, peopleById, maxProducers, readOn
                 <>
                   {' · '}<b>{money.inn}</b> checked in
                   {money.review ? <> · <b>{money.review}</b> to review</> : null}
+                  {ev.producers.length ? <> · {ev.producers.length} {ev.producers.length === 1 ? 'producer' : 'producers'}</> : null}
                   {money.away ? <> · {money.away} not coming</> : null}
                   {money.rejected ? <> · {money.rejected} rejected</> : null}
                 </>
@@ -251,8 +261,8 @@ export default function EventView({ ev, people, peopleById, maxProducers, readOn
             <div className="rows">
               {rows.map(r => {
                 const ig = socialLinks(r.p.socials).find(l => l.kind === 'ig');
-                const proof = /^https?:\/\//i.test(r.screenshot || '') ? r.screenshot : '';
-                const firstTime = !readOnly && !r.producerOnly && !isExcluded(r) && isFirstTime(r.p, evLabel, r.time);
+                const proof = !r.producer && /^https?:\/\//i.test(r.screenshot || '') ? r.screenshot : '';
+                const firstTime = !readOnly && !r.producer && !isExcluded(r) && isFirstTime(r.p, evLabel, r.time);
                 return (
                   <div className={`row ${isExcluded(r) ? 'excluded' : ''}`} key={r.personId}>
                     <button type="button" className="rowmain" onClick={() => onOpen(r.personId)}>
@@ -272,17 +282,15 @@ export default function EventView({ ev, people, peopleById, maxProducers, readOn
                       {ig && <a className="ico" href={ig.href} target="_blank" rel="noopener noreferrer" aria-label={ig.label}>IG</a>}
                       {r.p.phone && <a className="ico" href={`https://wa.me/91${r.p.phone}`} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp">WA</a>}
                       {proof && <a className="ico" href={proof} target="_blank" rel="noopener noreferrer" aria-label="Payment screenshot">Proof</a>}
-                      {!readOnly && !r.producerOnly && (
-                        <>
-                          <button type="button" className={`tick pay ${r.pay || 'none'}`} onClick={() => setPayFor(r.personId)}>
-                            {payLabel(r)}
-                          </button>
-                          {!isExcluded(r) && (
-                            <button type="button" className={`tick in ${r.attended ? 'on' : ''}`} aria-pressed={r.attended} onClick={() => toggleIn(r)}>
-                              {r.attended ? 'Here ✓' : 'Check in'}
-                            </button>
-                          )}
-                        </>
+                      {!readOnly && !r.producer && (
+                        <button type="button" className={`tick pay ${r.pay || 'none'}`} onClick={() => setPayFor(r.personId)}>
+                          {payLabel(r)}
+                        </button>
+                      )}
+                      {!readOnly && !r.producerOnly && !isExcluded(r) && (
+                        <button type="button" className={`tick in ${r.attended ? 'on' : ''}`} aria-pressed={r.attended} onClick={() => toggleIn(r)}>
+                          {r.attended ? 'Here ✓' : 'Check in'}
+                        </button>
                       )}
                     </div>
                   </div>
@@ -299,10 +307,10 @@ export default function EventView({ ev, people, peopleById, maxProducers, readOn
       )}
 
       {!readOnly && tab === 'money' && (
-        <MoneyTab ev={ev} money={money} onAdd={addExpense} onDelete={deleteExpense} />
+        <MoneyTab ev={ev} money={money} roster={roster} onPay={setPayFor} onAdd={addExpense} onDelete={deleteExpense} />
       )}
 
-      {payRow && (
+      {payRow && !payRow.producer && (
         <PayModal row={payRow} price={ev.price} onClose={() => setPayFor(null)}
                   onSave={(patch) => savePay(payRow, patch)} />
       )}
@@ -310,14 +318,22 @@ export default function EventView({ ev, people, peopleById, maxProducers, readOn
   );
 }
 
-/* ── Money: collection, expenses, net profit ── */
-function MoneyTab({ ev, money, onAdd, onDelete }) {
+/* ── Money: collection, who paid what, expenses, net profit ── */
+const PAY_ORDER = { paid: 0, free: 1, later: 2, unpaid: 3, '': 4 };
+
+function MoneyTab({ ev, money, roster, onPay, onAdd, onDelete }) {
   const [cat, setCat] = useState(EXPENSE_CATEGORIES[0]);
   const [note, setNote] = useState('');
   const [amt, setAmt] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const n = parseInt(amt, 10);
+
+  const payRows = useMemo(() => roster
+    .filter(r => !r.producer && !isExcluded(r))
+    .sort((a, b) => (PAY_ORDER[a.pay || ''] - PAY_ORDER[b.pay || ''])
+      || (shownAmount(b) - shownAmount(a))
+      || displayName(a.p).localeCompare(displayName(b.p))), [roster]);
 
   const add = async () => {
     if (!(n > 0) || busy) return;
@@ -340,7 +356,7 @@ function MoneyTab({ ev, money, onAdd, onDelete }) {
         <div className="mbox">
           <span>Collection</span>
           <b>{inr(money.collected)}</b>
-          <small>{money.paidN} paid</small>
+          <small>{money.paidN} paid{money.freeN ? ` · ${money.freeN} wildcard` : ''}</small>
         </div>
         <div className="mbox">
           <span>Expenses</span>
@@ -356,10 +372,45 @@ function MoneyTab({ ev, money, onAdd, onDelete }) {
 
       <div className="paybreak">
         <span><b>{money.paidN}</b> paid</span>
+        <span><b>{money.freeN}</b> wildcard</span>
         <span><b>{money.dueN}</b> pay on the day{money.due ? ` (${inr(money.due)})` : ''}</span>
         <span><b>{money.unpaidN}</b> not paid</span>
         <span><b>{money.review}</b> to review</span>
       </div>
+
+      <section className="psec">
+        <h3>Who paid what</h3>
+        <p className="hint">Tap a name to change their payment.</p>
+        {payRows.length === 0 ? (
+          <p className="muted">No registrations yet.</p>
+        ) : (
+          <ul className="paylist">
+            {payRows.map(r => (
+              <li key={r.personId} className={`pl-${r.pay || 'none'}`}>
+                <button type="button" className="plbtn" onClick={() => onPay(r.personId)}>
+                  <span className="plwho">
+                    <span className="pln">{displayName(r.p)}</span>
+                    <span className="pls">{r.pay ? PAY_TEXT[r.pay] : 'Needs review'}</span>
+                  </span>
+                  <b>
+                    {r.pay === 'paid' ? inr(shownAmount(r))
+                      : r.pay === 'free' ? inr(0)
+                      : r.pay === 'later' ? <em>{inr(shownAmount(r))} due</em>
+                      : '—'}
+                  </b>
+                </button>
+              </li>
+            ))}
+            <li className="pltotal">
+              <span className="plwho">
+                <span className="pln">Total collected</span>
+                <span className="pls">{money.paidN} paid · {money.freeN} wildcard</span>
+              </span>
+              <b>{inr(money.collected)}</b>
+            </li>
+          </ul>
+        )}
+      </section>
 
       <section className="psec">
         <h3>Add expense</h3>

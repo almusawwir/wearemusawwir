@@ -4,7 +4,7 @@ import { COOKIE, validToken, callSheet } from '../../../lib/usServer';
 export const dynamic = 'force-dynamic';
 
 const PERSON_ID = /^(\d{10}|no-phone-[\w-]{1,60})$/;
-const PAY = ['paid', 'later', 'unpaid', 'rejected', 'out', ''];
+const PAY = ['paid', 'later', 'unpaid', 'rejected', 'out', 'free', ''];
 const CATS = ['Marketing', 'Travel', 'Food', 'Venue', 'Other'];
 const bad = (error = 'Bad request') => NextResponse.json({ error }, { status: 400 });
 

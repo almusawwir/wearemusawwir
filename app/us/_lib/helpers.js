@@ -33,6 +33,7 @@ export const EVENT_FILTERS = [
   { id: 'review', label: 'Needs review' },
   { id: 'paid', label: 'Paid' },
   { id: 'later', label: 'Pays on day' },
+  { id: 'free', label: 'Wildcard' },
   { id: 'unpaid', label: 'Not paid' },
   { id: 'in', label: 'Checked in' },
   { id: 'notin', label: 'Not checked in' },
@@ -40,8 +41,7 @@ export const EVENT_FILTERS = [
   { id: 'rejected', label: 'Rejected' },
 ];
 export const EXPENSE_CATEGORIES = ['Marketing', 'Travel', 'Food', 'Venue', 'Other'];
-export const PAY_TEXT = { paid: 'Paid', later: 'Pays on day', unpaid: 'Not paid', rejected: 'Rejected', out: 'Not coming' };
-
+export const PAY_TEXT = { paid: 'Paid', free: 'Wildcard', later: 'Pays on day', unpaid: 'Not paid', rejected: 'Rejected', out: 'Not coming' };
 /* Planning: how "Wants to explore" answers group into roles. Someone can be in more than one. */
 export const ROLE_GROUPS = [
   { id: 'actors', label: 'Actors', test: /\bact/i },
