@@ -37,16 +37,18 @@ const EVENT_FILTERS = [
   { id: 'later', label: 'Pays on day' },
   { id: 'unpaid', label: 'Not paid' },
   { id: 'in', label: 'Checked in' },
-  { id: 'out', label: 'Not checked in' },
+  { id: 'notin', label: 'Not checked in' },
+  { id: 'away', label: 'Not coming' },
   { id: 'rejected', label: 'Rejected' },
 ];
 const EXPENSE_CATEGORIES = ['Marketing', 'Travel', 'Food', 'Venue', 'Other'];
-const PAY_TEXT = { paid: 'Paid', later: 'Pays on day', unpaid: 'Not paid', rejected: 'Rejected' };
+const PAY_TEXT = { paid: 'Paid', later: 'Pays on day', unpaid: 'Not paid', rejected: 'Rejected', out: 'Not coming' };
 
 /* ── Helpers ── */
 const displayName = (p) => p.nickname || p.name;
 const cls = (s) => String(s).replace(/[^A-Za-z]/g, '');
 const isRecent = (ms) => Date.now() - ms <= NEW_DAYS * 864e5;
+const isExcluded = (r) => r.pay === 'rejected' || r.pay === 'out';   // left out of this event entirely
 const inr = (n) => `${n < 0 ? '−' : ''}₹${Math.abs(Math.round(n || 0)).toLocaleString('en-IN')}`;
 const shownAmount = (r) => (r.amount ?? r.defaultAmount ?? 0);
 
@@ -159,27 +161,19 @@ function socialLinks(socials) {
   return out;
 }
 
-/* Contacts: the server builds the .vcf so iPhone opens "Add All Contacts" */
+/* Contacts: the server builds the .vcf from the event itself (no names or numbers in the link) */
 function isIOS() {
   if (typeof navigator === 'undefined') return false;
   return /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
-function exportContacts(people, tag) {
-  const ios = isIOS();
-  const form = document.createElement('form');
-  form.method = 'POST';
-  form.action = '/api/us/vcf';
-  form.target = ios ? '_blank' : '_self';
-  const add = (name, value) => {
-    const i = document.createElement('input');
-    i.type = 'hidden'; i.name = name; i.value = value;
-    form.appendChild(i);
-  };
-  add('payload', JSON.stringify({ tag, people: people.map(p => ({ name: p.name, phone: p.phone })) }));
-  add('mode', ios ? 'inline' : 'attachment');
-  document.body.appendChild(form);
-  form.submit();
-  form.remove();
+// First time = no sign-up for any other event before this one, and no extra events added by you
+function isFirstTime(p, label, time) {
+  if ((p.extra || 0) > 0) return false;
+  return !p.history.some(h => h.label !== label && h.time < time);
+}
+function openContacts(eventKey, who) {
+  const mode = isIOS() ? 'inline' : 'attachment';
+  window.location.href = `/api/us/vcf?event=${encodeURIComponent(eventKey)}&who=${who}&mode=${mode}`;
 }
 
 /* Crops to a square and shrinks to a small JPEG so it fits in one sheet cell */
@@ -471,7 +465,7 @@ function ProducerPicker({ people, exclude, onPick, onClose }) {
   );
 }
 
-/* ── Payment for one registration ── */
+/* ── Payment and status for one registration ── */
 function PayModal({ row, price, onSave, onClose }) {
   const def = row.defaultAmount || price || 0;
   const current = row.amount;
@@ -525,9 +519,17 @@ function PayModal({ row, price, onSave, onClose }) {
                     disabled={busy} onClick={() => choose({ pay: 'unpaid', amount: null })}>
               Not paid yet
             </button>
+
+            <p className="optgroup">Leave them out of this event</p>
+            <button type="button" className={`payopt away ${row.pay === 'out' ? 'on' : ''}`}
+                    disabled={busy} onClick={() => choose({ pay: 'out', amount: null })}>
+              Not coming
+              <small>Cancelled, didn&apos;t show up, or just test data</small>
+            </button>
             <button type="button" className={`payopt reject ${row.pay === 'rejected' ? 'on' : ''}`} disabled={busy}
                     onClick={() => { if (window.confirm(`Reject ${displayName(row.p)}'s registration? They won't count anywhere.`)) choose({ pay: 'rejected', amount: null }); }}>
               Reject registration
+              <small>For spam, fake or unwanted registrations</small>
             </button>
             {row.pay && (
               <button type="button" className="link" disabled={busy} onClick={() => choose({ pay: '', amount: null })}>
@@ -625,10 +627,11 @@ function EventView({ ev, people, peopleById, maxProducers, readOnly, onBack, onO
   }, [ev.regs, ev.producers, peopleById]);
 
   const money = useMemo(() => {
-    let collected = 0, paidN = 0, due = 0, dueN = 0, rejected = 0, review = 0, inn = 0, active = 0;
+    let collected = 0, paidN = 0, due = 0, dueN = 0, rejected = 0, away = 0, review = 0, inn = 0, active = 0;
     roster.forEach(r => {
       if (r.producerOnly) return;
       if (r.pay === 'rejected') { rejected++; return; }
+      if (r.pay === 'out') { away++; return; }
       active++;
       if (r.pay === 'paid') { collected += shownAmount(r); paidN++; }
       else if (r.pay === 'later') { due += shownAmount(r); dueN++; }
@@ -636,7 +639,7 @@ function EventView({ ev, people, peopleById, maxProducers, readOnly, onBack, onO
       if (r.attended) inn++;
     });
     const spent = (ev.expenses || []).reduce((s, x) => s + (x.amount || 0), 0);
-    return { collected, paidN, due, dueN, rejected, review, inn, active, spent, net: collected - spent };
+    return { collected, paidN, due, dueN, rejected, away, review, inn, active, spent, net: collected - spent };
   }, [roster, ev.expenses]);
 
   const rows = useMemo(() => {
@@ -644,14 +647,15 @@ function EventView({ ev, people, peopleById, maxProducers, readOnly, onBack, onO
     const d = t.replace(/\D/g, '');
     const arr = roster.filter(r => {
       if (filter === 'rejected') { if (r.pay !== 'rejected') return false; }
+      else if (filter === 'away') { if (r.pay !== 'out') return false; }
       else {
-        if (r.pay === 'rejected') return false;
+        if (isExcluded(r)) return false;
         if (filter === 'review' && (r.producerOnly || r.pay)) return false;
         if (filter === 'paid' && r.pay !== 'paid') return false;
         if (filter === 'later' && r.pay !== 'later') return false;
         if (filter === 'unpaid' && r.pay !== 'unpaid') return false;
         if (filter === 'in' && !r.attended) return false;
-        if (filter === 'out' && (r.attended || r.producerOnly)) return false;
+        if (filter === 'notin' && (r.attended || r.producerOnly)) return false;
       }
       if (t) {
         const hay = [r.p.name, r.p.nickname, ...r.p.otherNames, ...r.p.socials].join(' ').toLowerCase();
@@ -728,11 +732,15 @@ function EventView({ ev, people, peopleById, maxProducers, readOnly, onBack, onO
     }
   };
 
-  const doExport = () => {
-    const list = rows.map(r => r.p).filter(p => p.phone);
-    if (!list.length) { setMsg('No phone numbers to export.'); return; }
-    exportContacts(list, ev.tag || ev.form || '');
-    setMsg(`Exporting ${list.length} contacts…`);
+  // Contacts to save: never producers, rejected or not coming. "New" = first time with 3 AM.
+  const evLabel = ev.title + (ev.tag ? ' · ' + ev.tag : '');
+  const saveable = roster.filter(r => !r.producer && !r.producerOnly && !isExcluded(r) && r.p.phone);
+  const newCount = saveable.filter(r => isFirstTime(r.p, evLabel, r.time)).length;
+  const doExport = (who) => {
+    const n = who === 'new' ? newCount : saveable.length;
+    if (!n) { setMsg(who === 'new' ? 'No first-timers to save.' : 'No phone numbers to save.'); return; }
+    setMsg(`Preparing ${n} contacts…`);
+    openContacts(ev.key, who);
   };
 
   const slots = Math.min(maxProducers, Math.max(2, ev.producers.length + 1));
@@ -748,7 +756,14 @@ function EventView({ ev, people, peopleById, maxProducers, readOnly, onBack, onO
         {where && <p className="meta">{where}</p>}
         <p className="evstats">
           <b>{readOnly ? roster.length : money.active}</b>{ev.capacity ? ` / ${ev.capacity}` : ''} registered
-          {!readOnly && <> · <b>{money.inn}</b> checked in{money.review ? <> · <b>{money.review}</b> to review</> : null}{money.rejected ? <> · {money.rejected} rejected</> : null}</>}
+          {!readOnly && (
+            <>
+              {' · '}<b>{money.inn}</b> checked in
+              {money.review ? <> · <b>{money.review}</b> to review</> : null}
+              {money.away ? <> · {money.away} not coming</> : null}
+              {money.rejected ? <> · {money.rejected} rejected</> : null}
+            </>
+          )}
         </p>
         {readOnly && (
           <p className="muted">
@@ -823,9 +838,14 @@ function EventView({ ev, people, peopleById, maxProducers, readOnly, onBack, onO
             </select>
           </label>
           {!readOnly && (
-            <button type="button" className="export" onClick={doExport}>
-              Export {rows.filter(r => r.p.phone).length} contacts
-            </button>
+            <div className="exports">
+              <button type="button" className="export" onClick={() => doExport('new')} disabled={!newCount}>
+                Save new contacts ({newCount})
+              </button>
+              <button type="button" className="export ghost" onClick={() => doExport('all')} disabled={!saveable.length}>
+                Save all ({saveable.length})
+              </button>
+            </div>
           )}
         </div>
         <p className="muted">Showing {rows.length}</p>
@@ -839,8 +859,9 @@ function EventView({ ev, people, peopleById, maxProducers, readOnly, onBack, onO
           {rows.map(r => {
             const ig = socialLinks(r.p.socials).find(l => l.kind === 'ig');
             const proof = /^https?:\/\//i.test(r.screenshot || '') ? r.screenshot : '';
+            const firstTime = !readOnly && !r.producerOnly && !isExcluded(r) && isFirstTime(r.p, evLabel, r.time);
             return (
-              <div className={`row ${r.pay === 'rejected' ? 'rejected' : ''}`} key={r.personId}>
+              <div className={`row ${isExcluded(r) ? 'excluded' : ''}`} key={r.personId}>
                 <button type="button" className="rowmain" onClick={() => onOpen(r.personId)}>
                   <Avatar p={r.p} size={44} />
                   <span className="rowtext">
@@ -849,7 +870,8 @@ function EventView({ ev, people, peopleById, maxProducers, readOnly, onBack, onO
                       {r.producer && <span className="prodtag">Producer</span>}
                     </span>
                     <span className="meta">
-                      {[yearsText(r.p), r.p.tier, readOnly ? r.form : null, r.producerOnly ? 'Team' : `signed up ${ago(r.time)}`].filter(Boolean).join(' · ')}
+                      {[firstTime ? 'First time' : null, yearsText(r.p), r.p.tier, readOnly ? r.form : null,
+                        r.producerOnly ? 'Team' : `signed up ${ago(r.time)}`].filter(Boolean).join(' · ')}
                     </span>
                   </span>
                 </button>
@@ -862,7 +884,7 @@ function EventView({ ev, people, peopleById, maxProducers, readOnly, onBack, onO
                       <button type="button" className={`tick pay ${r.pay || 'none'}`} onClick={() => setPayFor(r.personId)}>
                         {payLabel(r)}
                       </button>
-                      {r.pay !== 'rejected' && (
+                      {!isExcluded(r) && (
                         <button type="button" className={`tick in ${r.attended ? 'on' : ''}`} aria-pressed={r.attended} onClick={() => toggleIn(r)}>
                           {r.attended ? 'Here ✓' : 'Check in'}
                         </button>
@@ -902,8 +924,7 @@ function EveryoneView({ data, onBack, onOpen }) {
   const [sort, setSort] = useState('latest');
 
   const stats = useMemo(() => {
-    const now = new Date();
-    const m = now.getMonth();
+    const m = new Date().getMonth();
     let returning = 0, bdays = 0, week = 0;
     data.people.forEach(p => {
       if (p.count >= 2) returning++;
@@ -1080,7 +1101,7 @@ function ProducersView({ data, peopleById, onBack, onOpen }) {
 
 /* ── Home: tiles ── */
 function EventTile({ ev, featured, onClick }) {
-  const active = ev.regs.filter(r => r.pay !== 'rejected');
+  const active = ev.regs.filter(r => !isExcluded(r));
   const paid = active.filter(r => r.pay === 'paid');
   const collected = paid.reduce((s, r) => s + shownAmount(r), 0);
   const inn = active.filter(r => r.attended).length;
@@ -1442,7 +1463,7 @@ html,body{margin:0;padding:0;background:#000}
 .us .mini{font:inherit;font-size:14px;font-weight:600;padding:8px 14px;background:transparent;color:#fff;border:2px solid #fff;cursor:pointer;text-decoration:none;display:inline-block}
 .us .mini.ghost{border-color:#555;color:#ccc}
 .us .mini:disabled{opacity:.6;cursor:default}
-.us .link{font:inherit;font-size:13.5px;font-weight:600;background:none;border:0;color:var(--pink);cursor:pointer;padding:0;text-decoration:underline}
+.us .link{font:inherit;font-size:13.5px;font-weight:600;background:none;border:0;color:var(--pink);cursor:pointer;padding:0;text-decoration:underline;text-align:left}
 .us .loadbar{height:3px;overflow:hidden;opacity:0;transition:opacity .2s ease}
 .us .loadbar.on{opacity:1}
 .us .loadbar i{display:block;width:40%;height:100%;background:var(--pink);animation:usload 1.1s ease-in-out infinite}
@@ -1515,9 +1536,12 @@ html,body{margin:0;padding:0;background:#000}
 .us .evtools .line{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;justify-content:space-between}
 .us .inline-sel{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--grey);text-transform:uppercase;letter-spacing:.1em}
 .us .export{font:inherit;font-weight:600;font-size:14.5px;padding:11px 16px;background:var(--pink);color:#fff;border:2px solid var(--pink);cursor:pointer}
+.us .exports{display:flex;gap:8px;flex-wrap:wrap}
+.us .export.ghost{background:transparent;color:#fff;border-color:#fff}
+.us .export:disabled{opacity:.4;cursor:default}
 .us .rows{display:flex;flex-direction:column;gap:8px;padding-top:6px;padding-bottom:60px}
 .us .row{display:flex;align-items:center;gap:10px;border:2px solid #333;background:var(--card);padding:8px 10px;flex-wrap:wrap}
-.us .row.rejected{opacity:.55}
+.us .row.excluded{opacity:.55}
 .us .rowmain{flex:1 1 240px;display:flex;align-items:center;gap:12px;background:none;border:0;color:#fff;font:inherit;text-align:left;cursor:pointer;min-width:0;padding:0}
 .us .rowtext{display:flex;flex-direction:column;min-width:0}
 .us .rowname{font-weight:600;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1530,6 +1554,7 @@ html,body{margin:0;padding:0;background:#000}
 .us .tick.pay.paid{background:var(--green);border-color:var(--green);color:#000}
 .us .tick.pay.later{background:var(--amber);border-color:var(--amber);color:#000}
 .us .tick.pay.unpaid{border-color:var(--pink);color:var(--pink)}
+.us .tick.pay.out{border-color:#777;color:#bbb}
 .us .tick.pay.rejected{border-color:#777;color:#999;text-decoration:line-through}
 .us .tick.in.on{background:var(--pink);border-color:var(--pink);color:#fff}
 
@@ -1595,13 +1620,16 @@ html,body{margin:0;padding:0;background:#000}
 .us .who{margin:0}
 .us .linkbtn{align-self:flex-start}
 .us .payopts{display:flex;flex-direction:column;gap:8px}
-.us .payopt{font:inherit;font-weight:600;font-size:15px;padding:13px 14px;text-align:left;background:transparent;color:#fff;border:2px solid #555;cursor:pointer}
+.us .payopt{font:inherit;font-weight:600;font-size:15px;padding:13px 14px;text-align:left;background:transparent;color:#fff;border:2px solid #555;cursor:pointer;display:flex;flex-direction:column;gap:2px}
+.us .payopt small{font-size:12.5px;font-weight:500;opacity:.75}
 .us .payopt:hover{border-color:#fff}
 .us .payopt.on{outline:3px solid #fff;outline-offset:-6px}
 .us .payopt.good{background:var(--green);border-color:var(--green);color:#000}
 .us .payopt.later{border-color:var(--amber);color:var(--amber)}
+.us .payopt.away{border-color:#888;color:#ddd}
 .us .payopt.reject{border-color:var(--pink);color:var(--pink)}
 .us .payopt:disabled{opacity:.5;cursor:default}
+.us .optgroup{margin:8px 0 0;font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--grey);font-weight:600}
 .us .payother{display:grid;grid-template-columns:1fr auto;gap:8px}
 .us .expadd{display:grid;grid-template-columns:1fr 130px auto;gap:8px}
 .us .explist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
@@ -1677,7 +1705,8 @@ html,body{margin:0;padding:0;background:#000}
   .us .pname h2{font-size:32px}
   .us .rowacts{width:100%}
   .us .tick{flex:1 1 auto}
-  .us .export{width:100%}
+  .us .exports{width:100%}
+  .us .export{flex:1 1 0}
   .us .mbox b{font-size:26px}
   .us .expadd{grid-template-columns:1fr 1fr}
   .us .expadd .save{grid-column:1 / -1}
