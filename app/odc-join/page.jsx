@@ -16,7 +16,7 @@ const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSSCmEDqxpPn1O
 /* ── Edit these ── */
 const EVENT_NAME = 'One Day Crew';
 const AMOUNT = 0;                         // fallback price when no ODC is listed in the sheet
-const UPI_ID = 'nazi4272m-2@okicici';
+const UPI_ID = 'nazi4272m-1@okicici';
 const PAYEE_NAME = 'Nazim Mansuri';
 const QR_IMAGE = '/images/pay.jpeg';      // must be in public/images/, NOT public/images/home/
 
