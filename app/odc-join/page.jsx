@@ -7,7 +7,7 @@ import Papa from 'papaparse';
 import { parseStatus } from '../lib/eventStyles';
 import { parseEventDate, isPastEvent } from '../lib/eventHelpers';
 
-const WHATSAPP_URL = "https://chat.whatsapp.com/BCJSRhlPN3E1JNk4OCzPlc";
+const WHATSAPP_URL = "https://chat.whatsapp.com/KRwGD7vmniL5jWjP1aEycF";
 // Your CMS sheet (same one the homepage reads)
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSSCmEDqxpPn1OEzXR3geUaynoeGhrswVO5xf8zKETC8xOq1oimP1SiapOAsSPY_nEMTHoDeacTgKC/pub?gid=0&single=true&output=csv";
 // Registrations are sent to /api/odc/submit. The Google script URL lives ONLY in
