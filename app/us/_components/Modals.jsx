@@ -2,7 +2,29 @@
 
 import React, { useMemo, useState } from 'react';
 import { Avatar, useEscape } from './Common';
-import { displayName, inr } from '../_lib/helpers';
+import { displayName, inr, socialLinks } from '../_lib/helpers';
+
+/* One person in a list: tap to open their profile, plus IG and WhatsApp buttons */
+export function PersonLine({ p, meta, onOpen }) {
+  const ig = socialLinks(p.socials).find(l => l.kind === 'ig');
+  return (
+    <div className="plrow">
+      <button type="button" className="plmain" onClick={() => onOpen(p.id)}>
+        <Avatar p={p} size={38} />
+        <span className="ptext">
+          <b>{displayName(p)}</b>
+          {meta ? <span className="meta">{meta}</span> : null}
+        </span>
+      </button>
+      {ig && (
+        <a className="ico" href={ig.href} target="_blank" rel="noopener noreferrer" aria-label={ig.label}>IG</a>
+      )}
+      {p.phone && (
+        <a className="ico" href={`https://wa.me/91${p.phone}`} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp ${displayName(p)}`}>WA</a>
+      )}
+    </div>
+  );
+}
 
 /* Pick a producer from your people */
 export function ProducerPicker({ people, exclude, onPick, onClose }) {
@@ -48,8 +70,8 @@ export function ProducerPicker({ people, exclude, onPick, onClose }) {
   );
 }
 
-/* A list of names with a WhatsApp button (used by the Planning boxes) */
-export function PeopleListModal({ title, items, onClose }) {
+/* A list of names (used by the Planning boxes) */
+export function PeopleListModal({ title, items, onOpen, onClose }) {
   useEscape(onClose);
   return (
     <div className="modalwrap" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -60,16 +82,7 @@ export function PeopleListModal({ title, items, onClose }) {
         </div>
         <div className="plist">
           {items.map(({ p, meta }) => (
-            <div className="plrow" key={p.id}>
-              <Avatar p={p} size={38} />
-              <span className="ptext">
-                <b>{displayName(p)}</b>
-                {meta ? <span className="meta">{meta}</span> : null}
-              </span>
-              {p.phone ? (
-                <a className="ico" href={`https://wa.me/91${p.phone}`} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp ${displayName(p)}`}>WA</a>
-              ) : null}
-            </div>
+            <PersonLine key={p.id} p={p} meta={meta} onOpen={onOpen} />
           ))}
         </div>
       </div>

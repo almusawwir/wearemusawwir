@@ -374,4 +374,31 @@ html,body{margin:0;padding:0;background:#000}
 }
 @media (prefers-reduced-motion:reduce){
   .us .dseg,.us .bt i{animation:none}
-}`;
+}
+  /* Planning: sub-tabs, producers +, lead picks, filter, clickable name lists */
+.us .drawer{z-index:50}
+.us .subtabs{display:flex;gap:8px}
+.us .subtab{font:inherit;font-size:14px;font-weight:600;padding:7px 16px;background:transparent;color:#bbb;border:2px solid #444;cursor:pointer}
+.us .subtab:hover{border-color:#fff;color:#fff}
+.us .subtab.on{border-color:var(--pink);color:#fff;background:#1a0610}
+.us .phead2{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.us .phead2 h3{margin:0}
+.us .addsq{width:28px;height:28px;padding:0;display:inline-flex;align-items:center;justify-content:center;font:inherit;font-size:20px;font-weight:600;line-height:1;background:transparent;color:#fff;border:2px solid #fff;cursor:pointer}
+.us .addsq:hover{border-color:var(--pink);color:var(--pink)}
+.us .leadbox{width:100%;display:flex;align-items:center;gap:16px;text-align:left;font:inherit;color:#fff;background:var(--pink);border:2px solid var(--pink);padding:14px 16px;cursor:pointer}
+.us .leadbox b{font-family:var(--display);font-weight:900;font-size:44px;line-height:1}
+.us .leadbox span{font-weight:600;font-size:15px}
+.us .leadbox:hover{border-color:#fff}
+.us .leadbox:disabled{background:var(--card);border-color:#333;color:var(--grey);cursor:default}
+.us .plmain{flex:1;display:flex;align-items:center;gap:10px;background:none;border:0;color:#fff;font:inherit;text-align:left;cursor:pointer;min-width:0;padding:2px 0}
+.us .plmain:hover b{color:var(--pink)}
+.us .plmain .ptext{min-width:0}
+.us .plmain .meta{overflow:hidden;text-overflow:ellipsis}
+.us .fbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.us .fcount{font-size:15px;color:#ccc}
+.us .fcount b{font-family:var(--display);font-weight:900;font-size:28px;color:#fff}
+.us .fbtns{display:flex;gap:8px}
+.us .fdims{display:flex;flex-direction:column;gap:16px;margin-top:6px}
+.us .fdim h4{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--grey);font-weight:600}
+.us .flist{border:2px solid #333;background:var(--card);padding:4px 12px}
+.us .flist .plrow:last-child{border-bottom:0}`;
