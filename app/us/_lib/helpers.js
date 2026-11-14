@@ -48,6 +48,7 @@ export const ROLE_GROUPS = [
   { id: 'directors', label: 'Directors', test: /direct|cinematograph|filmmaking/i },
   { id: 'camera', label: 'Camera', test: /photograph|cinematograph|camera/i },
   { id: 'editors', label: 'Editors', test: /\bedit/i },
+  { id: 'writers', label: 'Writers', test: /writ/i },
 ];
 /* Order of the "Own phone / camera" boxes (lowercase, no full stop) */
 export const DEVICE_ORDER = [

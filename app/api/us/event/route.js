@@ -61,6 +61,24 @@ export async function POST(request) {
         return bad();
       }
 
+    } else if (kind === 'crews') {
+      const { crews } = body;
+      const valid = Array.isArray(crews) && crews.length <= 20 && crews.every(c =>
+        c && typeof c.name === 'string' && c.name.length <= 40 &&
+        Array.isArray(c.members) && c.members.length <= 40 &&
+        c.members.every(m => m && typeof m.role === 'string' && m.role.length <= 40 &&
+          (m.personId === '' || (typeof m.personId === 'string' && PERSON_ID.test(m.personId)))));
+      if (!valid) return bad('Bad crews');
+      payload = {
+        action: 'crews',
+        eventId,
+        crews: crews.map(c => ({
+          id: String(c.id || '').slice(0, 30),
+          name: c.name,
+          members: c.members.map(m => ({ role: m.role, personId: m.personId })),
+        })),
+      };
+
     } else {
       return bad('Unknown action');
     }

@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { Avatar } from './Common';
 import { PayModal } from './Modals';
 import PlanningTab from './PlanningTab';
+import CrewsTab from './CrewsTab';
 import {
   EVENT_FILTERS, EVENT_SORTS, EXPENSE_CATEGORIES, PAY_TEXT,
   displayName, isExcluded, inr, shownAmount, shortDate, ago, yearsText, byAge,
@@ -11,7 +12,7 @@ import {
 } from '../_lib/helpers';
 
 export default function EventView({ ev, people, peopleById, maxProducers, readOnly, onBack, onOpen, onLocked, onEventUpdate, track }) {
-  const [tab, setTab] = useState('regs');           // regs | plan | money
+  const [tab, setTab] = useState('regs');           // regs | plan | crews | money
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState('all');
   const [sort, setSort] = useState('latest');
@@ -55,6 +56,13 @@ export default function EventView({ ev, people, peopleById, maxProducers, readOn
     () => roster.filter(r => !r.producerOnly && !isExcluded(r) && /^yes/i.test((r.answers || {}).device || '')).length,
     [roster],
   );
+
+  const crewInfo = useMemo(() => {
+    const placed = new Set();
+    (ev.crews || []).forEach(c => c.members.forEach(m => { if (m.personId) placed.add(m.personId); }));
+    const pool = roster.filter(r => !r.producer && !r.producerOnly && !isExcluded(r));
+    return { count: (ev.crews || []).length, out: pool.filter(r => !placed.has(r.personId)).length };
+  }, [ev.crews, roster]);
 
   const rows = useMemo(() => {
     const t = q.trim().toLowerCase();
@@ -139,6 +147,18 @@ export default function EventView({ ev, people, peopleById, maxProducers, readOn
     }
   };
 
+  const saveCrews = async (crews) => {
+    const prev = ev.crews || [];
+    onEventUpdate(ev.key, e => ({ ...e, crews }));
+    try {
+      await post({ kind: 'crews', eventId: ev.key, crews });
+      return { ok: true };
+    } catch (err) {
+      onEventUpdate(ev.key, e => ({ ...e, crews: prev }));
+      return { ok: false, error: err.message };
+    }
+  };
+
   const addExpense = async (x) => {
     try {
       const res = await post({ kind: 'expense', eventId: ev.key, op: 'add', ...x });
@@ -199,6 +219,11 @@ export default function EventView({ ev, people, peopleById, maxProducers, readOn
             <span>Planning</span>
             <b>{camYes}</b>
             <small>sure cameras · {ev.producers.length}/{maxProducers} producers</small>
+          </button>
+          <button type="button" role="tab" aria-selected={tab === 'crews'} className={`evtab ${tab === 'crews' ? 'on' : ''}`} onClick={() => setTab('crews')}>
+            <span>Crews</span>
+            <b>{crewInfo.count}</b>
+            <small>{crewInfo.count ? `${crewInfo.out} not in a crew` : 'not built yet'}</small>
           </button>
           <button type="button" role="tab" aria-selected={tab === 'money'} className={`evtab ${tab === 'money' ? 'on' : ''}`} onClick={() => setTab('money')}>
             <span>Money</span>
@@ -304,6 +329,10 @@ export default function EventView({ ev, people, peopleById, maxProducers, readOn
       {!readOnly && tab === 'plan' && (
         <PlanningTab ev={ev} roster={roster} people={people} peopleById={peopleById}
                      maxProducers={maxProducers} onOpen={onOpen} onSaveProducers={saveProducers} />
+      )}
+
+      {!readOnly && tab === 'crews' && (
+        <CrewsTab ev={ev} roster={roster} onOpen={onOpen} onSaveCrews={saveCrews} />
       )}
 
       {!readOnly && tab === 'money' && (
