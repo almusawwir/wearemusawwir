@@ -14,8 +14,8 @@ const skillText = (prof) => (prof ? prof.skills.map(s => SKILL_LABEL[s]).join(' 
 export default function CrewsTab({ ev, roster, onOpen, onSaveCrews }) {
   const crews = ev.crews || [];
 
-  // Everyone who can be in a crew: registered, not a producer, not rejected or not coming
-  const pool = useMemo(() => roster.filter(r => !r.producer && !r.producerOnly && !isExcluded(r)), [roster]);
+  // Everyone who can be in a crew: registrations and producers, minus rejected / not coming
+  const pool = useMemo(() => roster.filter(r => !isExcluded(r)), [roster]);
   const byId = useMemo(() => {
     const m = {};
     pool.forEach(r => { m[r.personId] = profile(r); });
@@ -33,7 +33,9 @@ export default function CrewsTab({ ev, roster, onOpen, onSaveCrews }) {
   }, [crews]);
   const unassigned = pool.filter(r => !placedIn[r.personId]);
 
-  const suggested = Math.max(1, Math.min(12, Math.round(pool.length / 6) || 1));
+  const [withProducers, setWithProducers] = useState(false);
+  const autoPool = withProducers ? pool : pool.filter(r => !r.producer);
+  const suggested = Math.max(1, Math.min(12, Math.round(pool.filter(r => !r.producer).length / 6) || 1));
   const [n, setN] = useState(String(suggested));
   const [warnings, setWarnings] = useState([]);
   const [msg, setMsg] = useState('');
@@ -54,7 +56,7 @@ export default function CrewsTab({ ev, roster, onOpen, onSaveCrews }) {
     const num = parseInt(n, 10);
     if (!(num >= 1)) return;
     if (crews.length && !window.confirm('Replace your current crews with a fresh auto-build? Your manual changes will be lost.')) return;
-    const { crews: built, warnings: w } = buildCrews(pool, num);
+    const { crews: built, warnings: w } = buildCrews(autoPool, num);
     setWarnings(w);
     save(built, `Built ${built.length} crews ✓`);
   };
@@ -135,9 +137,10 @@ export default function CrewsTab({ ev, roster, onOpen, onSaveCrews }) {
 
   const pickCrew = pick && crews.find(c => c.id === pick.crewId);
   const menuCrew = menu && crews.find(c => c.id === menu.crewId);
+  const num = parseInt(n, 10);
 
   return (
-    <div className="plan">
+    <div className="crewsview">
       <section className="psec ocard">
         <h3>Auto-build</h3>
         <p className="hint">
@@ -150,10 +153,16 @@ export default function CrewsTab({ ev, roster, onOpen, onSaveCrews }) {
             <input type="number" min="1" max="12" inputMode="numeric" value={n} onChange={(e) => setN(e.target.value)} aria-label="Number of crews" />
           </label>
           <span className="muted">
-            {pool.length} people{parseInt(n, 10) >= 1 ? ` · about ${Math.ceil(pool.length / parseInt(n, 10))} per crew` : ''}
+            {autoPool.length} people{num >= 1 ? ` · about ${Math.ceil(autoPool.length / num)} per crew` : ''}
           </span>
-          <button type="button" className="save" onClick={autoBuild} disabled={!pool.length || !(parseInt(n, 10) >= 1)}>Build crews</button>
+          <button type="button" className="save" onClick={autoBuild} disabled={!autoPool.length || !(num >= 1)}>Build crews</button>
         </div>
+        {ev.producers.length > 0 && (
+          <label className="check">
+            <input type="checkbox" checked={withProducers} onChange={(e) => setWithProducers(e.target.checked)} />
+            <span>Include producers in auto-build</span>
+          </label>
+        )}
         {warnings.map(w => <p key={w} className="warnline">⚠ {w}</p>)}
       </section>
 
@@ -189,7 +198,8 @@ export default function CrewsTab({ ev, roster, onOpen, onSaveCrews }) {
         ) : (
           <div className="flist">
             {unassigned.map(r => (
-              <PersonLine key={r.personId} p={r.p} meta={skillText(byId[r.personId]) || 'No roles picked'} onOpen={onOpen} />
+              <PersonLine key={r.personId} p={r.p} onOpen={onOpen}
+                          meta={[r.producer ? 'Producer' : null, skillText(byId[r.personId]) || (r.producer ? '' : 'No roles picked')].filter(Boolean).join(' · ')} />
             ))}
           </div>
         )}
@@ -254,7 +264,9 @@ function CrewCard({ crew, byId, rowById, onRename, onSlot, onAddRole, onDelete }
                 <>
                   <Avatar p={row.p} size={38} />
                   <span className="cname">{displayName(row.p)}</span>
-                  <span className="cskills">{prof ? skillText(prof) : 'Not coming any more'}</span>
+                  <span className="cskills">
+                    {!prof ? 'Not coming any more' : [row.producer ? 'Producer' : null, skillText(prof)].filter(Boolean).join(' · ')}
+                  </span>
                 </>
               ) : (
                 <span className="cplus">+ Pick</span>
@@ -330,7 +342,8 @@ function SlotPicker({ crew, role, pool, byId, placedIn, onPick, onClose }) {
         <span className="ptext">
           <b>{displayName(r.p)}</b>
           <span className="meta">
-            {[skillText(prof), a.experience, a.energy, where ? `in ${where.name}` : 'free'].filter(Boolean).join(' · ')}
+            {[r.producer ? 'Producer' : null, skillText(prof), a.experience, a.energy, where ? `in ${where.name}` : 'free']
+              .filter(Boolean).join(' · ')}
           </span>
         </span>
       </button>

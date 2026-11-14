@@ -403,7 +403,8 @@ html,body{margin:0;padding:0;background:#000}
 .us .flist{border:2px solid #333;background:var(--card);padding:4px 12px}
 .us .flist .plrow:last-child{border-bottom:0}
 /* Crews */
-.us .evtabs{grid-template-columns:repeat(4,1fr)}
+.us .evtabs{grid-template-columns:repeat(3,1fr)}
+.us .crewsview{display:flex;flex-direction:column;gap:22px}
 .us .ocard{display:flex;flex-direction:column;gap:12px;border:2px solid #333;background:var(--card);padding:16px}
 .us .crewbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .us .crewbar label{display:flex;align-items:center;gap:8px;font-weight:600}
@@ -436,6 +437,6 @@ html,body{margin:0;padding:0;background:#000}
 .us .pickrow:hover{background:#161616}
 .us .pickhead{margin:10px 8px 4px;font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--grey);font-weight:600}
 @media (max-width:520px){
-  .us .evtabs{grid-template-columns:1fr 1fr}
   .us .crews{grid-template-columns:1fr}
+  .us .subtab{padding:7px 12px}
 }`;

@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { Avatar } from './Common';
 import { ProducerPicker, PeopleListModal, PersonLine } from './Modals';
 import { Donut, Bars } from './Charts';
+import CrewsTab from './CrewsTab';
 import { ROLE_GROUPS, DEVICE_ORDER, displayName, isExcluded, splitMulti, cleanOption } from '../_lib/helpers';
 
 const CAMERA_COLORS = ['#FF0065', '#FFC53D', '#8a8a8a', '#4a4a4a'];   // yes · maybe · prefer not · no
@@ -60,8 +61,8 @@ function summary(r) {
   return [a.experience, a.energy, cleanOption(a.device)].filter(Boolean).join(' · ');
 }
 
-export default function PlanningTab({ ev, roster, people, peopleById, maxProducers, onOpen, onSaveProducers }) {
-  const [view, setView] = useState('overview');   // overview | filter
+export default function PlanningTab({ ev, roster, people, peopleById, maxProducers, onOpen, onSaveProducers, onSaveCrews }) {
+  const [view, setView] = useState('overview');   // overview | filter | crews
   const [picking, setPicking] = useState(false);
   const [list, setList] = useState(null);         // { title, items }
   const [pmsg, setPmsg] = useState('');
@@ -140,6 +141,8 @@ export default function PlanningTab({ ev, roster, people, peopleById, maxProduce
     setPmsg(res.ok ? 'Saved ✓' : `Not saved: ${res.error}`);
   };
 
+  const crewCount = (ev.crews || []).length;
+
   return (
     <div className="plan">
       <div className="subtabs" role="tablist" aria-label="Planning views">
@@ -150,6 +153,10 @@ export default function PlanningTab({ ev, roster, people, peopleById, maxProduce
         <button type="button" role="tab" aria-selected={view === 'filter'}
                 className={`subtab ${view === 'filter' ? 'on' : ''}`} onClick={() => setView('filter')}>
           Filter{filterCount ? ` (${filterCount})` : ''}
+        </button>
+        <button type="button" role="tab" aria-selected={view === 'crews'}
+                className={`subtab ${view === 'crews' ? 'on' : ''}`} onClick={() => setView('crews')}>
+          Crews{crewCount ? ` (${crewCount})` : ''}
         </button>
       </div>
 
@@ -341,6 +348,10 @@ export default function PlanningTab({ ev, roster, people, peopleById, maxProduce
             )}
           </section>
         </>
+      )}
+
+      {view === 'crews' && (
+        <CrewsTab ev={ev} roster={roster} onOpen={onOpen} onSaveCrews={onSaveCrews} />
       )}
 
       {picking && (
